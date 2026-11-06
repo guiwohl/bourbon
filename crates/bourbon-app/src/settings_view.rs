@@ -347,6 +347,20 @@ mod tests {
     }
 
     #[test]
+    fn the_backup_auth_choice_marks_the_current_login() {
+        let mut settings = Settings::default();
+        assert_eq!(
+            flags(backup_auth_choices(&settings)),
+            [(true, true), (false, true)]
+        );
+        settings.backup_auth = BackupAuth::Token;
+        assert_eq!(
+            flags(backup_auth_choices(&settings)),
+            [(false, true), (true, true)]
+        );
+    }
+
+    #[test]
     fn disabled_buttons_are_dimmed() {
         assert!((opacity_of(true) - 1.).abs() < f32::EPSILON);
         assert!(opacity_of(false) < 1.);

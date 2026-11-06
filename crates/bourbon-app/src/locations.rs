@@ -48,6 +48,11 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_default_work_dir_is_inside_the_bourbon_cache() {
+        assert!(default_backup_work_dir().ends_with("bourbon/backup"));
+    }
+
+    #[test]
     fn xdg_cache_home_wins() {
         assert_eq!(
             resolve_backup_work_dir(Some("/x/cache"), Some("/home/u")),
