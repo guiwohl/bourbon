@@ -2,9 +2,12 @@ use bourbon_core::{Note, NotebookNode, Tag, TagSummary};
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Editor, EditorState, Input, InputEvent, InputState};
+use gpui_kit::component::label::Label;
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
     ParentElement as _, SharedString, Styled as _, Subscription, TestSupportExt as _, Window, div,
+    px,
 };
 
 use crate::presentation::UNTITLED;
@@ -13,10 +16,25 @@ use crate::workspace::Workspace;
 pub(crate) mod actions;
 mod header;
 mod history;
+mod link_picker;
+mod link_trigger;
+mod preview;
+mod preview_blocks;
+pub(crate) mod tasks;
+mod toolbar;
+mod view_mode;
+mod word_count;
 
 pub(crate) use history::History;
+pub(crate) use link_picker::LinkPicker;
+pub(crate) use link_trigger::{closing_brackets_after, link_query_before_cursor};
+pub(crate) use tasks::TextEdit;
+pub(crate) use view_mode::ViewMode;
+pub(crate) use word_count::WordCount;
 
 use header::{HeaderView, NoteHeader};
+
+const FOCUS_COLUMN_WIDTH: f32 = 720.;
 
 pub(crate) struct EditorPane {
     title_input: Entity<InputState>,
@@ -25,6 +43,7 @@ pub(crate) struct EditorPane {
     note_header: Option<NoteHeader>,
     tag_highlight: Option<usize>,
     notebook_selector_open: bool,
+    pub(crate) link_picker: Option<LinkPicker>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -54,25 +73,37 @@ impl EditorPane {
             note_header: None,
             tag_highlight: None,
             notebook_selector_open: false,
+            link_picker: None,
             _subscriptions: vec![tag_events],
         }
     }
 
     pub(crate) fn subscribe_to_edits(&self, cx: &mut Context<Workspace>) -> Vec<Subscription> {
         vec![
-            cx.subscribe(&self.title_input, Self::forward_edit::<InputState>),
-            cx.subscribe(&self.body_editor, Self::forward_edit::<EditorState>),
+            cx.subscribe(&self.title_input, Self::forward_title_edit),
+            cx.subscribe(&self.body_editor, Self::forward_body_edit),
         ]
     }
 
-    fn forward_edit<Source: 'static>(
+    fn forward_title_edit(
         workspace: &mut Workspace,
-        _source: Entity<Source>,
+        _source: Entity<InputState>,
         event: &InputEvent,
         cx: &mut Context<Workspace>,
     ) {
         if matches!(event, InputEvent::Change) {
             workspace.restart_autosave(cx);
+        }
+    }
+
+    fn forward_body_edit(
+        workspace: &mut Workspace,
+        _source: Entity<EditorState>,
+        event: &InputEvent,
+        cx: &mut Context<Workspace>,
+    ) {
+        if matches!(event, InputEvent::Change) {
+            workspace.body_edited(cx);
         }
     }
 
@@ -90,6 +121,62 @@ impl EditorPane {
             .update(cx, |title, cx| title.set_value(note.title, window, cx));
         self.body_editor
             .update(cx, |body, cx| body.set_value(note.body, window, cx));
+    }
+
+    pub(crate) fn text_before_cursor(&self, cx: &App) -> String {
+        let body = self.body_editor.read(cx);
+        body.value()[..body.cursor()].to_owned()
+    }
+
+    pub(crate) fn text_after_cursor(&self, cx: &App) -> String {
+        let body = self.body_editor.read(cx);
+        body.value()[body.cursor()..].to_owned()
+    }
+
+    pub(crate) fn cursor(&self, cx: &App) -> usize {
+        self.body_editor.read(cx).cursor()
+    }
+
+    pub(crate) fn replace_range(
+        &self,
+        range: std::ops::Range<usize>,
+        text: &str,
+        window: &mut Window,
+        cx: &mut Context<Workspace>,
+    ) {
+        self.body_editor.update(cx, |body, cx| {
+            body.set_selected_range(range, cx);
+            body.replace(text.to_owned(), window, cx);
+        });
+    }
+
+    pub(crate) fn apply_edit(
+        &self,
+        edit: &TextEdit,
+        window: &mut Window,
+        cx: &mut Context<Workspace>,
+    ) {
+        let cursor = self.cursor(cx);
+        self.replace_range(edit.range.clone(), &edit.text, window, cx);
+        let moved = if cursor >= edit.range.end {
+            cursor + edit.text.len() - edit.range.len()
+        } else {
+            cursor
+        };
+        self.body_editor
+            .update(cx, |body, cx| body.set_selected_range(moved..moved, cx));
+    }
+
+    pub(crate) fn open_search(
+        &self,
+        replace_mode: bool,
+        window: &mut Window,
+        cx: &mut Context<Workspace>,
+    ) {
+        self.body_editor.update(cx, |body, cx| {
+            body.focus(window, cx);
+            body.open_search(replace_mode, cx);
+        });
     }
 
     pub(crate) fn show_header(&mut self, note: &Note) {
@@ -146,6 +233,45 @@ impl EditorPane {
         self.notebook_selector_open
     }
 
+    pub(crate) fn focus_body(&self, window: &mut Window, cx: &mut Context<Workspace>) {
+        self.body_editor
+            .update(cx, |body, cx| body.focus(window, cx));
+    }
+
+    #[cfg(test)]
+    pub(crate) fn place_cursor_at_end(&self, cx: &mut Context<Workspace>) {
+        let end = self.body(cx).len();
+        self.body_editor
+            .update(cx, |body, cx| body.set_selected_range(end..end, cx));
+    }
+
+    #[cfg(test)]
+    pub(crate) fn place_cursor_on_line(
+        &self,
+        line: usize,
+        _window: &mut Window,
+        cx: &mut Context<Workspace>,
+    ) {
+        let offset = self
+            .body(cx)
+            .split('\n')
+            .take(line)
+            .map(|text| text.len() + 1)
+            .sum();
+        self.body_editor
+            .update(cx, |body, cx| body.set_selected_range(offset..offset, cx));
+    }
+
+    #[cfg(test)]
+    pub(crate) fn search_is_open(&self, cx: &App) -> bool {
+        self.body_editor.read(cx).search_session().open
+    }
+
+    #[cfg(test)]
+    pub(crate) fn search_is_replacing(&self, cx: &App) -> bool {
+        self.body_editor.read(cx).search_session().replace_mode
+    }
+
     pub(crate) fn focus_title(&self, window: &mut Window, cx: &mut Context<Workspace>) {
         self.title_input
             .update(cx, |title, cx| title.focus(window, cx));
@@ -153,8 +279,7 @@ impl EditorPane {
 
     pub(crate) fn render(
         &self,
-        notebooks: &[NotebookNode],
-        tags: &[TagSummary],
+        view: &EditorView<'_>,
         cx: &mut Context<Workspace>,
     ) -> impl IntoElement + use<> {
         let typed_tag = self.tag_input_text(cx);
@@ -162,8 +287,8 @@ impl EditorPane {
             header::render(
                 &HeaderView {
                     header,
-                    notebooks,
-                    tags,
+                    notebooks: view.notebooks,
+                    tags: view.tags,
                     tag_input: &self.tag_input,
                     typed_tag: &typed_tag,
                     highlight: self.tag_highlight,
@@ -172,19 +297,61 @@ impl EditorPane {
                 cx,
             )
         });
+        let body = self.body(cx);
+        let mut panes = div().flex_1().min_h_0().flex().gap_2();
+        if view.mode.shows_editor() {
+            panes = panes.child(self.render_body_editor(cx));
+        }
+        if view.mode.shows_preview() {
+            panes = panes.child(preview::render(&body, cx));
+        }
+        div().flex_1().h_full().flex().justify_center().child(
+            div()
+                .w_full()
+                .h_full()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .p_3()
+                .when(view.focus_mode, |column| {
+                    column.max_w(px(FOCUS_COLUMN_WIDTH))
+                })
+                .child(
+                    Input::new(&self.title_input)
+                        .id("title")
+                        .aria_label("Title"),
+                )
+                .children(header)
+                .child(toolbar::render(view.mode, cx))
+                .child(panes)
+                .child(
+                    div().id("word-count").test_support().child(
+                        Label::new(WordCount::of(&body).label())
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground),
+                    ),
+                ),
+        )
+    }
+
+    fn render_body_editor(&self, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
         div()
+            .id("body-editor")
+            .test_support()
+            .when(self.link_picker.is_some(), |wrapper| {
+                wrapper.key_context("LinkPicker")
+            })
             .flex_1()
+            .min_w_0()
             .h_full()
             .flex()
             .flex_col()
-            .gap_2()
-            .p_3()
-            .child(
-                Input::new(&self.title_input)
-                    .id("title")
-                    .aria_label("Title"),
+            .gap_1()
+            .children(
+                self.link_picker
+                    .as_ref()
+                    .map(|picker| link_picker::render(picker, cx)),
             )
-            .children(header)
             .child(
                 Editor::new(&self.body_editor)
                     .aria_label("Body")
@@ -192,6 +359,13 @@ impl EditorPane {
                     .flex_1(),
             )
     }
+}
+
+pub(crate) struct EditorView<'a> {
+    pub(crate) notebooks: &'a [NotebookNode],
+    pub(crate) tags: &'a [TagSummary],
+    pub(crate) mode: ViewMode,
+    pub(crate) focus_mode: bool,
 }
 
 pub(crate) fn render_empty(cx: &mut Context<Workspace>) -> impl IntoElement + use<> {

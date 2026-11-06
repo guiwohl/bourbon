@@ -115,6 +115,10 @@ impl Workspace {
             }
             (PaneAction::HistoryBack, _) => self.history_back(window, cx),
             (PaneAction::HistoryForward, _) => self.history_forward(window, cx),
+            (PaneAction::CycleViewMode, _) => self.cycle_view_mode(window, cx),
+            (PaneAction::Find, _) => self.find_in_note(false, window, cx),
+            (PaneAction::Replace, _) => self.find_in_note(true, window, cx),
+            (PaneAction::ToggleFocusMode, _) => self.toggle_focus_mode(window, cx),
             (PaneAction::SetStatus(status), Some(_)) => self.set_selected_status(status, cx),
             (PaneAction::MoveToNotebook, Some(_)) => self.open_notebook_selector(cx),
             (PaneAction::DuplicateNote, Some(id)) => self.duplicate(&id, window, cx),

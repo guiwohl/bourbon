@@ -8,8 +8,10 @@ use gpui_kit::{
 };
 
 use crate::editor::actions::{
-    HistoryBack, HistoryForward, OpenNotebookSelector, SetStatusActive, SetStatusCompleted,
-    SetStatusDropped, SetStatusNone, SetStatusOnHold,
+    CycleViewMode, ExitFocusMode, FindInNote, HistoryBack, HistoryForward, LinkPickCancel,
+    LinkPickConfirm, LinkPickNext, LinkPickPrevious, OpenNotebookSelector, ReplaceInNote,
+    SetStatusActive, SetStatusCompleted, SetStatusDropped, SetStatusNone, SetStatusOnHold,
+    ToggleFocusMode, ToggleTaskAtCursor,
 };
 use crate::locations::Locations;
 use crate::sidebar::ToggleSidebar;
@@ -92,6 +94,22 @@ pub(crate) fn bind_keys(cx: &mut App) {
         KeyBinding::new("ctrl-alt-m", OpenNotebookSelector, None),
         KeyBinding::new("alt-left", HistoryBack, None),
         KeyBinding::new("alt-right", HistoryForward, None),
+        KeyBinding::new("ctrl-e", CycleViewMode, None),
+        KeyBinding::new("ctrl-e", CycleViewMode, Some("Input")),
+        KeyBinding::new("ctrl-f", FindInNote, None),
+        KeyBinding::new("ctrl-h", ReplaceInNote, None),
+        KeyBinding::new("ctrl-shift-f", ToggleFocusMode, None),
+        KeyBinding::new("ctrl-shift-f", ToggleFocusMode, Some("Input")),
+        KeyBinding::new("escape", ExitFocusMode, None),
+        KeyBinding::new(
+            "ctrl-enter",
+            ToggleTaskAtCursor,
+            Some("Input && mode == editor"),
+        ),
+        KeyBinding::new("up", LinkPickPrevious, Some("LinkPicker > Input")),
+        KeyBinding::new("down", LinkPickNext, Some("LinkPicker > Input")),
+        KeyBinding::new("enter", LinkPickConfirm, Some("LinkPicker > Input")),
+        KeyBinding::new("escape", LinkPickCancel, Some("LinkPicker > Input")),
     ]);
 }
 
