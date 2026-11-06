@@ -1,9 +1,10 @@
 use bourbon_core::{
-    Note, NoteId, NoteStatus, NoteStore, NotebookId, StoreError, TagColor, TagId, Timestamp,
+    NoteId, NoteStatus, NoteStore, NotebookId, StoreError, TagColor, TagId, Timestamp,
 };
 use gpui_kit::{Context, Window};
 
 use super::Workspace;
+use super::load_note;
 use crate::editor::History;
 
 type HistoryStep = fn(&mut History, &dyn Fn(&NoteId) -> bool) -> Option<NoteId>;
@@ -43,8 +44,9 @@ impl Workspace {
             self.add_tag_to_selected(&tag.id, window, cx);
         } else if !typed.trim().is_empty() {
             let created = self.edit_selected(cx, |store, note, now| {
-                let tag = store.create_tag(&typed, TagColor::Default, now)?;
-                store.add_tag_to_note(note, &tag.id, now)
+                store
+                    .add_new_tag_to_note(note, &typed, TagColor::Default, now)
+                    .map(drop)
             });
             if created {
                 self.editor.clear_tag_input(window, cx);
@@ -88,18 +90,16 @@ impl Workspace {
     }
 
     fn walk_history(&mut self, step: HistoryStep, window: &mut Window, cx: &mut Context<Self>) {
-        if let Err(error) = self.flush_pending_save(cx) {
-            self.report(&error, cx);
-            return;
-        }
-        let store = &self.store;
-        let Some(id) = step(&mut self.history, &|id| is_openable(store, id)) else {
-            return;
-        };
-        match load_note(&self.store, &id) {
-            Ok(note) => self.show(note, window, cx),
-            Err(error) => self.report(&error, cx),
-        }
+        self.flush_then(cx, |this, cx| {
+            let store = &this.store;
+            let Some(id) = step(&mut this.history, &|id| is_openable(store, id)) else {
+                return;
+            };
+            match load_note(&this.store, &id) {
+                Ok(note) => this.show(note, window, cx),
+                Err(error) => this.report(&error, cx),
+            }
+        });
     }
 
     fn edit_selected(
@@ -110,37 +110,23 @@ impl Workspace {
         let Some(id) = self.selected.clone() else {
             return false;
         };
-        match self.apply_change(&id, change, cx) {
-            Ok(note) => {
-                self.editor.show_header(&note);
-                self.reload_sidebar(cx);
-                self.reload_list(cx);
-                cx.notify();
-                true
+        self.flush_then(cx, |this, cx| {
+            let changed = change(&this.store, &id, Timestamp::now())
+                .and_then(|()| load_note(&this.store, &id));
+            match changed {
+                Ok(note) => {
+                    this.editor.show_header(&note);
+                    this.refresh_listing(cx);
+                    true
+                }
+                Err(error) => {
+                    this.report(&error, cx);
+                    false
+                }
             }
-            Err(error) => {
-                self.report(&error, cx);
-                false
-            }
-        }
+        })
+        .unwrap_or(false)
     }
-
-    fn apply_change(
-        &mut self,
-        id: &NoteId,
-        change: impl FnOnce(&NoteStore, &NoteId, Timestamp) -> Result<(), StoreError>,
-        cx: &mut Context<Self>,
-    ) -> Result<Note, StoreError> {
-        self.flush_pending_save(cx)?;
-        change(&self.store, id, Timestamp::now())?;
-        load_note(&self.store, id)
-    }
-}
-
-fn load_note(store: &NoteStore, id: &NoteId) -> Result<Note, StoreError> {
-    store
-        .find_note(id)?
-        .ok_or_else(|| StoreError::NoteNotFound(id.clone()))
 }
 
 fn is_openable(store: &NoteStore, id: &NoteId) -> bool {

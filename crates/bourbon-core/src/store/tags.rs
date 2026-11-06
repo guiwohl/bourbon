@@ -35,6 +35,25 @@ impl NoteStore {
         Ok(tag)
     }
 
+    pub fn add_new_tag_to_note(
+        &self,
+        note: &NoteId,
+        name: &str,
+        color: TagColor,
+        now: Timestamp,
+    ) -> Result<Tag, StoreError> {
+        self.ensure_note_exists(note)?;
+        let transaction = self.connection.unchecked_transaction()?;
+        let tag = self.create_tag(name, color, now)?;
+        transaction.execute(
+            "INSERT INTO note_tags (note_id, tag_id) VALUES (?1, ?2)",
+            params![note, tag.id],
+        )?;
+        stamp_note(&transaction, note, now)?;
+        transaction.commit()?;
+        Ok(tag)
+    }
+
     pub fn rename_tag(&self, id: &TagId, name: &str) -> Result<(), StoreError> {
         let name = name.trim();
         self.ensure_tag_exists(id)?;
@@ -127,7 +146,7 @@ impl NoteStore {
         self.ensure_tag_exists(tag)
     }
 
-    fn ensure_tag_exists(&self, id: &TagId) -> Result<(), StoreError> {
+    pub(super) fn ensure_tag_exists(&self, id: &TagId) -> Result<(), StoreError> {
         let exists: bool = self.connection.query_row(
             "SELECT EXISTS (SELECT 1 FROM tags WHERE id = ?1)",
             params![id],

@@ -150,3 +150,29 @@ fn duplicating_an_unknown_note_fails() {
     let error = store.duplicate_note(&missing, at(1)).unwrap_err();
     assert!(matches!(error, StoreError::NoteNotFound(id) if id == missing));
 }
+
+#[test]
+fn toggling_pin_flips_and_reports_the_new_state() {
+    let store = store();
+    let note = titled_note(&store, &inbox(&store), "a", 1, 2);
+    assert!(store.toggle_pin(&note).unwrap());
+    assert!(stored(&store, &note).pinned);
+    assert!(!store.toggle_pin(&note).unwrap());
+    assert!(!stored(&store, &note).pinned);
+}
+
+#[test]
+fn toggling_pin_keeps_updated_at() {
+    let store = store();
+    let note = titled_note(&store, &inbox(&store), "a", 1, 2);
+    store.toggle_pin(&note).unwrap();
+    assert_eq!(stored(&store, &note).updated_at, at(2));
+}
+
+#[test]
+fn toggling_pin_of_an_unknown_note_fails() {
+    let store = store();
+    let missing = NoteId::generate();
+    let result = store.toggle_pin(&missing).map(|_| ());
+    assert_not_found(result, &missing);
+}

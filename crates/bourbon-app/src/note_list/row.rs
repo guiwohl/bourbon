@@ -110,7 +110,7 @@ fn tag_chip(note: &NoteId, tag: &Tag, cx: &mut Context<Workspace>) -> impl IntoE
         .test_support()
         .cursor_pointer()
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-        .on_click(cx.listener(move |workspace, _, _, cx| workspace.show_tag(&tag_id, cx)))
+        .on_click(cx.listener(move |workspace, _, _, cx| workspace.select_tag(&tag_id, false, cx)))
         .child(
             TagChip::color(chip_color(tag.color))
                 .small()

@@ -23,15 +23,16 @@ impl Workspace {
         cx: &mut Context<Self>,
     ) {
         self.sidebar.toggle_expansion(notebook);
-        self.refresh_after_expansion(notebook, cx);
+        self.align_depth_with_expansion(notebook);
+        self.reload_list(cx);
+        cx.notify();
     }
 
-    fn refresh_after_expansion(&mut self, notebook: &NotebookId, cx: &mut Context<Self>) {
-        match &self.listing.navigation {
-            Navigation::Notebook(current, _) if current == notebook => {
-                self.select_notebook(notebook, cx);
-            }
-            _ => cx.notify(),
+    fn align_depth_with_expansion(&mut self, notebook: &NotebookId) {
+        if matches!(&self.listing.navigation, Navigation::Notebook(current, _) if current == notebook)
+        {
+            let depth = self.sidebar.depth_of(notebook);
+            self.listing.navigation = Navigation::Notebook(notebook.clone(), depth);
         }
     }
 
@@ -136,9 +137,9 @@ impl Workspace {
         let result = match &prompt {
             Prompt::Name { target, input, .. } => {
                 let name = input.read(cx).value().to_string();
-                self.apply_name(target, &name, cx)
+                self.apply_name(target, &name)
             }
-            Prompt::Deletion { target, .. } => self.apply_deletion(target),
+            Prompt::Deletion { target, .. } => self.apply_deletion(target, cx),
         };
         if result.is_err() {
             self.sidebar.prompt = Some(prompt);
@@ -146,19 +147,14 @@ impl Workspace {
         self.finish_sidebar_change(result, cx);
     }
 
-    fn apply_name(
-        &mut self,
-        target: &NameTarget,
-        name: &str,
-        cx: &mut Context<Self>,
-    ) -> Result<(), StoreError> {
+    fn apply_name(&mut self, target: &NameTarget, name: &str) -> Result<(), StoreError> {
         match target {
             NameTarget::NewNotebook(parent) => {
                 self.store
                     .create_notebook(name, parent.as_ref(), Timestamp::now())?;
                 if let Some(parent) = parent {
                     self.sidebar.expanded.insert(parent.clone());
-                    self.refresh_after_expansion(parent, cx);
+                    self.align_depth_with_expansion(parent);
                 }
                 Ok(())
             }
@@ -167,14 +163,20 @@ impl Workspace {
         }
     }
 
-    fn apply_deletion(&mut self, target: &DeletionTarget) -> Result<(), StoreError> {
+    fn apply_deletion(
+        &mut self,
+        target: &DeletionTarget,
+        cx: &mut Context<Self>,
+    ) -> Result<(), StoreError> {
         match target {
             DeletionTarget::Notebook(notebook) => {
+                self.flush_pending_save(cx)?;
                 let doomed = subtree_ids(&self.notebooks, notebook);
                 self.store.delete_notebook(notebook, Timestamp::now())?;
                 if self.listing.navigation.is_inside(&doomed) {
                     self.listing.navigation = Navigation::AllNotes;
                 }
+                self.clear_unavailable_selection();
                 Ok(())
             }
             DeletionTarget::Tag(tag) => {
@@ -194,9 +196,7 @@ impl Workspace {
         match result {
             Ok(()) => {
                 self.error_message = None;
-                self.reload_sidebar(cx);
-                self.reload_list(cx);
-                cx.notify();
+                self.refresh_listing(cx);
             }
             Err(error) => self.report(&error, cx),
         }

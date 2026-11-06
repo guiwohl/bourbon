@@ -1,4 +1,4 @@
-use rusqlite::params;
+use rusqlite::{OptionalExtension, params};
 
 use crate::identifier::NoteId;
 use crate::note::Note;
@@ -35,6 +35,17 @@ impl NoteStore {
 
     pub fn unpin_note(&self, note: &NoteId) -> Result<(), StoreError> {
         self.write_pinned(note, PinState::Unpinned)
+    }
+
+    pub fn toggle_pin(&self, note: &NoteId) -> Result<bool, StoreError> {
+        self.connection
+            .query_row(
+                "UPDATE notes SET pinned = 1 - pinned WHERE id = ?1 RETURNING pinned",
+                params![note],
+                |row| row.get(0),
+            )
+            .optional()?
+            .ok_or_else(|| StoreError::NoteNotFound(note.clone()))
     }
 
     pub fn duplicate_note(&self, note: &NoteId, now: Timestamp) -> Result<Note, StoreError> {

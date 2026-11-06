@@ -17,6 +17,7 @@ use rusqlite::Connection;
 use crate::identifier::{NoteId, NotebookId, TagId};
 use crate::migrations::migrate;
 
+pub use notes::NoteSeed;
 pub use tags::TagSummary;
 pub use trash::TRASH_RETENTION;
 

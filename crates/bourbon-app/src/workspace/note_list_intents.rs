@@ -1,9 +1,8 @@
-use bourbon_core::{NoteId, NoteSort, NoteStore, StoreError, TagId, Timestamp};
+use bourbon_core::{NoteId, NoteSort, NoteStore, StoreError, Timestamp};
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::button::ButtonVariant;
 use gpui_kit::{Context, Window};
 
-use crate::navigation::Navigation;
 use crate::workspace::Workspace;
 
 pub(crate) fn empty_trash_prompt(count: usize) -> String {
@@ -18,19 +17,8 @@ impl Workspace {
         cx.notify();
     }
 
-    pub(crate) fn show_tag(&mut self, tag: &TagId, cx: &mut Context<Self>) {
-        self.navigate(Navigation::Tags(vec![tag.clone()]), cx);
-    }
-
     pub(crate) fn toggle_pin(&mut self, id: &NoteId, cx: &mut Context<Self>) {
-        let pinned = self.notes.iter().any(|note| note.id == *id && note.pinned);
-        self.change_notes(cx, |store| {
-            if pinned {
-                store.unpin_note(id)
-            } else {
-                store.pin_note(id)
-            }
-        });
+        self.change_notes(cx, |store| store.toggle_pin(id));
     }
 
     pub(crate) fn duplicate(&mut self, id: &NoteId, window: &mut Window, cx: &mut Context<Self>) {
@@ -47,11 +35,9 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if let Err(error) = self.flush_pending_save(cx) {
-            self.report(&error, cx);
+        let Some(successor) = self.flush_then(cx, |this, _| this.neighbour_of(id)) else {
             return;
-        }
-        let successor = self.neighbour_of(id);
+        };
         if self
             .change_notes(cx, |store| store.trash_note(id, Timestamp::now()))
             .is_none()
@@ -92,13 +78,7 @@ impl Workspace {
 
     pub(crate) fn empty_trash(&mut self, cx: &mut Context<Self>) {
         self.change_notes(cx, NoteStore::empty_trash);
-        let selected_was_purged = self
-            .selected
-            .as_ref()
-            .is_some_and(|id| matches!(self.store.find_note(id), Ok(None)));
-        if selected_was_purged {
-            self.selected = None;
-        }
+        self.clear_unavailable_selection();
         cx.notify();
     }
 
@@ -107,20 +87,28 @@ impl Workspace {
         cx: &mut Context<Self>,
         change: impl FnOnce(&NoteStore) -> Result<T, StoreError>,
     ) -> Option<T> {
-        if let Err(error) = self.flush_pending_save(cx) {
-            self.report(&error, cx);
-            return None;
-        }
-        let outcome = change(&self.store);
-        self.reload_list(cx);
-        self.reload_sidebar(cx);
-        cx.notify();
-        match outcome {
-            Ok(value) => Some(value),
-            Err(error) => {
-                self.report(&error, cx);
-                None
+        self.flush_then(cx, |this, cx| {
+            let outcome = change(&this.store);
+            this.refresh_listing(cx);
+            match outcome {
+                Ok(value) => Some(value),
+                Err(error) => {
+                    this.report(&error, cx);
+                    None
+                }
             }
+        })
+        .flatten()
+    }
+
+    pub(super) fn clear_unavailable_selection(&mut self) {
+        let is_unavailable = self.selected.as_ref().is_some_and(|id| {
+            self.store
+                .find_note(id)
+                .is_ok_and(|found| found.is_none_or(|note| note.trashed_at.is_some()))
+        });
+        if is_unavailable {
+            self.selected = None;
         }
     }
 

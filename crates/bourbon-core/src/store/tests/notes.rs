@@ -1,5 +1,5 @@
-use super::support::{at, inbox, store};
-use crate::{NoteId, NoteStatus, NoteStore, NotebookId, StoreError};
+use super::support::{add_tag, at, inbox, store};
+use crate::{NoteId, NoteSeed, NoteStatus, NoteStore, NotebookId, StoreError, TagId};
 
 #[test]
 fn created_note_is_empty_stamped_and_in_the_given_notebook() {
@@ -168,4 +168,61 @@ fn open_fails_when_parent_is_a_file() {
     std::fs::write(&blocker, "x").unwrap();
     let error = NoteStore::open(&blocker.join("bourbon.db")).err().unwrap();
     assert!(matches!(error, StoreError::Io(_)));
+}
+
+#[test]
+fn seeded_note_gets_the_tags_and_status() {
+    let store = store();
+    let first = add_tag(&store, "a", crate::TagColor::Red);
+    let second = add_tag(&store, "b", crate::TagColor::Blue);
+    let seed = NoteSeed {
+        tags: vec![first.clone(), second.clone()],
+        status: NoteStatus::Completed,
+    };
+    let note = store
+        .create_note_with(&inbox(&store), &seed, at(10))
+        .unwrap();
+    assert_eq!(note.status, NoteStatus::Completed);
+    let mut ids: Vec<_> = note.tags.iter().map(|tag| tag.id.clone()).collect();
+    ids.sort_by_key(ToString::to_string);
+    let mut expected = vec![first, second];
+    expected.sort_by_key(ToString::to_string);
+    assert_eq!(ids, expected);
+    assert_eq!(store.find_note(&note.id).unwrap(), Some(note));
+}
+
+#[test]
+fn default_seed_makes_a_plain_note() {
+    let store = store();
+    let note = store
+        .create_note_with(&inbox(&store), &NoteSeed::default(), at(10))
+        .unwrap();
+    assert_eq!(note.status, NoteStatus::None);
+    assert_eq!(note.tags.len(), 0);
+}
+
+#[test]
+fn seeding_with_an_unknown_tag_writes_nothing() {
+    let store = store();
+    let missing = TagId::generate();
+    let seed = NoteSeed {
+        tags: vec![missing.clone()],
+        status: NoteStatus::None,
+    };
+    let error = store
+        .create_note_with(&inbox(&store), &seed, at(10))
+        .unwrap_err();
+    assert!(matches!(error, StoreError::TagNotFound(id) if id == missing));
+    let listed = store.list_notes(&crate::NoteQuery::default()).unwrap();
+    assert_eq!(listed.len(), 0);
+}
+
+#[test]
+fn seeding_an_unknown_notebook_fails() {
+    let store = store();
+    let missing = NotebookId::generate();
+    let error = store
+        .create_note_with(&missing, &NoteSeed::default(), at(1))
+        .unwrap_err();
+    assert!(matches!(error, StoreError::NotebookNotFound(id) if id == missing));
 }

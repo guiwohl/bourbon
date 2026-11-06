@@ -435,6 +435,22 @@ fn deleting_a_notebook_asks_first_and_moves_its_notes_to_trash(cx: &mut TestAppC
 }
 
 #[gpui_kit::test]
+fn deleting_a_notebook_saves_the_pending_edit_and_clears_the_selection(cx: &mut TestAppContext) {
+    let tree = tree_store();
+    let (handle, view) = open_view(cx, tree.store);
+    let edited = cx.read(|cx| view.read(cx).selected.clone().unwrap());
+    super::type_into_title(cx, handle, "!");
+
+    choose_menu_item(cx, handle, &row(&tree.work), DELETE_NOTEBOOK);
+    click(cx, handle, "sidebar-prompt-confirm");
+
+    let note = note_of(cx, &view, &edited);
+    assert_eq!(note.title, "In sub!");
+    assert!(note.trashed_at.is_some());
+    assert_eq!(cx.read(|cx| view.read(cx).selected.clone()), None);
+}
+
+#[gpui_kit::test]
 fn declining_the_deletion_keeps_the_notebook(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
