@@ -30,7 +30,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 Everything runs through `just`. Full reference: `docs/development/justfile.md`.
 
-- `just check` — fmt-check, lint, deny, comments, test. **Must pass before every commit.**
+- `just check` — fmt-check, lint, deny, architecture, comments, test. **Must pass before every commit.**
 - `just build` / `just run` / `just test`
 - `just fmt` — format before `check`.
 - `just mutants` — slow; run before a PR that touches logic.

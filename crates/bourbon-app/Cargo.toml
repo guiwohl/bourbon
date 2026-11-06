@@ -6,6 +6,10 @@ license.workspace = true
 
 [dependencies]
 bourbon-core = { path = "../bourbon-core" }
+gpui-kit = { version = "0.9.0", features = ["tree-sitter-markdown"] }
+
+[dev-dependencies]
+gpui-kit = { version = "0.9.0", features = ["tree-sitter-markdown", "test-support"] }
 
 [lints]
 workspace = true

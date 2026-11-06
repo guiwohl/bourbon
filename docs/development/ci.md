@@ -4,6 +4,8 @@
 
 `.github/workflows/check.yml` runs `just check` on every pull request and every push to `main`. Job name: `check`.
 
+Before `just check`, one apt step runs `apt-get update` and installs `ripgrep`, `build-essential`, `clang`, `cmake`, `libfontconfig-dev`, `libwayland-dev`, `libx11-xcb-dev`, `libxkbcommon-x11-dev`. The list is taken from the apt branch of Zed's `script/linux` (keeping only what the lockfile needs: `yeslogic-fontconfig-sys`, `freetype-sys` via cmake, `wayland-sys`, `xcb`, `xkbcommon`). It could not be run locally; the first CI run is its proof. Tests are headless and need no display or GPU.
+
 ## Ruleset on `main`
 
 | Rule | Effect |

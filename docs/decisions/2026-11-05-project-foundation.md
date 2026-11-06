@@ -13,7 +13,7 @@ Bourbon is a Markdown notes app in the spirit of InkDrop: opinionated, open sour
 | 1 | Name | **Bourbon** | Classic-spirit vibe; free on crates.io and AUR as of 2026-11-05 |
 | 2 | Platform | **Linux only** | Minimal scope; Wayland and X11 |
 | 3 | Language and UI | **Rust + GPUI** (Zed's framework) | Zed-level fluidity and GPU rendering. Same path as the official Herdr app |
-| 4 | Components | **`gpui-component` (longbridge/gpui-kit) mixed with our own components** | The library provides an editor (Tree-sitter), Markdown rendering, virtual lists, docking and themes. Our own components go where the visual identity lives. All of them read the same theme |
+| 4 | Components | **`gpui-component` mixed with our own components, pulled in through the `gpui-kit` crate** (0.9.0, which pins its GPUI fork `gpui-pre`) | The library provides an editor (Tree-sitter), Markdown rendering, virtual lists, docking and themes. Our own components go where the visual identity lives. All of them read the same theme |
 | 5 | Animations | **GPUI's native API: `with_animation` and `with_spring`** | macOS-style spring physics. Layout or shared-element transitions, if needed, will be built by hand |
 | 6 | Storage | **SQLite as the source of truth** | Users should not edit notes outside the app |
 | 7 | Export | **Export as a folder of `.md` files** | Data is never locked inside the app |

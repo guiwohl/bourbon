@@ -1,6 +1,20 @@
 [bans]
 deny = [
-    { crate = "gpui", wrappers = ["bourbon-app"] },
-    { crate = "gpui-pre", wrappers = ["bourbon-app"] },
-    { crate = "gpui-component", wrappers = ["bourbon-app"] },
+    { crate = "gpui-kit", wrappers = ["bourbon-app"] },
+    { crate = "gpui-component", wrappers = ["gpui-kit"] },
+    { crate = "gpui-base", wrappers = ["gpui-component", "gpui-kit"] },
+    { crate = "gpui-pre", wrappers = [
+        "gpui-base",
+        "gpui-component",
+        "gpui-kit",
+        "gpui-kit-assets",
+        "gpui-pre-apple",
+        "gpui-pre-ios",
+        "gpui-pre-linux",
+        "gpui-pre-macos",
+        "gpui-pre-platform",
+        "gpui-pre-web",
+        "gpui-pre-wgpu",
+        "gpui-pre-windows",
+    ] },
 ]
