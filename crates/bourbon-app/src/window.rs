@@ -124,7 +124,35 @@ fn window_options(identity: &Identity) -> WindowOptions {
 
 #[cfg(test)]
 mod tests {
-    use super::{DEVELOPMENT, RELEASE, window_options};
+    use std::sync::mpsc;
+
+    use gpui_kit::{AppContext as _, Empty, TestAppContext, WindowOptions};
+
+    use super::{
+        DEVELOPMENT, FOCUS_POLL_INTERVAL, RELEASE, app_id, forward_focus_requests, window_options,
+    };
+
+    #[test]
+    fn app_id_is_one_of_the_known_identities() {
+        assert!([RELEASE.app_id, DEVELOPMENT.app_id].contains(&app_id()));
+    }
+
+    #[gpui_kit::test]
+    fn a_focus_request_activates_the_window(cx: &mut TestAppContext) {
+        let (sender, receiver) = mpsc::channel();
+        let target = cx.update(|cx| {
+            let target = cx
+                .open_window(WindowOptions::default(), |_, cx| cx.new(|_| Empty))
+                .unwrap();
+            forward_focus_requests(target.into(), receiver, cx);
+            target
+        });
+        assert_eq!(cx.update(|cx| cx.active_window()), None);
+        sender.send(()).unwrap();
+        cx.executor().advance_clock(FOCUS_POLL_INTERVAL * 2);
+        cx.run_until_parked();
+        assert_eq!(cx.update(|cx| cx.active_window()), Some(target.into()));
+    }
 
     #[test]
     fn release_window_identifies_itself_as_bourbon() {
