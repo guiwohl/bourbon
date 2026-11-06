@@ -57,3 +57,23 @@ Headless, through `gpui-kit` `test-support` (`#[gpui_kit::test]`, `TestAppContex
 ## Dependency guard
 
 `just architecture` fails if `cargo tree -p bourbon-core -e normal --prefix none` lists any crate starting with `gpui`, so it cannot go stale as GPUI crates are added. Proven by adding `gpui-pre-util` to `bourbon-core`: the recipe failed; reverted, it passed. `deny.toml` bans `gpui-kit`, `gpui-component`, `gpui-base` and `gpui-pre`, each with `wrappers` listing its exact direct parents (from `cargo tree -i`). Only `bourbon-app` may depend on `gpui-kit`, the entry point of the whole chain. Proven by adding `gpui-kit` to `bourbon-core`: `error[banned]`. `just deny` also prints many `duplicate` warnings from GPUI; they are expected.
+
+## Sidebar
+
+Implements decision rows 2, 4, 7, 11, 12 and 23 of [M2 organization](../decisions/2026-11-06-m2-organization.md). Code: `sidebar/` (rendering, pure helpers, state types) and `workspace/sidebar_intents.rs` (every `impl Workspace` method the sidebar calls).
+
+| Topic | Behaviour |
+|---|---|
+| Sections | All Notes, Notebooks (header with a "+" button creating a top-level notebook), the notebook tree, Status (Active, On Hold, Completed, Dropped), Tags, Trash |
+| Tree | Depth-first rows indented per depth; each row shows name and `NotebookNode::note_count`. Rows with children have a disclosure triangle (`toggle-notebook-<id>`) that expands/collapses without navigating |
+| Expansion | `SidebarState::expanded` (set of `NotebookId`), all collapsed at startup, lives in the workspace |
+| Depth | `Navigation::Notebook(id, depth)`. Selecting an expanded notebook uses `DirectOnly`; a collapsed one `WithDescendants`. Toggling the disclosure of the selected notebook re-applies the depth and reloads the list |
+| Notebook menu | Right click: New sub-notebook (also expands the parent), Rename, Delete. The Inbox (`default_notebook()`, read once at startup) has no Delete |
+| Tag rows | Colour dot (fixed palette in `sidebar/palette.rs`, independent of the theme), name, `TagSummary::note_count`. Click selects the tag alone; `Ctrl+click` toggles it in the `Navigation::Tags` selection (notes having all of them); removing the last tag goes to All Notes |
+| Tag menu | Rename, Change colour (submenu of the 14 `TagColor` values, current one checked), Delete |
+| Prompt | One inline panel at the top of the sidebar (`SidebarState::prompt`): a name field with Save/Cancel (Enter also saves) for create and rename, a question with Delete/Cancel for deletions ("Delete notebook X? Its notes move to Trash."). No dialog: the dialog layer needs `Root` as the window root view, which the app does not use. A core error (empty name, duplicate tag) goes to the banner and the prompt stays open; success clears the banner and the prompt |
+| After a mutation | Reload the sidebar data and the list. Deleting a notebook whose subtree contains the current notebook, or deleting a selected tag, adjusts the navigation first (All Notes, or the remaining tags) |
+| `Ctrl+/` | `ToggleSidebar` action bound in `window::bind_keys`; `SidebarState::is_visible`, the other two columns take the space |
+| Not in this slice | Drag and drop, sidebar sorting, templates |
+
+Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure clicks, `Ctrl+click`, right click plus keyboard choice in the popup menu, typing into the prompt, and `Ctrl+/` through the key binding. Counts are checked from painted text inside each row's bounds.

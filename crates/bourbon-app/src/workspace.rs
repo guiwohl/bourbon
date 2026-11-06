@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests;
 
+mod sidebar_intents;
+
 use bourbon_core::{
     Note, NoteId, NoteStore, NoteSummary, NotebookNode, StoreError, TagSummary, Timestamp,
 };
@@ -14,6 +16,7 @@ use gpui_kit::{
 use crate::editor::{self, EditorPane};
 use crate::navigation::{Listing, Navigation};
 use crate::sidebar::SidebarData;
+use crate::sidebar::{SidebarState, ToggleSidebar};
 use crate::{autosave, note_list, sidebar};
 
 gpui_kit::actions!(bourbon, [NewNote]);
@@ -25,6 +28,7 @@ pub struct Workspace {
     notebooks: Vec<NotebookNode>,
     tags: Vec<TagSummary>,
     selected: Option<NoteId>,
+    sidebar: SidebarState,
     editor: EditorPane,
     pending_save: Option<Task<()>>,
     error_message: Option<SharedString>,
@@ -40,6 +44,7 @@ impl Workspace {
             view.flush_before_closing(cx);
             std::future::ready(())
         }));
+        let sidebar = SidebarState::new(store.default_notebook().ok());
         let mut view = Self {
             store,
             listing: Listing::default(),
@@ -47,6 +52,7 @@ impl Workspace {
             notebooks: Vec::new(),
             tags: Vec::new(),
             selected: None,
+            sidebar,
             editor,
             pending_save: None,
             error_message: None,
@@ -172,7 +178,7 @@ impl Workspace {
 
     fn create_note_for_navigation(&self) -> Result<Note, StoreError> {
         let now = Timestamp::now();
-        if let Navigation::Notebook(notebook) = &self.listing.navigation {
+        if let Navigation::Notebook(notebook, _) = &self.listing.navigation {
             return self.store.create_note(notebook, now);
         }
         let note = self
@@ -220,6 +226,7 @@ impl Render for Workspace {
                 current: &self.listing.navigation,
                 notebooks: &self.notebooks,
                 tags: &self.tags,
+                state: &self.sidebar,
             },
             cx,
         );
@@ -232,6 +239,7 @@ impl Render for Workspace {
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
             .on_action(cx.listener(|view, _: &NewNote, window, cx| view.create_note(window, cx)))
+            .on_action(cx.listener(|view, _: &ToggleSidebar, _, cx| view.toggle_sidebar(cx)))
             .when_some(self.error_message.clone(), |root, message| {
                 root.child(editor::error_banner(message, cx))
             })
@@ -240,7 +248,7 @@ impl Render for Workspace {
                     .flex_1()
                     .min_h_0()
                     .flex()
-                    .child(sidebar)
+                    .children(sidebar)
                     .child(note_list)
                     .child(pane),
             )

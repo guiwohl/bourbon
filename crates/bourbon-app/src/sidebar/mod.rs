@@ -1,13 +1,25 @@
+mod notebooks;
+mod palette;
+mod prompt;
+mod state;
+mod tags;
+mod tree;
+
 use bourbon_core::{NoteStatus, NotebookNode, TagSummary};
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    Context, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
+    Context, Div, InteractiveElement as _, IntoElement, ParentElement as _, SharedString, Stateful,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
 
+pub(crate) use state::{DeletionTarget, NameTarget, Prompt, SidebarState};
+pub(crate) use tree::subtree_ids;
+
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
+
+gpui_kit::actions!(bourbon, [ToggleSidebar]);
 
 const SIDEBAR_WIDTH: f32 = 240.;
 const BASE_INDENT: f32 = 8.;
@@ -24,40 +36,43 @@ pub(crate) struct SidebarData<'a> {
     pub(crate) current: &'a Navigation,
     pub(crate) notebooks: &'a [NotebookNode],
     pub(crate) tags: &'a [TagSummary],
+    pub(crate) state: &'a SidebarState,
 }
 
-pub(crate) fn render(data: &SidebarData, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
-    let mut rows = vec![
-        row(
-            "nav-all-notes".into(),
+pub(crate) fn render(
+    data: &SidebarData,
+    cx: &mut Context<Workspace>,
+) -> Option<impl IntoElement + use<>> {
+    if !data.state.is_visible {
+        return None;
+    }
+    let mut rows = Vec::new();
+    if let Some(prompt) = &data.state.prompt {
+        rows.push(prompt::render(prompt, cx).into_any_element());
+    }
+    rows.push(
+        simple_row(
+            "nav-all-notes",
             "All Notes",
-            0,
             Navigation::AllNotes,
             data.current,
             cx,
         )
         .into_any_element(),
-    ];
-    for (depth, node) in flattened(data.notebooks) {
+    );
+    rows.push(notebooks::section_header(cx).into_any_element());
+    for visible in tree::visible_notebooks(data.notebooks, &data.state.expanded) {
         rows.push(
-            row(
-                format!("nav-notebook-{}", node.notebook.id).into(),
-                &node.notebook.name,
-                depth,
-                Navigation::Notebook(node.notebook.id.clone()),
-                data.current,
-                cx,
-            )
-            .into_any_element(),
+            notebooks::row(&visible, data.state.inbox.as_ref(), data.current, cx)
+                .into_any_element(),
         );
     }
     rows.push(header("Status", cx).into_any_element());
     for (status, label) in STATUS_ROWS {
         rows.push(
-            row(
-                format!("nav-status-{}", status.as_stored()).into(),
+            simple_row(
+                &format!("nav-status-{}", status.as_stored()),
                 label,
-                0,
                 Navigation::Status(status),
                 data.current,
                 cx,
@@ -67,61 +82,37 @@ pub(crate) fn render(data: &SidebarData, cx: &mut Context<Workspace>) -> impl In
     }
     rows.push(header("Tags", cx).into_any_element());
     for summary in data.tags {
-        rows.push(
-            row(
-                format!("nav-tag-{}", summary.tag.id).into(),
-                &summary.tag.name,
-                0,
-                Navigation::Tags(vec![summary.tag.id.clone()]),
-                data.current,
-                cx,
-            )
-            .into_any_element(),
-        );
+        rows.push(tags::row(summary, data.current, cx).into_any_element());
     }
     rows.push(
-        row(
-            "nav-trash".into(),
-            "Trash",
-            0,
-            Navigation::Trash,
-            data.current,
-            cx,
-        )
-        .into_any_element(),
+        simple_row("nav-trash", "Trash", Navigation::Trash, data.current, cx).into_any_element(),
     );
+    Some(
+        div()
+            .id("sidebar")
+            .test_support()
+            .w(px(SIDEBAR_WIDTH))
+            .h_full()
+            .flex_none()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .p_2()
+            .overflow_y_scroll()
+            .bg(cx.theme().sidebar)
+            .text_color(cx.theme().sidebar_foreground)
+            .border_r_1()
+            .border_color(cx.theme().sidebar_border)
+            .children(rows),
+    )
+}
+
+fn header(label: &'static str, cx: &mut Context<Workspace>) -> Div {
     div()
-        .id("sidebar")
-        .w(px(SIDEBAR_WIDTH))
-        .h_full()
-        .flex_none()
         .flex()
-        .flex_col()
-        .gap_1()
-        .p_2()
-        .overflow_y_scroll()
-        .bg(cx.theme().sidebar)
-        .text_color(cx.theme().sidebar_foreground)
-        .border_r_1()
-        .border_color(cx.theme().sidebar_border)
-        .children(rows)
-}
-
-fn flattened(nodes: &[NotebookNode]) -> Vec<(u16, &NotebookNode)> {
-    let mut rows = Vec::new();
-    collect(nodes, 0, &mut rows);
-    rows
-}
-
-fn collect<'a>(nodes: &'a [NotebookNode], depth: u16, rows: &mut Vec<(u16, &'a NotebookNode)>) {
-    for node in nodes {
-        rows.push((depth, node));
-        collect(&node.children, depth + 1, rows);
-    }
-}
-
-fn header(label: &'static str, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
-    div()
+        .flex_row()
+        .items_center()
+        .justify_between()
         .px_2()
         .pt_2()
         .text_xs()
@@ -129,100 +120,71 @@ fn header(label: &'static str, cx: &mut Context<Workspace>) -> impl IntoElement 
         .child(label)
 }
 
-fn row(
-    id: SharedString,
-    label: &str,
-    depth: u16,
+fn simple_row(
+    id: &str,
+    label: &'static str,
     target: Navigation,
     current: &Navigation,
     cx: &mut Context<Workspace>,
 ) -> impl IntoElement + use<> {
-    let is_selected = is_selected(current, &target);
+    nav_row(id.to_owned().into(), 0, is_current(current, &target), cx)
+        .test_support()
+        .child(label)
+        .on_click(cx.listener(move |workspace, _, _, cx| workspace.navigate(target.clone(), cx)))
+}
+
+fn nav_row(
+    id: SharedString,
+    depth: u16,
+    is_selected: bool,
+    cx: &mut Context<Workspace>,
+) -> Stateful<Div> {
     div()
         .id(id)
-        .test_support()
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap_1()
         .pl(px(indent(depth)))
         .pr_2()
         .py_1()
         .rounded_md()
         .cursor_pointer()
-        .truncate()
         .when(is_selected, |row| {
             row.bg(cx.theme().sidebar_accent)
                 .text_color(cx.theme().sidebar_accent_foreground)
         })
-        .child(label.to_owned())
-        .on_click(cx.listener(move |workspace, _, _, cx| workspace.navigate(target.clone(), cx)))
+}
+
+fn is_current(current: &Navigation, target: &Navigation) -> bool {
+    current == target
 }
 
 fn indent(depth: u16) -> f32 {
     BASE_INDENT + INDENT_STEP * f32::from(depth)
 }
 
-fn is_selected(current: &Navigation, target: &Navigation) -> bool {
-    match (current, target) {
-        (Navigation::Tags(current), Navigation::Tags(target)) => {
-            target.iter().all(|tag| current.contains(tag))
-        }
-        _ => current == target,
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use bourbon_core::{Notebook, NotebookId, TagId, Timestamp};
-
     use super::*;
 
-    fn node(name: &str, children: Vec<NotebookNode>) -> NotebookNode {
-        NotebookNode {
-            notebook: Notebook {
-                id: NotebookId::generate(),
-                name: name.to_owned(),
-                parent: None,
-                created_at: Timestamp::from_millis(0),
-            },
-            note_count: 0,
-            children,
-        }
+    #[test]
+    fn a_simple_row_is_current_only_for_its_own_navigation() {
+        assert!(is_current(&Navigation::Trash, &Navigation::Trash));
+        assert!(!is_current(&Navigation::Trash, &Navigation::AllNotes));
+        assert!(is_current(
+            &Navigation::Status(NoteStatus::Active),
+            &Navigation::Status(NoteStatus::Active)
+        ));
+        assert!(!is_current(
+            &Navigation::Status(NoteStatus::Active),
+            &Navigation::Status(NoteStatus::Dropped)
+        ));
     }
 
     #[test]
-    fn the_tree_is_flattened_depth_first_with_depths() {
-        let tree = vec![
-            node(
-                "A",
-                vec![
-                    node("A1", vec![node("A1a", Vec::new())]),
-                    node("A2", Vec::new()),
-                ],
-            ),
-            node("B", Vec::new()),
-        ];
-        let rows: Vec<_> = flattened(&tree)
-            .into_iter()
-            .map(|(depth, node)| (depth, node.notebook.name.as_str()))
-            .collect();
-        assert_eq!(rows, [(0, "A"), (1, "A1"), (2, "A1a"), (1, "A2"), (0, "B")]);
-    }
-
-    #[test]
-    fn a_row_is_selected_only_for_the_current_navigation() {
-        let notebook = NotebookId::generate();
-        let tag = TagId::generate();
-        assert!(is_selected(&Navigation::Trash, &Navigation::Trash));
-        assert!(!is_selected(&Navigation::Trash, &Navigation::AllNotes));
-        assert!(is_selected(
-            &Navigation::Notebook(notebook.clone()),
-            &Navigation::Notebook(notebook)
-        ));
-        assert!(is_selected(
-            &Navigation::Tags(vec![tag.clone(), TagId::generate()]),
-            &Navigation::Tags(vec![tag.clone()])
-        ));
-        assert!(!is_selected(
-            &Navigation::Tags(Vec::new()),
-            &Navigation::Tags(vec![tag])
-        ));
+    fn each_depth_indents_one_step_further() {
+        assert_eq!(indent(0), BASE_INDENT);
+        assert_eq!(indent(3), BASE_INDENT + 3. * INDENT_STEP);
     }
 }
