@@ -100,7 +100,7 @@ impl NoteStore {
             .transpose()
     }
 
-    fn ensure_note_exists(&self, id: &NoteId) -> Result<(), StoreError> {
+    pub(super) fn ensure_note_exists(&self, id: &NoteId) -> Result<(), StoreError> {
         let exists: bool = self.connection.query_row(
             "SELECT EXISTS (SELECT 1 FROM notes WHERE id = ?1)",
             params![id],

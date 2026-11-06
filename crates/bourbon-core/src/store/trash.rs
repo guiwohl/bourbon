@@ -21,7 +21,7 @@ impl NoteStore {
             params![note, now],
         )?;
         if changed == 0 {
-            self.ensure_note_is_known(note)?;
+            self.ensure_note_exists(note)?;
         }
         Ok(())
     }
@@ -38,7 +38,7 @@ impl NoteStore {
             params![note],
         )?;
         if changed == 0 {
-            self.ensure_note_is_known(note)?;
+            self.ensure_note_exists(note)?;
         }
         Ok(())
     }
@@ -93,19 +93,6 @@ impl NoteStore {
             transaction.execute(&format!("DELETE FROM notes WHERE {condition}"), parameters)?;
         transaction.commit()?;
         Ok(deleted)
-    }
-
-    fn ensure_note_is_known(&self, note: &NoteId) -> Result<(), StoreError> {
-        let exists: bool = self.connection.query_row(
-            "SELECT EXISTS (SELECT 1 FROM notes WHERE id = ?1)",
-            params![note],
-            |row| row.get(0),
-        )?;
-        if exists {
-            Ok(())
-        } else {
-            Err(StoreError::NoteNotFound(note.clone()))
-        }
     }
 }
 
