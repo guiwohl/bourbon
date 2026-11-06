@@ -8,6 +8,7 @@
 | [development/](development/CLAUDE.md) | How to build, test and lint |
 | [architecture/](architecture/CLAUDE.md) | How the crates are built: core, app and cli |
 | [brand/](brand/CLAUDE.md) | Logo and icon assets |
+| [research/](research/CLAUDE.md) | UI analysis and InkDrop theming research (proposals) |
 
 ## How to use this folder
 
