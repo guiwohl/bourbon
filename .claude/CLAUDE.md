@@ -39,6 +39,16 @@ Everything runs through `just`. Full reference: `docs/development/justfile.md`.
 - `main` only accepts PRs with `check` and `mutants` green. See `docs/development/ci.md`.
 - CPU: at most 2 subagents compiling at once. Never start background processes, wait loops or monitors.
 
+### Good use of `just`
+
+1. **Red:** write the test, run only it: `cargo nextest run -p <crate> <test_name>` → see it fail for the right reason.
+2. **Green:** implement, rerun the same filter until it passes.
+3. **Loop:** `just fmt` then `just quick` after each small step. Never `just check` in a tight loop.
+4. **UI work:** keep `just dev` open; `just dev-shot` to see the window; `just dev-seed` to reset data.
+5. **Before the PR:** `just fmt` → `just check` once, must exit 0. Logic changed → optionally `just mutants` (diff only).
+6. **PR:** CI runs `check` and `mutants`; fix any missed mutant with a real test, never an exclusion.
+7. Never run two cargo commands at once; never `just build` just to "see if it compiles" (`just quick` does it).
+
 ## Writing style
 
 Write few words that can make the user understand, be simple, short, ULTRA SUMMARIZED, but do not miss details, never.
