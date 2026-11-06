@@ -127,6 +127,17 @@ mod tests {
     }
 
     #[test]
+    fn unreachable_socket_is_an_error_not_a_stale_socket() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let socket = dir.path().join("a.sock");
+        drop(std::os::unix::net::UnixListener::bind(&socket).unwrap());
+        std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o000)).unwrap();
+        assert!(claim(&socket).is_err());
+        assert!(socket.exists());
+    }
+
+    #[test]
     fn unknown_messages_do_not_request_focus() {
         let dir = tempfile::tempdir().unwrap();
         let socket = dir.path().join("a.sock");
