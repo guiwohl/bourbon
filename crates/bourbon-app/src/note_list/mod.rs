@@ -13,6 +13,7 @@ use gpui_kit::{
 
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
+use header::ListView;
 
 const NOTE_LIST_WIDTH: f32 = 320.;
 
@@ -22,6 +23,7 @@ pub(crate) struct NoteListData<'a> {
     pub(crate) notebooks: &'a [NotebookNode],
     pub(crate) tags: &'a [TagSummary],
     pub(crate) notes: &'a [NoteSummary],
+    pub(crate) templates: &'a [NoteSummary],
     pub(crate) selected: Option<&'a NoteId>,
 }
 
@@ -31,8 +33,13 @@ pub(crate) fn render(data: &NoteListData, cx: &mut Context<Workspace>) -> impl I
         header::HeaderData {
             title: title::view_title(data.navigation, data.notebooks, data.tags).into(),
             sort: data.sort,
-            in_trash,
+            view: ListView::of(data.navigation),
             note_count: data.notes.len(),
+            templates: data
+                .templates
+                .iter()
+                .map(|template| (template.id.clone(), template.title.clone()))
+                .collect(),
         },
         cx,
     );

@@ -37,6 +37,16 @@ impl Workspace {
         self.edit_selected(cx, |store, note, now| store.set_status(note, status, now));
     }
 
+    pub(crate) fn set_selected_template(&mut self, is_template: bool, cx: &mut Context<Self>) {
+        self.edit_selected(cx, |store, note, _| {
+            if is_template {
+                store.mark_as_template(note)
+            } else {
+                store.unmark_template(note)
+            }
+        });
+    }
+
     pub(crate) fn remove_tag_from_selected(&mut self, tag: &TagId, cx: &mut Context<Self>) {
         self.edit_selected(cx, |store, note, now| {
             store.remove_tag_from_note(note, tag, now)

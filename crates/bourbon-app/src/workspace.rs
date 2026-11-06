@@ -6,7 +6,8 @@ mod note_list_intents;
 mod sidebar_intents;
 
 use bourbon_core::{
-    Note, NoteId, NoteSeed, NoteStore, NoteSummary, NotebookNode, StoreError, TagSummary, Timestamp,
+    Note, NoteId, NoteQuery, NoteScope, NoteSeed, NoteStore, NoteSummary, NotebookId, NotebookNode,
+    StoreError, TagSummary, TemplateTimeZone, Timestamp,
 };
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::prelude::FluentBuilder as _;
@@ -28,6 +29,7 @@ pub struct Workspace {
     store: NoteStore,
     listing: Listing,
     notes: Vec<NoteSummary>,
+    templates: Vec<NoteSummary>,
     notebooks: Vec<NotebookNode>,
     tags: Vec<TagSummary>,
     selected: Option<NoteId>,
@@ -53,6 +55,7 @@ impl Workspace {
             store,
             listing: Listing::default(),
             notes: Vec::new(),
+            templates: Vec::new(),
             notebooks: Vec::new(),
             tags: Vec::new(),
             selected: None,
@@ -101,6 +104,14 @@ impl Workspace {
         }
         match self.store.list_tags() {
             Ok(tags) => self.tags = tags,
+            Err(error) => self.report(&error, cx),
+        }
+        let templates = NoteQuery {
+            scope: NoteScope::Templates,
+            sort: self.listing.sort,
+        };
+        match self.store.list_notes(&templates) {
+            Ok(templates) => self.templates = templates,
             Err(error) => self.report(&error, cx),
         }
     }
@@ -173,24 +184,75 @@ impl Workspace {
     }
 
     pub(crate) fn create_note(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.listing.navigation == Navigation::Templates {
+            self.create_template(window, cx);
+            return;
+        }
         self.flush_then(cx, |this, cx| {
-            if this.listing.navigation == Navigation::Trash {
-                this.listing.navigation = Navigation::AllNotes;
-            }
-            let created = this.create_note_for_navigation();
-            this.refresh_listing(cx);
-            match created {
-                Ok(note) => {
-                    this.show(note, window, cx);
-                    this.editor.focus_title(window, cx);
-                }
-                Err(error) => this.report(&error, cx),
-            }
+            this.leave_view_hiding_new_notes();
+            let created = this.new_note_placement().and_then(|(notebook, seed)| {
+                this.store
+                    .create_note_with(&notebook, &seed, Timestamp::now())
+            });
+            this.show_created(created, window, cx);
         });
     }
 
-    fn create_note_for_navigation(&self) -> Result<Note, StoreError> {
-        let (notebook, seed) = match &self.listing.navigation {
+    pub(crate) fn create_template(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.flush_then(cx, |this, cx| {
+            this.listing.navigation = Navigation::Templates;
+            let created = this
+                .store
+                .default_notebook()
+                .and_then(|inbox| this.store.create_template(&inbox, Timestamp::now()));
+            this.show_created(created, window, cx);
+        });
+    }
+
+    pub(crate) fn create_note_from_template(
+        &mut self,
+        template: &NoteId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.flush_then(cx, |this, cx| {
+            this.leave_view_hiding_new_notes();
+            let created = this.new_note_placement().and_then(|(notebook, _)| {
+                this.store.create_note_from_template(
+                    template,
+                    &notebook,
+                    Timestamp::now(),
+                    &TemplateTimeZone::system(),
+                )
+            });
+            this.show_created(created, window, cx);
+        });
+    }
+
+    fn leave_view_hiding_new_notes(&mut self) {
+        if self.listing.navigation.hides_new_notes() {
+            self.listing.navigation = Navigation::AllNotes;
+        }
+    }
+
+    fn show_created(
+        &mut self,
+        created: Result<Note, StoreError>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.refresh_listing(cx);
+        match created {
+            Ok(note) => {
+                self.show(note, window, cx);
+                self.editor.focus_title(window, cx);
+            }
+            Err(error) => self.report(&error, cx),
+        }
+    }
+
+    fn new_note_placement(&self) -> Result<(NotebookId, NoteSeed), StoreError> {
+        Ok(match &self.listing.navigation {
             Navigation::Notebook(notebook, _) => (notebook.clone(), NoteSeed::default()),
             Navigation::Tags(tags) => (
                 self.store.default_notebook()?,
@@ -207,9 +269,7 @@ impl Workspace {
                 },
             ),
             _ => (self.store.default_notebook()?, NoteSeed::default()),
-        };
-        self.store
-            .create_note_with(&notebook, &seed, Timestamp::now())
+        })
     }
 
     fn show(&mut self, note: Note, window: &mut Window, cx: &mut Context<Self>) {
@@ -262,6 +322,7 @@ impl Render for Workspace {
                 notebooks: &self.notebooks,
                 tags: &self.tags,
                 notes: &self.notes,
+                templates: &self.templates,
                 selected: self.selected.as_ref(),
             },
             cx,

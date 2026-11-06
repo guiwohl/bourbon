@@ -1,11 +1,11 @@
 use bourbon_core::{Note, NoteStatus, NotebookId, NotebookNode, Tag, TagId, TagSummary};
 use gpui_kit::component::ActiveTheme as _;
-use gpui_kit::component::Sizable as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputState, MoveDown, MoveUp};
-use gpui_kit::component::menu::DropdownMenu as _;
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::popover::Popover;
 use gpui_kit::component::tag::Tag as TagChip;
+use gpui_kit::component::{IconName, Sizable as _};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     Action, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
@@ -53,6 +53,7 @@ pub(crate) struct NoteHeader {
     notebook: NotebookId,
     status: NoteStatus,
     tags: Vec<Tag>,
+    is_template: bool,
 }
 
 impl NoteHeader {
@@ -61,6 +62,7 @@ impl NoteHeader {
             notebook: note.notebook.clone(),
             status: note.status,
             tags: note.tags.clone(),
+            is_template: note.is_template,
         }
     }
 }
@@ -139,6 +141,7 @@ pub(crate) fn render(view: &HeaderView, cx: &mut Context<Workspace>) -> impl Int
                 .gap_2()
                 .child(notebook_selector(view, rows, cx))
                 .child(status_button(view.header.status))
+                .child(note_actions_button(view.header.is_template, cx))
                 .children(
                     view.header
                         .tags
@@ -237,6 +240,32 @@ fn status_button(current: NoteStatus) -> impl IntoElement + use<> {
         })
 }
 
+fn template_action_label(is_template: bool) -> &'static str {
+    if is_template {
+        "Unmark template"
+    } else {
+        "Mark as template"
+    }
+}
+
+fn note_actions_button(is_template: bool, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
+    let owner = cx.entity();
+    Button::new("note-actions")
+        .ghost()
+        .small()
+        .icon(IconName::Ellipsis)
+        .dropdown_menu(move |menu, _, _| {
+            let owner = owner.clone();
+            menu.item(
+                PopupMenuItem::new(template_action_label(is_template)).on_click(move |_, _, cx| {
+                    owner.update(cx, |workspace, cx| {
+                        workspace.set_selected_template(!is_template, cx);
+                    });
+                }),
+            )
+        })
+}
+
 fn tag_chip(tag: &Tag, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
     let id: TagId = tag.id.clone();
     div()
@@ -278,4 +307,15 @@ fn suggestion_row(
         .on_click(cx.listener(move |workspace, _, window, cx| {
             workspace.add_tag_to_selected(&id, window, cx);
         }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_action_offers_the_opposite_of_the_current_state() {
+        assert_eq!(template_action_label(false), "Mark as template");
+        assert_eq!(template_action_label(true), "Unmark template");
+    }
 }
