@@ -11,6 +11,7 @@ use gpui_kit::{
 use super::Workspace;
 use crate::navigation::Navigation;
 
+mod drag;
 mod editor;
 
 struct Seeded {

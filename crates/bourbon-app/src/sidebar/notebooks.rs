@@ -10,6 +10,7 @@ use gpui_kit::{
 
 use super::tree::VisibleNotebook;
 use super::{header, nav_row};
+use crate::dragged_note::DraggedNote;
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
 
@@ -36,6 +37,7 @@ pub(super) fn row(
     let is_selected = current.shows_notebook(&id);
     let can_delete = inbox != Some(&id);
     let selecting = id.clone();
+    let dropping = id.clone();
     nav_row(
         format!("nav-notebook-{id}").into(),
         visible.depth,
@@ -47,6 +49,10 @@ pub(super) fn row(
     .child(div().flex_1().truncate().child(node.notebook.name.clone()))
     .child(Label::new(node.note_count.to_string()).text_color(cx.theme().muted_foreground))
     .on_click(cx.listener(move |workspace, _, _, cx| workspace.select_notebook(&selecting, cx)))
+    .drag_over::<DraggedNote>(|style, _, _, cx| style.bg(cx.theme().drop_target))
+    .on_drop(cx.listener(move |workspace, dragged: &DraggedNote, _, cx| {
+        workspace.drop_note_on_notebook(dragged, &dropping, cx);
+    }))
     .context_menu(context_menu(id, node.notebook.name.clone(), can_delete, cx))
 }
 

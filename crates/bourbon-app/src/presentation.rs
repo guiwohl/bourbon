@@ -4,6 +4,10 @@ use gpui_kit::{Hsla, rgb};
 
 pub(crate) const UNTITLED: &str = "Untitled";
 
+pub(crate) fn display_title(title: &str) -> &str {
+    if title.is_empty() { UNTITLED } else { title }
+}
+
 pub(crate) fn status_label(status: NoteStatus) -> &'static str {
     match status {
         NoteStatus::None => "None",

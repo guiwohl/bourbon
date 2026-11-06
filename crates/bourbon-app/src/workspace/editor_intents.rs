@@ -5,6 +5,7 @@ use gpui_kit::{Context, Window};
 
 use super::Workspace;
 use super::load_note;
+use crate::dragged_note::DraggedNote;
 use crate::editor::History;
 
 type HistoryStep = fn(&mut History, &dyn Fn(&NoteId) -> bool) -> Option<NoteId>;
@@ -12,7 +13,24 @@ type HistoryStep = fn(&mut History, &dyn Fn(&NoteId) -> bool) -> Option<NoteId>;
 impl Workspace {
     pub(crate) fn move_selected_to(&mut self, notebook: &NotebookId, cx: &mut Context<Self>) {
         self.editor.set_notebook_selector_open(false);
-        self.edit_selected(cx, |store, note, now| store.move_note(note, notebook, now));
+        if let Some(id) = self.selected.clone() {
+            self.move_note_to(&id, notebook, cx);
+        }
+    }
+
+    pub(crate) fn drop_note_on_notebook(
+        &mut self,
+        dragged: &DraggedNote,
+        notebook: &NotebookId,
+        cx: &mut Context<Self>,
+    ) {
+        self.move_note_to(&dragged.id, notebook, cx);
+    }
+
+    fn move_note_to(&mut self, id: &NoteId, notebook: &NotebookId, cx: &mut Context<Self>) {
+        self.edit_note(id, cx, |store, note, now| {
+            store.move_note(note, notebook, now)
+        });
     }
 
     pub(crate) fn set_selected_status(&mut self, status: NoteStatus, cx: &mut Context<Self>) {
@@ -110,12 +128,23 @@ impl Workspace {
         let Some(id) = self.selected.clone() else {
             return false;
         };
+        self.edit_note(&id, cx, change)
+    }
+
+    fn edit_note(
+        &mut self,
+        id: &NoteId,
+        cx: &mut Context<Self>,
+        change: impl FnOnce(&NoteStore, &NoteId, Timestamp) -> Result<(), StoreError>,
+    ) -> bool {
         self.flush_then(cx, |this, cx| {
-            let changed = change(&this.store, &id, Timestamp::now())
-                .and_then(|()| load_note(&this.store, &id));
+            let changed =
+                change(&this.store, id, Timestamp::now()).and_then(|()| load_note(&this.store, id));
             match changed {
                 Ok(note) => {
-                    this.editor.show_header(&note);
+                    if this.selected.as_ref() == Some(id) {
+                        this.editor.show_header(&note);
+                    }
                     this.refresh_listing(cx);
                     true
                 }

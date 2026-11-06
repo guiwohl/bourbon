@@ -5,14 +5,15 @@ use gpui_kit::component::tag::Tag as TagChip;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AssetSource as _, Context, Entity, InteractiveElement as _, IntoElement, MouseButton,
-    ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _,
+    AppContext as _, AssetSource as _, Context, Entity, InteractiveElement as _, IntoElement,
+    MouseButton, ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _,
     TestSupportExt as _, div,
 };
 use jiff::tz::TimeZone;
 
 use super::date::short_date;
-use crate::presentation::{UNTITLED, chip_color};
+use crate::dragged_note::DraggedNote;
+use crate::presentation::{chip_color, display_title};
 use crate::workspace::Workspace;
 
 icon_assets!(PinIcon, [Pin]);
@@ -27,11 +28,7 @@ pub(crate) fn render(data: &RowData, cx: &mut Context<Workspace>) -> impl IntoEl
     let summary = data.summary;
     let id = summary.id.clone();
     let view = cx.entity();
-    let title = if summary.title.is_empty() {
-        UNTITLED
-    } else {
-        &summary.title
-    };
+    let title = display_title(&summary.title);
     let updated_on = short_date(summary.updated_at, Timestamp::now(), &TimeZone::system());
     let pinned = summary.pinned;
     let in_trash = data.in_trash;
@@ -87,6 +84,11 @@ pub(crate) fn render(data: &RowData, cx: &mut Context<Workspace>) -> impl IntoEl
         .on_click(
             cx.listener(move |workspace, _, window, cx| workspace.select(&click_id, window, cx)),
         )
+        .when(!in_trash, |row| {
+            row.on_drag(DraggedNote::of(summary), |dragged, _, _, cx| {
+                cx.new(|_| dragged.clone())
+            })
+        })
         .context_menu(move |menu, _, _| {
             if in_trash {
                 menu.item(restore_item(&menu_id, &view))
