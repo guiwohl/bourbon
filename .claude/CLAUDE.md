@@ -30,11 +30,14 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 Everything runs through `just`. Full reference: `docs/development/justfile.md`.
 
-- `just check` — fmt-check, lint, deny, architecture, comments, test. **Must pass before every commit.**
+- `just quick` — fmt, comments, clippy and tests of the changed crates. **Use while developing.**
+- `just check` — fmt-check, lint, deny, architecture, comments, test. **Must pass before a PR.**
 - `just build` / `just run` / `just test`
+- `just dev` — UI loop: Bourbon Dev rebuilds and restarts on save, on demo data. `just dev-shot` screenshots it.
 - `just fmt` — format before `check`.
-- `just mutants` — slow; run before a PR that touches logic.
-- `main` only accepts PRs with the `check` workflow green. See `docs/development/ci.md`.
+- `just mutants` — optional locally (diff only); CI runs it on every PR.
+- `main` only accepts PRs with `check` and `mutants` green. See `docs/development/ci.md`.
+- CPU: at most 2 subagents compiling at once. Never start background processes, wait loops or monitors.
 
 ## Writing style
 

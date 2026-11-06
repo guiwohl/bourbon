@@ -10,3 +10,4 @@
 | [2026-11-06-minimal-core-milestone.md](2026-11-06-minimal-core-milestone.md) | Milestone 1 scope and core storage rules |
 | [2026-11-06-feature-scope.md](2026-11-06-feature-scope.md) | Every feature in/out until complete; milestone order M1–M8 |
 | [2026-11-06-m2-organization.md](2026-11-06-m2-organization.md) | M2: InkDrop layout, notebooks, tags, status, pin, trash, templates |
+| [2026-11-06-dev-loop-and-cpu.md](2026-11-06-dev-loop-and-cpu.md) | `just dev` UI loop, dev identity, mutants in CI, CPU limits |

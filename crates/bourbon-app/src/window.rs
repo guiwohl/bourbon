@@ -8,8 +8,26 @@ use crate::editor::actions::{
 use crate::sidebar::ToggleSidebar;
 use crate::workspace::{NewNote, Workspace};
 
-const APP_ID: &str = "bourbon";
-const WINDOW_TITLE: &str = "Bourbon";
+struct Identity {
+    app_id: &'static str,
+    title: &'static str,
+}
+
+const RELEASE: Identity = Identity {
+    app_id: "bourbon",
+    title: "Bourbon",
+};
+
+const DEVELOPMENT: Identity = Identity {
+    app_id: "bourbon-dev",
+    title: "Bourbon Dev",
+};
+
+const CURRENT: Identity = if cfg!(feature = "dev") {
+    DEVELOPMENT
+} else {
+    RELEASE
+};
 
 pub fn run(store: NoteStore) {
     gpui_kit::application()
@@ -17,7 +35,7 @@ pub fn run(store: NoteStore) {
         .run(move |cx| {
             gpui_kit::init(cx);
             bind_keys(cx);
-            let opened = gpui_kit::open_window(window_options(), cx, |window, cx| {
+            let opened = gpui_kit::open_window(window_options(&CURRENT), cx, |window, cx| {
                 build_workspace(store, window, cx)
             });
             if let Err(error) = opened {
@@ -57,11 +75,11 @@ pub(crate) fn build_workspace(
     view
 }
 
-fn window_options() -> WindowOptions {
+fn window_options(identity: &Identity) -> WindowOptions {
     WindowOptions {
-        app_id: Some(APP_ID.to_owned()),
+        app_id: Some(identity.app_id.to_owned()),
         titlebar: Some(TitlebarOptions {
-            title: Some(WINDOW_TITLE.into()),
+            title: Some(identity.title.into()),
             ..TitlebarOptions::default()
         }),
         ..WindowOptions::default()
@@ -70,13 +88,21 @@ fn window_options() -> WindowOptions {
 
 #[cfg(test)]
 mod tests {
-    use super::window_options;
+    use super::{DEVELOPMENT, RELEASE, window_options};
 
     #[test]
-    fn window_identifies_itself_as_bourbon() {
-        let options = window_options();
+    fn release_window_identifies_itself_as_bourbon() {
+        let options = window_options(&RELEASE);
         assert_eq!(options.app_id.as_deref(), Some("bourbon"));
         let title = options.titlebar.and_then(|titlebar| titlebar.title);
         assert_eq!(title.as_deref(), Some("Bourbon"));
+    }
+
+    #[test]
+    fn development_window_never_passes_for_the_real_app() {
+        let options = window_options(&DEVELOPMENT);
+        assert_eq!(options.app_id.as_deref(), Some("bourbon-dev"));
+        let title = options.titlebar.and_then(|titlebar| titlebar.title);
+        assert_eq!(title.as_deref(), Some("Bourbon Dev"));
     }
 }

@@ -1,0 +1,5 @@
+[profile.default]
+test-threads = 8
+
+[profile.ci]
+test-threads = "num-cpus"
