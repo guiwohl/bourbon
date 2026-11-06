@@ -8,6 +8,9 @@ pub(crate) enum PaneAction {
     NewTemplate,
     ToggleSidebar,
     OpenSettings,
+    BackUpNow,
+    RestoreFromBackup,
+    ExportToMarkdown,
     GoToAllNotes,
     GoToTemplates,
     GoToTrash,
@@ -29,11 +32,14 @@ pub(crate) enum PaneAction {
     ToggleFocusMode,
 }
 
-const ALL: [PaneAction; 27] = [
+const ALL: [PaneAction; 29] = [
     PaneAction::NewNote,
     PaneAction::NewTemplate,
     PaneAction::ToggleSidebar,
     PaneAction::OpenSettings,
+    PaneAction::BackUpNow,
+    PaneAction::RestoreFromBackup,
+    PaneAction::ExportToMarkdown,
     PaneAction::GoToAllNotes,
     PaneAction::GoToTemplates,
     PaneAction::GoToTrash,
@@ -66,6 +72,9 @@ impl PaneAction {
             Self::NewTemplate => "New template".to_owned(),
             Self::ToggleSidebar => "Toggle sidebar".to_owned(),
             Self::OpenSettings => "Open settings".to_owned(),
+            Self::BackUpNow => "Back up now".to_owned(),
+            Self::RestoreFromBackup => "Restore from backup\u{2026}".to_owned(),
+            Self::ExportToMarkdown => "Export to Markdown\u{2026}".to_owned(),
             Self::GoToAllNotes => "Go to All Notes".to_owned(),
             Self::GoToTemplates => "Go to Templates".to_owned(),
             Self::GoToTrash => "Go to Trash".to_owned(),

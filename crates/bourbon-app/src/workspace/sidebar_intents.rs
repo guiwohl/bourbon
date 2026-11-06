@@ -3,6 +3,7 @@ use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::{AppContext as _, Context, Entity, Window};
 
 use super::Workspace;
+use crate::control_pane::PaneAction;
 use crate::navigation::Navigation;
 use crate::sidebar::{DeletionTarget, NameTarget, Prompt, subtree_ids};
 
@@ -128,6 +129,21 @@ impl Workspace {
             question: format!("Delete tag {name}?").into(),
         });
         cx.notify();
+    }
+
+    pub(crate) fn toggle_app_menu(&mut self, cx: &mut Context<Self>) {
+        self.sidebar.menu_open = !self.sidebar.menu_open;
+        cx.notify();
+    }
+
+    pub(crate) fn run_menu_entry(
+        &mut self,
+        action: PaneAction,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.sidebar.menu_open = false;
+        self.run_pane_action(action, window, cx);
     }
 
     pub(crate) fn cancel_prompt(&mut self, cx: &mut Context<Self>) {

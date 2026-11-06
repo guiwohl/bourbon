@@ -1,3 +1,4 @@
+mod menu;
 mod notebooks;
 mod prompt;
 mod state;
@@ -47,7 +48,7 @@ pub(crate) fn render(
     if !data.state.is_visible {
         return None;
     }
-    let mut rows = Vec::new();
+    let mut rows = vec![menu::render(data.state.menu_open, cx).into_any_element()];
     if let Some(prompt) = &data.state.prompt {
         rows.push(prompt::render(prompt, cx).into_any_element());
     }

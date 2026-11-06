@@ -27,11 +27,22 @@ pub enum Appearance {
     Dark,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BackupAuth {
+    #[default]
+    GhCli,
+    Token,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Settings {
     pub theme_source: ThemeSource,
     pub appearance: Appearance,
     pub sidebar_visible: bool,
+    pub backup_repository: Option<String>,
+    pub backup_auth: BackupAuth,
+    pub backup_enabled: bool,
     sidebar_width: u16,
     note_list_width: u16,
 }
@@ -42,6 +53,9 @@ impl Default for Settings {
             theme_source: ThemeSource::default(),
             appearance: Appearance::default(),
             sidebar_visible: true,
+            backup_repository: None,
+            backup_auth: BackupAuth::default(),
+            backup_enabled: false,
             sidebar_width: DEFAULT_SIDEBAR_WIDTH,
             note_list_width: DEFAULT_NOTE_LIST_WIDTH,
         }
@@ -59,6 +73,9 @@ impl Settings {
             theme_source: field(&table, "theme_source").unwrap_or(defaults.theme_source),
             appearance: field(&table, "appearance").unwrap_or(defaults.appearance),
             sidebar_visible: field(&table, "sidebar_visible").unwrap_or(defaults.sidebar_visible),
+            backup_repository: field(&table, "backup_repository"),
+            backup_auth: field(&table, "backup_auth").unwrap_or(defaults.backup_auth),
+            backup_enabled: field(&table, "backup_enabled").unwrap_or(defaults.backup_enabled),
             ..defaults
         };
         if let Some(width) = field(&table, "sidebar_width") {
@@ -111,6 +128,11 @@ impl SettingsFile {
     #[must_use]
     pub fn at(path: PathBuf) -> Self {
         Self { path }
+    }
+
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
     #[must_use]
@@ -285,5 +307,44 @@ mod tests {
         let settings = Settings::parse("appearance = \"light\"\nsidebar_visible = false\n");
         assert_eq!(settings.appearance, Appearance::Light);
         assert!(!settings.sidebar_visible);
+    }
+
+    #[test]
+    fn backup_defaults_are_off_with_the_gh_cli() {
+        let settings = Settings::default();
+        assert_eq!(settings.backup_repository, None);
+        assert_eq!(settings.backup_auth, BackupAuth::GhCli);
+        assert!(!settings.backup_enabled);
+    }
+
+    #[test]
+    fn backup_fields_round_trip_through_the_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let file = SettingsFile::at(directory.path().join("settings.toml"));
+        let settings = Settings {
+            backup_repository: Some("owner/notes".to_owned()),
+            backup_auth: BackupAuth::Token,
+            backup_enabled: true,
+            ..Settings::default()
+        };
+
+        file.save(&settings).unwrap();
+
+        assert_eq!(file.load(), settings);
+        assert!(
+            std::fs::read_to_string(directory.path().join("settings.toml"))
+                .unwrap()
+                .contains("backup_auth = \"token\"")
+        );
+    }
+
+    #[test]
+    fn invalid_backup_fields_fall_back_individually() {
+        let settings = Settings::parse(
+            "backup_repository = 5\nbackup_auth = \"password\"\nbackup_enabled = true\n",
+        );
+        assert_eq!(settings.backup_repository, None);
+        assert_eq!(settings.backup_auth, BackupAuth::GhCli);
+        assert!(settings.backup_enabled);
     }
 }

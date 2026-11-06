@@ -197,6 +197,13 @@ Tests: pure unit tests next to each file; `workspace/tests/control_pane.rs` driv
 - `panes.rs`: the draggable `Divider` handles; widths come from `Settings` and flow into `SidebarData` and `NoteListData`.
 - Keys: `Ctrl+,` opens settings; control pane action "Open settings".
 
+## Data: backup, restore, export (M6)
+
+- `backup_runner.rs`: `BackupRunner` trait and `GitBackupRunner`; `Locations` carries the database path, token file, work dir and runner.
+- `workspace/data_intents.rs`: `DataState` (running, dirty, status, timers), `back_up_now`, the 5 minute timer (`note_data_changed`), `request_close` (bounded 20 s), `begin_restore`/`confirm_restore`/`cancel_restore`, `export_to_markdown`/`export_into`.
+- `sidebar/menu.rs`: the "⋯" menu; entries run `PaneAction`s through `run_pane_action`.
+- `settings_view.rs`: Backup section, `restore_confirmation`, `notice_banner`. Tests: `workspace/tests/data.rs` with a recording fake runner. Details in [the M6 app decision](../decisions/2026-11-06-m6-data-app.md).
+
 ## Single instance
 
 At startup `main` calls `claim` on `$XDG_RUNTIME_DIR/<app id>.sock` (fallback `/tmp/<app id>-<uid>.sock`). A live instance gets `focus\n` and the new process exits 0 without opening the store. A refused connection is a stale socket: it is removed and rebound. The listener runs on a std thread and forwards each `focus` line through an mpsc channel; a GPUI task polls it every 100 ms and calls `activate_window()`. Other messages are ignored. Dev builds use the app id `bourbon-dev`, so they never collide with a release build.

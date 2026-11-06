@@ -2,6 +2,7 @@
 mod tests;
 
 mod control_pane_intents;
+mod data_intents;
 mod editor_intents;
 mod note_list_intents;
 mod settings_intents;
@@ -15,11 +16,12 @@ use bourbon_core::{
     Settings, StoreError, TagSummary, TemplateTimeZone, Timestamp,
 };
 use gpui_kit::component::ActiveTheme as _;
+use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    Context, DragMoveEvent, FocusHandle, Focusable, InteractiveElement as _, IntoElement,
-    MouseButton, ParentElement as _, Render, SharedString, Styled as _, Subscription, Task, Window,
-    div,
+    AnyElement, AppContext as _, Context, DragMoveEvent, Entity, FocusHandle, Focusable,
+    InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render, SharedString,
+    Styled as _, Subscription, Task, Window, div,
 };
 
 use crate::control_pane::{self, ControlPane};
@@ -28,6 +30,7 @@ use crate::locations::Locations;
 use crate::navigation::{Listing, Navigation};
 use crate::note_list::NoteListData;
 use crate::panes::{self, Divider};
+use crate::settings_view::SettingsData;
 use crate::sidebar::SidebarData;
 use crate::sidebar::{SidebarState, ToggleSidebar};
 use crate::theme::{self, ModificationWatch};
@@ -60,6 +63,10 @@ pub struct Workspace {
     omarchy_watch: ModificationWatch,
     _omarchy_polling: Task<()>,
     error_message: Option<SharedString>,
+    notice: Option<SharedString>,
+    data: data_intents::DataState,
+    repository_input: Entity<InputState>,
+    token_input: Entity<InputState>,
     focus_handle: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
@@ -79,6 +86,33 @@ impl Workspace {
             view.flush_before_closing(cx);
             std::future::ready(())
         }));
+        let repository_input = cx.new(|cx| InputState::new(window, cx).placeholder("owner/name"));
+        repository_input.update(cx, |input, cx| {
+            input.set_value(
+                settings.backup_repository.clone().unwrap_or_default(),
+                window,
+                cx,
+            );
+        });
+        let token_input = cx.new(|cx| {
+            InputState::new(window, cx)
+                .masked(true)
+                .placeholder("Personal access token")
+        });
+        subscriptions.push(
+            cx.subscribe(&repository_input, |view, _, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    view.repository_changed(cx);
+                }
+            }),
+        );
+        subscriptions.push(
+            cx.subscribe(&token_input, |view, _, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    view.token_changed(cx);
+                }
+            }),
+        );
         let mut sidebar = SidebarState::new(store.default_notebook().ok());
         sidebar.is_visible = settings.sidebar_visible;
         let omarchy_watch = ModificationWatch::new(locations.omarchy_colors.clone());
@@ -104,11 +138,16 @@ impl Workspace {
             omarchy_watch,
             _omarchy_polling: poll_omarchy_theme(cx),
             error_message: None,
+            notice: None,
+            data: data_intents::DataState::default(),
+            repository_input,
+            token_input,
             focus_handle: cx.focus_handle(),
             _subscriptions: subscriptions,
         };
         view.purge_expired_trash(cx);
-        view.refresh_listing(cx);
+        view.reload_list(cx);
+        view.reload_sidebar(cx);
         if let Some(most_recent) = view.notes.first().map(|summary| summary.id.clone()) {
             view.select(&most_recent, window, cx);
         }
@@ -117,6 +156,7 @@ impl Workspace {
     }
 
     pub(crate) fn restart_autosave(&mut self, cx: &mut Context<Self>) {
+        self.note_data_changed(cx);
         self.pending_save = Some(autosave::after_delay(cx, |view, cx| {
             if let Err(error) = view.save_and_reload(cx) {
                 view.report(&error, cx);
@@ -156,6 +196,7 @@ impl Workspace {
     }
 
     pub(super) fn refresh_listing(&mut self, cx: &mut Context<Self>) {
+        self.note_data_changed(cx);
         self.reload_list(cx);
         self.reload_sidebar(cx);
         cx.notify();
@@ -176,6 +217,7 @@ impl Workspace {
         let body = self.editor.body(cx);
         self.store.save_note(&id, &title, &body, Timestamp::now())?;
         self.error_message = None;
+        self.notice = None;
         cx.notify();
         Ok(())
     }
@@ -326,6 +368,38 @@ impl Workspace {
     }
 }
 
+impl Workspace {
+    fn open_pane(&self, cx: &mut Context<Self>) -> AnyElement {
+        if self.settings_open {
+            settings_view::render(
+                &SettingsData {
+                    settings: &self.settings,
+                    repository_input: &self.repository_input,
+                    token_input: &self.token_input,
+                    repository_error: self.data.repository_error.clone(),
+                    status: self.data.status.clone(),
+                },
+                cx,
+            )
+            .into_any_element()
+        } else if self.selected.is_some() {
+            self.editor
+                .render(
+                    &EditorView {
+                        notebooks: &self.notebooks,
+                        tags: &self.tags,
+                        mode: self.view_mode,
+                        focus_mode: self.focus_mode,
+                    },
+                    cx,
+                )
+                .into_any_element()
+        } else {
+            editor::render_empty(cx).into_any_element()
+        }
+    }
+}
+
 const OMARCHY_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
 fn poll_omarchy_theme(cx: &mut Context<Workspace>) -> Task<()> {
@@ -390,23 +464,7 @@ impl Workspace {
 
 impl Render for Workspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let pane = if self.settings_open {
-            settings_view::render(&self.settings, cx).into_any_element()
-        } else if self.selected.is_some() {
-            self.editor
-                .render(
-                    &EditorView {
-                        notebooks: &self.notebooks,
-                        tags: &self.tags,
-                        mode: self.view_mode,
-                        focus_mode: self.focus_mode,
-                    },
-                    cx,
-                )
-                .into_any_element()
-        } else {
-            editor::render_empty(cx).into_any_element()
-        };
+        let pane = self.open_pane(cx);
         let sidebar = self.sidebar_column(cx);
         let note_list = self.note_list_column(cx);
         div()
@@ -443,6 +501,12 @@ impl Render for Workspace {
             .map(|root| editor::actions::register(root, cx))
             .when_some(self.error_message.clone(), |root, message| {
                 root.child(editor::error_banner(message, cx))
+            })
+            .when_some(self.notice.clone(), |root, message| {
+                root.child(settings_view::notice_banner(message, cx))
+            })
+            .when_some(self.restore_question(), |root, question| {
+                root.child(settings_view::restore_confirmation(question, cx))
             })
             .child(
                 div()

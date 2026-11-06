@@ -45,6 +45,7 @@ pub(crate) struct SidebarState {
     pub(crate) expanded: HashSet<NotebookId>,
     pub(crate) inbox: Option<NotebookId>,
     pub(crate) prompt: Option<Prompt>,
+    pub(crate) menu_open: bool,
 }
 
 impl SidebarState {
@@ -54,6 +55,7 @@ impl SidebarState {
             expanded: HashSet::new(),
             inbox,
             prompt: None,
+            menu_open: false,
         }
     }
 

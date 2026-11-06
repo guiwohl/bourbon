@@ -52,6 +52,10 @@ fn copy_of(locations: &Locations) -> Locations {
     Locations {
         settings: locations.settings.clone(),
         omarchy_colors: locations.omarchy_colors.clone(),
+        database: locations.database.clone(),
+        backup_token: locations.backup_token.clone(),
+        backup_work_dir: locations.backup_work_dir.clone(),
+        backup_runner: locations.backup_runner.clone(),
     }
 }
 

@@ -186,6 +186,8 @@ The system `git` binary does the transport (`export` and `backup` modules need n
 | `Settings::parse(text)` | Never fails: bad text or bad fields give defaults per field; widths clamped |
 | `Settings::to_toml()` | Serialized form written to disk |
 | `SettingsFile::at(path)` | `load()` (missing file gives defaults) and `save()` (atomic: temp file plus rename, creates directories) |
+| `Settings` backup fields | `backup_repository: Option<String>`, `backup_auth: BackupAuth` (`GhCli`/`Token`), `backup_enabled` |
+| `TokenFile::at(path)` | `save(token)` (atomic, mode 0600) and `load()` (`None` when missing or blank); `default_location()` is `backup-token` next to the settings |
 | `default_settings_path()` | `$XDG_CONFIG_HOME/bourbon/settings.toml`, else `~/.config/...` |
 | `OmarchyColors::parse(text)` | `None` unless background, foreground, accent, selection, color1, color8 are valid `#rrggbb` |
 | `Rgb` | `from_hex`, `as_hex`, `mix`, `luminance` |

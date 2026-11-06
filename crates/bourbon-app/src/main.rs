@@ -1,4 +1,5 @@
 mod autosave;
+mod backup_runner;
 mod cli_command;
 mod control_pane;
 mod dragged_note;
