@@ -676,3 +676,18 @@ fn the_settings_toggle_and_buttons_drive_the_backup(cx: &mut TestAppContext) {
             .read_with(cx, |view, _| view.restore_question().is_some())
     );
 }
+
+#[gpui_kit::test]
+fn starting_an_export_dismisses_the_previous_notice(cx: &mut TestAppContext) {
+    let setup = open_default(cx);
+    setup
+        .view
+        .update(cx, |view, _| view.notice = Some("old".into()));
+
+    setup.view.update(cx, Workspace::export_to_markdown);
+
+    assert_eq!(
+        setup.view.read_with(cx, |view, _| view.notice.clone()),
+        None
+    );
+}
