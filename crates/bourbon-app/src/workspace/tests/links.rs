@@ -376,3 +376,22 @@ fn only_the_highlighted_suggestion_is_marked_selected(cx: &mut TestAppContext) {
         [Some(false), Some(true)]
     );
 }
+
+#[gpui_kit::test]
+fn picking_a_link_keeps_the_text_that_follows_the_query(cx: &mut TestAppContext) {
+    let (store, seeded) = seeded_store();
+    let (handle, view) = open_view(cx, store);
+    super::view_modes::focus_body(cx, handle, &view);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.input("[[Old", cx);
+    })
+    .unwrap();
+
+    press(cx, handle, "enter");
+
+    assert_eq!(
+        editor_body(cx, &view),
+        format!("[Older](bourbon://note/{})newer body", seeded.older)
+    );
+}
