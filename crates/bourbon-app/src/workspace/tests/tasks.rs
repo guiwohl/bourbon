@@ -172,3 +172,57 @@ fn the_cursor_stays_on_a_line_that_became_a_task(cx: &mut TestAppContext) {
         "intro\n- [ ] first\n- [x] second\n- [x] plain\nclosing"
     );
 }
+
+fn cursor(cx: &mut TestAppContext, view: &Entity<Workspace>) -> usize {
+    cx.read(|cx| view.read(cx).editor.cursor(cx))
+}
+
+#[gpui_kit::test]
+fn a_cursor_after_the_inserted_checkbox_moves_with_the_text(cx: &mut TestAppContext) {
+    let (store, _) = store_with_body(BODY);
+    let (handle, view) = open_view(cx, store);
+    focus_body(cx, handle, &view);
+    let end_of_plain = BODY.find("\nclosing").unwrap();
+    cx.update_window(handle, |_, _, cx| {
+        view.update(cx, |view, cx| view.editor.place_cursor_at(end_of_plain, cx));
+    })
+    .unwrap();
+
+    press(cx, handle, "ctrl-enter");
+
+    assert_eq!(cursor(cx, &view), end_of_plain + "[ ] ".len());
+}
+
+#[gpui_kit::test]
+fn a_cursor_before_the_edit_does_not_move(cx: &mut TestAppContext) {
+    let (store, _) = store_with_body(BODY);
+    let (handle, view) = open_view(cx, store);
+    focus_body(cx, handle, &view);
+    let start_of_plain = BODY.find("- plain").unwrap();
+    cx.update_window(handle, |_, _, cx| {
+        view.update(cx, |view, cx| {
+            view.editor.place_cursor_at(start_of_plain, cx)
+        });
+    })
+    .unwrap();
+
+    press(cx, handle, "ctrl-enter");
+
+    assert_eq!(cursor(cx, &view), start_of_plain);
+}
+
+#[gpui_kit::test]
+fn a_cursor_after_a_toggled_mark_stays_put(cx: &mut TestAppContext) {
+    let (store, _) = store_with_body(BODY);
+    let (handle, view) = open_view(cx, store);
+    focus_body(cx, handle, &view);
+    let end_of_first = BODY.find("\n- [x]").unwrap();
+    cx.update_window(handle, |_, _, cx| {
+        view.update(cx, |view, cx| view.editor.place_cursor_at(end_of_first, cx));
+    })
+    .unwrap();
+
+    press(cx, handle, "ctrl-enter");
+
+    assert_eq!(cursor(cx, &view), end_of_first);
+}
