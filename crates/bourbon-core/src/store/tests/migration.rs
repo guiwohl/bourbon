@@ -98,7 +98,81 @@ fn open_rejects_schema_newer_than_supported() {
         error,
         StoreError::SchemaTooNew {
             found: 99,
-            supported: 2
+            supported: 3
         }
     ));
+}
+
+fn build_version_two_database(path: &std::path::Path) {
+    let connection = Connection::open(path).unwrap();
+    connection
+        .execute_batch(
+            "CREATE TABLE notebooks (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL, parent_id TEXT, created_at INTEGER NOT NULL
+            );
+            CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            INSERT INTO notebooks VALUES ('inboxinboxin', 'Inbox', NULL, 0);
+            INSERT INTO settings VALUES ('default_notebook_id', 'inboxinboxin');
+            CREATE TABLE notes (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                notebook_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'none',
+                pinned INTEGER NOT NULL DEFAULT 0,
+                deleted_at INTEGER
+            );
+            CREATE TABLE tags (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                color TEXT NOT NULL, created_at INTEGER NOT NULL
+            );
+            CREATE TABLE note_tags (
+                note_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (note_id, tag_id)
+            );
+            INSERT INTO notes (id, title, body, created_at, updated_at, notebook_id, status, pinned)
+            VALUES ('cccccccccccc', 'Kept', 'kept body', 50, 60, 'inboxinboxin', 'active', 1);
+            PRAGMA user_version = 2;",
+        )
+        .unwrap();
+}
+
+#[test]
+fn version_two_notes_migrate_to_version_three_as_ordinary_notes() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("bourbon.db");
+    build_version_two_database(&path);
+
+    let store = NoteStore::open(&path).unwrap();
+    let note = store
+        .find_note(&crate::NoteId::parse("cccccccccccc").unwrap())
+        .unwrap()
+        .unwrap();
+
+    assert!(!note.is_template);
+    assert_eq!(note.title, "Kept");
+    assert_eq!(note.body, "kept body");
+    assert_eq!(note.status, NoteStatus::Active);
+    assert!(note.pinned);
+    assert_eq!(note.updated_at, at(60));
+    let version: usize = Connection::open(&path)
+        .unwrap()
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, 3);
+    let templates = store
+        .list_notes(&crate::NoteQuery {
+            scope: crate::NoteScope::Templates,
+            sort: crate::NoteSort::default(),
+        })
+        .unwrap();
+    assert_eq!(templates.len(), 0);
+    assert_eq!(
+        store
+            .list_notes(&crate::NoteQuery::default())
+            .unwrap()
+            .len(),
+        1
+    );
 }

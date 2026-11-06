@@ -5,6 +5,7 @@ mod notebooks;
 mod notes;
 mod tag_rows;
 mod tags;
+mod templates;
 #[cfg(test)]
 mod tests;
 mod trash;
@@ -27,6 +28,8 @@ pub enum StoreError {
     NoteNotFound(NoteId),
     #[error("notebook not found: {0}")]
     NotebookNotFound(NotebookId),
+    #[error("note is not a template: {0}")]
+    NotATemplate(NoteId),
     #[error("notebook name must not be empty")]
     EmptyNotebookName,
     #[error("tag name must not be empty")]

@@ -8,9 +8,11 @@ license.workspace = true
 workspace = true
 
 [dependencies]
+jiff = "0.2.38"
 rand = "0.9"
 rusqlite = { version = "0.37", features = ["bundled"] }
 thiserror = "2"
 
 [dev-dependencies]
+jiff = { version = "0.2.38", features = ["tzdb-bundle-always"] }
 tempfile = "3"

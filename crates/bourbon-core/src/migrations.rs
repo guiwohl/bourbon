@@ -59,7 +59,9 @@ CREATE INDEX notes_by_deleted_at ON notes (deleted_at);
 CREATE INDEX note_tags_by_tag ON note_tags (tag_id);
 ";
 
-const MIGRATIONS: &[&str] = &[NOTES_TABLE, ORGANIZATION];
+const TEMPLATES: &str = "ALTER TABLE notes ADD COLUMN is_template INTEGER NOT NULL DEFAULT 0";
+
+const MIGRATIONS: &[&str] = &[NOTES_TABLE, ORGANIZATION, TEMPLATES];
 
 pub fn migrate(connection: &mut Connection) -> Result<(), StoreError> {
     let applied: usize = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;

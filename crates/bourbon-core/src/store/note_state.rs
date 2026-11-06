@@ -41,8 +41,8 @@ impl NoteStore {
         let copy_id = NoteId::generate();
         let transaction = self.connection.unchecked_transaction()?;
         let copied = transaction.execute(
-            "INSERT INTO notes (id, title, body, created_at, updated_at, notebook_id, status)
-             SELECT ?2, title, body, ?3, ?3, notebook_id, status FROM notes WHERE id = ?1",
+            "INSERT INTO notes (id, title, body, created_at, updated_at, notebook_id, status, is_template)
+             SELECT ?2, title, body, ?3, ?3, notebook_id, status, is_template FROM notes WHERE id = ?1",
             params![note, copy_id, now],
         )?;
         if copied == 0 {

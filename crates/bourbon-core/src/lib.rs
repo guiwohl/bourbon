@@ -8,6 +8,7 @@ mod status;
 mod store;
 mod stored_text;
 mod tag;
+mod template_variables;
 mod timestamp;
 
 pub use database_path::default_database_path;
@@ -18,4 +19,5 @@ pub use query::{NoteQuery, NoteScope, NoteSort, NotebookDepth};
 pub use status::NoteStatus;
 pub use store::{NoteStore, StoreError, TRASH_RETENTION, TagSummary};
 pub use tag::{Tag, TagColor};
+pub use template_variables::TemplateTimeZone;
 pub use timestamp::Timestamp;

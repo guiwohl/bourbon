@@ -7,7 +7,7 @@ use crate::query::{NoteScope, NoteSort, NotebookDepth};
 use crate::status::NoteStatus;
 use crate::store::notebooks::NOTEBOOK_SUBTREE;
 
-const NOT_TRASHED: &str = "n.deleted_at IS NULL";
+const NOT_TRASHED: &str = "n.deleted_at IS NULL AND n.is_template = 0";
 
 pub struct NoteFilter {
     pub common_table: &'static str,
@@ -52,6 +52,11 @@ impl NoteFilter {
                     parameters,
                 }
             }
+            NoteScope::Templates => Self {
+                common_table: "",
+                condition: "n.deleted_at IS NULL AND n.is_template = 1".to_owned(),
+                parameters: Vec::new(),
+            },
             NoteScope::Trash => Self {
                 common_table: "",
                 condition: "n.deleted_at IS NOT NULL".to_owned(),
