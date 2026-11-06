@@ -1,8 +1,10 @@
+mod exportable;
 mod listing;
 mod note_filter;
 mod note_state;
 mod notebooks;
 mod notes;
+mod snapshot;
 mod tag_rows;
 mod tags;
 mod templates;
@@ -18,6 +20,7 @@ use crate::identifier::{NoteId, NotebookId, TagId};
 use crate::migrations::migrate;
 
 pub use notes::NoteSeed;
+pub(crate) use snapshot::verify_integrity;
 pub use tags::TagSummary;
 pub use trash::TRASH_RETENTION;
 
@@ -41,6 +44,10 @@ pub enum StoreError {
     TagNotFound(TagId),
     #[error("the default notebook cannot be deleted")]
     DefaultNotebookUndeletable,
+    #[error("export destination is not an empty directory: {}", .0.display())]
+    ExportDestinationNotEmpty(std::path::PathBuf),
+    #[error("database integrity check failed: {0}")]
+    IntegrityCheckFailed(String),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
     #[error("database schema version {found} is newer than supported version {supported}")]

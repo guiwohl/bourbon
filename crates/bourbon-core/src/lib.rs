@@ -1,4 +1,6 @@
+mod backup;
 mod database_path;
+mod export;
 mod identifier;
 mod migrations;
 mod note;
@@ -11,7 +13,11 @@ mod tag;
 mod template_variables;
 mod timestamp;
 
+pub use backup::{
+    BackupError, BackupOutcome, BackupRemote, GitHubRepository, RemoteUrl, Secret, backup, restore,
+};
 pub use database_path::default_database_path;
+pub use export::ExportSummary;
 pub use identifier::{InvalidIdentifier, NoteId, NotebookId, TagId};
 pub use note::{Note, NoteSummary};
 pub use notebook::{Notebook, NotebookNode};

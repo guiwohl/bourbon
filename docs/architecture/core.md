@@ -32,6 +32,9 @@ Pure domain plus SQLite. Never depends on GPUI. No repository trait: one storage
 | `find_note(id)` | `Option<Note>`; also finds trashed notes |
 | `list_notes(query)` | See listing rules |
 | `default_database_path()` | See database path |
+| `export_markdown(destination)` | See export |
+| `snapshot(target)` | See backup |
+| `backup(store, remote, work_dir)`, `restore(remote, destination_db, work_dir)` | See backup |
 
 ## Schema
 
@@ -139,3 +142,21 @@ The caller chooses the notebook. Variables are expanded in title and body only, 
 Matching is exact and case-sensitive; every occurrence is replaced; anything else (`{{Date}}`, `{{ date }}`, `{{name}}`) is left as written. A timestamp outside the supported calendar range leaves the text unexpanded.
 
 `TemplateTimeZone` wraps a `jiff` time zone: `system()` for the app, `utc()` for deterministic callers. The `jiff` dependency is pure Rust and pulls no GPUI crate; its bundled tz database is enabled for tests only, so tests that name a zone do not depend on the host.
+
+## Export
+
+`export_markdown(destination) -> ExportSummary { notebooks, notes, templates }`. Layout, naming, frontmatter and atomicity rules are in [the M6 decision](../decisions/2026-11-06-m6-data-core.md). Pure planning lives in `export/layout.rs` (no I/O); `export/destination.rs` checks the destination and writes through a staging folder. A destination that is not an empty directory gives `StoreError::ExportDestinationNotEmpty`.
+
+## Backup
+
+| Item | Behaviour |
+|---|---|
+| `snapshot(target)` | `VACUUM INTO` a new file, then a read-only integrity check; failure removes the file and gives `StoreError::IntegrityCheckFailed` |
+| `GitHubRepository::parse("owner/name")` | Validated; else `BackupError::InvalidRepository` |
+| `Secret` | `new(pat)`, `from_gh_cli()`; `Debug` is redacted |
+| `RemoteUrl` | `GitHub(GitHubRepository)` or `LocalFile(path)` (`file://`, for tests) |
+| `BackupRemote` | `url` + `token`; `BackupRemote::github(repository, token)` |
+| `backup(...)` | `BackupOutcome::Pushed` or `Unchanged`; one force-pushed commit holding only `bourbon.db` |
+| `restore(...)` | Shallow clone, integrity check, atomic replace of `destination_db`; close the store before calling |
+
+The system `git` binary does the transport (`export` and `backup` modules need no network crate). Tests use a local bare repository and a `file://` URL.
