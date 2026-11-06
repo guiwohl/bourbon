@@ -227,3 +227,40 @@ fn footer(cx: &mut TestAppContext, handle: AnyWindowHandle) -> String {
     })
     .unwrap()
 }
+
+fn button_state(
+    cx: &mut TestAppContext,
+    handle: AnyWindowHandle,
+    id: &str,
+) -> (Option<String>, Option<bool>) {
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let label = window.find(id.to_owned()).label().map(str::to_owned);
+        (label, window.find(format!("{id}-state")).selected())
+    })
+    .unwrap()
+}
+
+#[gpui_kit::test]
+fn the_switch_labels_its_modes_and_marks_only_the_current_one(cx: &mut TestAppContext) {
+    let (store, _) = seeded_store();
+    let (handle, _) = open_view(cx, store);
+    click(cx, handle, "view-mode-side-by-side");
+
+    let states: Vec<_> = [
+        "view-mode-edit",
+        "view-mode-side-by-side",
+        "view-mode-preview",
+    ]
+    .map(|id| button_state(cx, handle, id))
+    .into();
+
+    assert_eq!(
+        states,
+        [
+            (Some("Edit".to_owned()), Some(false)),
+            (Some("Side-by-side".to_owned()), Some(true)),
+            (Some("Preview".to_owned()), Some(false)),
+        ]
+    );
+}
