@@ -31,7 +31,7 @@ pub use omarchy::{OmarchyColors, Rgb, default_omarchy_colors_path};
 pub use query::{NoteQuery, NoteScope, NoteSort, NotebookDepth};
 pub use settings::{
     Appearance, BackupAuth, NOTE_LIST_WIDTH_RANGE, SIDEBAR_WIDTH_RANGE, Settings, SettingsFile,
-    ThemeSource, default_settings_path,
+    ThemeSource, ViewMode, default_settings_path,
 };
 pub use status::NoteStatus;
 pub use store::{NoteSeed, NoteStore, SearchHit, StoreError, TRASH_RETENTION, TagSummary};

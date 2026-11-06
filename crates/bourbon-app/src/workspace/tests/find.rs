@@ -2,7 +2,7 @@ use gpui_kit::TestAppContext;
 
 use super::view_modes::{focus_body, is_rendered, mode, press};
 use super::{click, open_view, seeded_store};
-use crate::editor::ViewMode;
+use bourbon_core::ViewMode;
 
 #[gpui_kit::test]
 fn ctrl_f_in_the_editor_opens_find(cx: &mut TestAppContext) {

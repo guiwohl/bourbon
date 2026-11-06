@@ -97,6 +97,7 @@ fn context_menu(
         let creating = id.clone();
         let renaming = (id.clone(), name.clone());
         let deleting = (id.clone(), name.clone());
+        let defaulting = id.clone();
         let menu = menu
             .item(item(
                 "New sub-notebook",
@@ -109,7 +110,12 @@ fn context_menu(
                 workspace.begin_rename_notebook(&renaming.0, &renaming.1, window, cx);
             }));
         if can_delete {
-            menu.item(item("Delete", &workspace, move |workspace, _, cx| {
+            menu.item(item(
+                "Use for new notes",
+                &workspace,
+                move |workspace, _, cx| workspace.make_default_notebook(&defaulting, cx),
+            ))
+            .item(item("Delete", &workspace, move |workspace, _, cx| {
                 workspace.begin_delete_notebook(&deleting.0, &deleting.1, cx);
             }))
         } else {

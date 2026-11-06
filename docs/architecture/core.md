@@ -21,7 +21,8 @@ Pure domain plus SQLite. Never depends on GPUI. No repository trait: one storage
 | `NoteSort` | `UpdatedNewestFirst` (default), `CreatedNewestFirst`, `TitleAlphabetical` |
 | `NoteStore::open(path)` | Creates parent dirs and file, enables WAL, migrates |
 | `NoteStore::open_in_memory()` | Same, in memory |
-| `default_notebook()` | Id of the Inbox, read from settings |
+| `default_notebook()` | Id of the notebook that receives new notes (the Inbox until changed), read from settings |
+| `set_default_notebook(id)` | Changes it; `NotebookNotFound` for an unknown id |
 | `create_notebook(name, parent, now)` | Names need not be unique; unknown parent gives `StoreError::NotebookNotFound` |
 | `rename_notebook(id, name)` | Unknown id gives `NotebookNotFound` |
 | `notebook_tree()` | Roots and children ordered by name, case-insensitive |

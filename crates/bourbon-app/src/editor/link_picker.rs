@@ -1,4 +1,4 @@
-use bourbon_core::NoteSummary;
+use bourbon_core::{NoteSummary, SearchHit};
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -9,7 +9,7 @@ use gpui_kit::{
 use crate::presentation::display_title;
 use crate::workspace::Workspace;
 
-const MAX_SUGGESTIONS: usize = 8;
+pub(crate) const MAX_SUGGESTIONS: usize = 8;
 
 pub(crate) struct LinkPicker {
     pub(crate) start: usize,
@@ -18,14 +18,8 @@ pub(crate) struct LinkPicker {
 }
 
 impl LinkPicker {
-    pub(crate) fn matching(start: usize, query: &str, notes: &[NoteSummary]) -> Option<Self> {
-        let needle = query.to_lowercase();
-        let candidates: Vec<NoteSummary> = notes
-            .iter()
-            .filter(|note| display_title(&note.title).to_lowercase().contains(&needle))
-            .take(MAX_SUGGESTIONS)
-            .cloned()
-            .collect();
+    pub(crate) fn from_hits(start: usize, hits: Vec<SearchHit>) -> Option<Self> {
+        let candidates: Vec<NoteSummary> = hits.into_iter().map(|hit| hit.summary).collect();
         (!candidates.is_empty()).then_some(Self {
             start,
             candidates,
@@ -81,63 +75,47 @@ pub(super) fn render(picker: &LinkPicker, cx: &mut Context<Workspace>) -> impl I
 
 #[cfg(test)]
 mod tests {
-    use bourbon_core::{NoteId, NoteStatus, NoteSummary, Timestamp};
+    use bourbon_core::{NoteId, NoteStatus, NoteSummary, SearchHit, Timestamp};
 
     use super::LinkPicker;
 
-    fn note(title: &str) -> NoteSummary {
-        NoteSummary {
-            id: NoteId::generate(),
-            title: title.to_owned(),
-            excerpt: String::new(),
-            updated_at: Timestamp::from_millis(0),
-            created_at: Timestamp::from_millis(0),
-            pinned: false,
-            status: NoteStatus::None,
-            tags: Vec::new(),
+    fn hit(title: &str) -> SearchHit {
+        SearchHit {
+            summary: NoteSummary {
+                id: NoteId::generate(),
+                title: title.to_owned(),
+                excerpt: String::new(),
+                updated_at: Timestamp::from_millis(0),
+                created_at: Timestamp::from_millis(0),
+                pinned: false,
+                status: NoteStatus::None,
+                tags: Vec::new(),
+            },
+            snippet: String::new(),
         }
     }
 
     #[test]
-    fn matching_ignores_case_and_keeps_listing_order() {
-        let notes = [note("Alpha"), note("beta"), note("ALPHABET")];
-        let picker = LinkPicker::matching(3, "alph", &notes).unwrap();
+    fn the_hits_become_candidates_in_order() {
+        let picker = LinkPicker::from_hits(3, vec![hit("Alpha"), hit("beta")]).unwrap();
         let titles: Vec<&str> = picker
             .candidates
             .iter()
             .map(|candidate| candidate.title.as_str())
             .collect();
-        assert_eq!(titles, ["Alpha", "ALPHABET"]);
+        assert_eq!(titles, ["Alpha", "beta"]);
         assert_eq!(picker.start, 3);
         assert_eq!(picker.highlight, 0);
     }
 
     #[test]
-    fn an_empty_query_matches_everything_up_to_the_limit() {
-        let notes: Vec<NoteSummary> = (0..20).map(|n| note(&format!("n{n}"))).collect();
-        assert_eq!(
-            LinkPicker::matching(0, "", &notes)
-                .unwrap()
-                .candidates
-                .len(),
-            8
-        );
-    }
-
-    #[test]
-    fn untitled_notes_match_by_their_displayed_name() {
-        let notes = [note("")];
-        assert!(LinkPicker::matching(0, "untit", &notes).is_some());
-    }
-
-    #[test]
-    fn nothing_matching_gives_no_picker() {
-        assert!(LinkPicker::matching(0, "zzz", &[note("a")]).is_none());
+    fn no_hits_give_no_picker() {
+        assert!(LinkPicker::from_hits(0, Vec::new()).is_none());
     }
 
     #[test]
     fn the_highlight_stays_inside_the_candidates() {
-        let mut picker = LinkPicker::matching(0, "", &[note("a"), note("b")]).unwrap();
+        let mut picker = LinkPicker::from_hits(0, vec![hit("a"), hit("b")]).unwrap();
         picker.highlight_previous();
         assert_eq!(picker.highlight, 0);
         picker.highlight_next();

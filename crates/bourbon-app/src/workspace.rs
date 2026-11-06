@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use bourbon_core::{
     Note, NoteId, NoteQuery, NoteScope, NoteSeed, NoteStore, NoteSummary, NotebookId, NotebookNode,
-    Settings, StoreError, TagSummary, TemplateTimeZone, Timestamp,
+    Settings, StoreError, TagSummary, TemplateTimeZone, Timestamp, ViewMode,
 };
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::input::{InputEvent, InputState};
@@ -25,7 +25,7 @@ use gpui_kit::{
 };
 
 use crate::control_pane::{self, ControlPane};
-use crate::editor::{self, EditorPane, EditorView, History, ViewMode};
+use crate::editor::{self, EditorPane, EditorView, History};
 use crate::locations::Locations;
 use crate::navigation::{Listing, Navigation};
 use crate::note_list::NoteListData;
@@ -128,7 +128,7 @@ impl Workspace {
             editor,
             history: History::default(),
             control_pane: None,
-            view_mode: ViewMode::default(),
+            view_mode: settings.editor_view_mode,
             focus_mode: false,
             pending_save: None,
             locations,

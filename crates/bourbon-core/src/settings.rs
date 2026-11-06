@@ -29,6 +29,47 @@ pub enum Appearance {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum ViewMode {
+    #[default]
+    Edit,
+    SideBySide,
+    Preview,
+}
+
+impl ViewMode {
+    pub const ALL: [Self; 3] = [Self::Edit, Self::SideBySide, Self::Preview];
+
+    #[must_use]
+    pub fn next(self) -> Self {
+        match self {
+            Self::Edit => Self::SideBySide,
+            Self::SideBySide => Self::Preview,
+            Self::Preview => Self::Edit,
+        }
+    }
+
+    #[must_use]
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Edit => "Edit",
+            Self::SideBySide => "Side-by-side",
+            Self::Preview => "Preview",
+        }
+    }
+
+    #[must_use]
+    pub fn shows_editor(self) -> bool {
+        self != Self::Preview
+    }
+
+    #[must_use]
+    pub fn shows_preview(self) -> bool {
+        self != Self::Edit
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BackupAuth {
     #[default]
     GhCli,
@@ -43,6 +84,7 @@ pub struct Settings {
     pub backup_repository: Option<String>,
     pub backup_auth: BackupAuth,
     pub backup_enabled: bool,
+    pub editor_view_mode: ViewMode,
     sidebar_width: u16,
     note_list_width: u16,
 }
@@ -56,6 +98,7 @@ impl Default for Settings {
             backup_repository: None,
             backup_auth: BackupAuth::default(),
             backup_enabled: false,
+            editor_view_mode: ViewMode::default(),
             sidebar_width: DEFAULT_SIDEBAR_WIDTH,
             note_list_width: DEFAULT_NOTE_LIST_WIDTH,
         }
@@ -76,6 +119,8 @@ impl Settings {
             backup_repository: field(&table, "backup_repository"),
             backup_auth: field(&table, "backup_auth").unwrap_or(defaults.backup_auth),
             backup_enabled: field(&table, "backup_enabled").unwrap_or(defaults.backup_enabled),
+            editor_view_mode: field(&table, "editor_view_mode")
+                .unwrap_or(defaults.editor_view_mode),
             ..defaults
         };
         if let Some(width) = field(&table, "sidebar_width") {
@@ -346,5 +391,52 @@ mod tests {
         assert_eq!(settings.backup_repository, None);
         assert_eq!(settings.backup_auth, BackupAuth::GhCli);
         assert!(settings.backup_enabled);
+    }
+
+    #[test]
+    fn the_view_mode_defaults_to_edit_and_round_trips() {
+        assert_eq!(Settings::default().editor_view_mode, ViewMode::Edit);
+        let directory = tempfile::tempdir().unwrap();
+        let file = SettingsFile::at(directory.path().join("settings.toml"));
+        let settings = Settings {
+            editor_view_mode: ViewMode::SideBySide,
+            ..Settings::default()
+        };
+
+        file.save(&settings).unwrap();
+
+        assert_eq!(file.load(), settings);
+        assert!(
+            std::fs::read_to_string(directory.path().join("settings.toml"))
+                .unwrap()
+                .contains("editor_view_mode = \"side_by_side\"")
+        );
+    }
+
+    #[test]
+    fn an_invalid_view_mode_falls_back_alone() {
+        let settings = Settings::parse("editor_view_mode = \"split\"\nbackup_enabled = true\n");
+        assert_eq!(settings.editor_view_mode, ViewMode::Edit);
+        assert!(settings.backup_enabled);
+    }
+
+    #[test]
+    fn cycling_visits_edit_side_by_side_preview_and_wraps() {
+        assert_eq!(ViewMode::Edit.next(), ViewMode::SideBySide);
+        assert_eq!(ViewMode::SideBySide.next(), ViewMode::Preview);
+        assert_eq!(ViewMode::Preview.next(), ViewMode::Edit);
+    }
+
+    #[test]
+    fn each_mode_shows_the_panes_it_names() {
+        assert!(ViewMode::Edit.shows_editor() && !ViewMode::Edit.shows_preview());
+        assert!(ViewMode::SideBySide.shows_editor() && ViewMode::SideBySide.shows_preview());
+        assert!(!ViewMode::Preview.shows_editor() && ViewMode::Preview.shows_preview());
+    }
+
+    #[test]
+    fn labels_name_the_modes() {
+        let labels = ViewMode::ALL.map(ViewMode::label);
+        assert_eq!(labels, ["Edit", "Side-by-side", "Preview"]);
     }
 }

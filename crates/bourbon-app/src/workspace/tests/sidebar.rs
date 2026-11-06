@@ -11,7 +11,7 @@ use crate::workspace::Workspace;
 
 const NEW_SUB_NOTEBOOK: usize = 0;
 const RENAME_NOTEBOOK: usize = 1;
-const DELETE_NOTEBOOK: usize = 2;
+const DELETE_NOTEBOOK: usize = 3;
 const RENAME_TAG: usize = 0;
 const CHANGE_COLOUR: usize = 1;
 const DELETE_TAG: usize = 2;
@@ -518,13 +518,13 @@ fn the_inbox_menu_has_no_delete_item(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn other_notebook_menus_offer_new_sub_notebook_rename_and_delete(cx: &mut TestAppContext) {
+fn other_notebook_menus_offer_sub_notebook_rename_default_and_delete(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, _) = open_view(cx, tree.store);
 
     assert_eq!(
         menu_labels(cx, handle, &row(&tree.other)),
-        ["New sub-notebook", "Rename", "Delete"]
+        ["New sub-notebook", "Rename", "Use for new notes", "Delete"]
     );
 }
 
@@ -759,4 +759,21 @@ fn ctrl_slash_works_while_the_title_has_focus(cx: &mut TestAppContext) {
     VisualTestContext::from_window(handle, cx).simulate_keystrokes("ctrl-/");
 
     assert!(!is_listed(cx, handle, "sidebar"));
+}
+
+#[gpui_kit::test]
+fn making_a_notebook_the_default_sends_new_notes_there(cx: &mut TestAppContext) {
+    let (store, _) = super::seeded_store();
+    let work = store.create_notebook("Work", None, at(7)).unwrap();
+    let (handle, view) = open_view(cx, store);
+    click(cx, handle, "nav-all-notes");
+
+    view.update(cx, |view, cx| view.make_default_notebook(&work.id, cx));
+    click(cx, handle, "new-note");
+
+    let notebook = view.read_with(cx, |view, _| {
+        let created = view.selected.clone().unwrap();
+        view.store.find_note(&created).unwrap().unwrap().notebook
+    });
+    assert_eq!(notebook, work.id);
 }
