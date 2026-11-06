@@ -5,6 +5,7 @@ members = ["crates/bourbon-core", "crates/bourbon-app"]
 [workspace.package]
 edition = "2024"
 version = "0.1.0"
+license = "GPL-3.0-only"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
