@@ -5,6 +5,7 @@ mod identifier;
 mod migrations;
 mod note;
 mod notebook;
+mod parent_directory;
 mod query;
 mod status;
 mod store;

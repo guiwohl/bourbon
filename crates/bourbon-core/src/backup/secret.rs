@@ -1,5 +1,5 @@
 use std::fmt;
-use std::process::Command;
+use std::process::{Command, Output};
 
 use super::error::BackupError;
 
@@ -17,15 +17,16 @@ impl Secret {
             .args(["auth", "token"])
             .output()
             .map_err(|error| BackupError::GhCliUnavailable(error.to_string()))?;
+        Self::from_gh_output(&output)
+    }
+
+    fn from_gh_output(output: &Output) -> Result<Self, BackupError> {
         if !output.status.success() {
             return Err(BackupError::GhCliUnavailable(
                 "gh auth token exited with an error".to_owned(),
             ));
         }
-        Self::from_gh_output(&String::from_utf8_lossy(&output.stdout))
-    }
-
-    fn from_gh_output(stdout: &str) -> Result<Self, BackupError> {
+        let stdout = String::from_utf8_lossy(&output.stdout);
         let token = stdout.trim();
         if token.is_empty() {
             Err(BackupError::GhCliUnavailable(
@@ -63,16 +64,38 @@ mod tests {
         assert_eq!(Secret::new("abc").expose(), "abc");
     }
 
+    #[cfg(unix)]
+    fn gh_output(exit_code: i32, stdout: &str) -> Output {
+        use std::os::unix::process::ExitStatusExt;
+
+        Output {
+            status: std::process::ExitStatus::from_raw(exit_code << 8),
+            stdout: stdout.as_bytes().to_vec(),
+            stderr: Vec::new(),
+        }
+    }
+
+    #[cfg(unix)]
     #[test]
     fn gh_output_is_trimmed() {
-        let secret = Secret::from_gh_output("  gho_abc123\n").unwrap();
+        let secret = Secret::from_gh_output(&gh_output(0, "  gho_abc123\n")).unwrap();
         assert_eq!(secret.expose(), "gho_abc123");
     }
 
+    #[cfg(unix)]
     #[test]
     fn empty_gh_output_is_an_error() {
         assert!(matches!(
-            Secret::from_gh_output(" \n"),
+            Secret::from_gh_output(&gh_output(0, " \n")),
+            Err(BackupError::GhCliUnavailable(_))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_failing_gh_is_an_error_even_if_it_printed_something() {
+        assert!(matches!(
+            Secret::from_gh_output(&gh_output(1, "gho_abc123")),
             Err(BackupError::GhCliUnavailable(_))
         ));
     }

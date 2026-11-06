@@ -3,6 +3,7 @@ use std::io;
 use std::path::Path;
 
 use super::layout::ExportPlan;
+use crate::parent_directory::parent_directory_of;
 use crate::store::StoreError;
 
 pub fn ensure_available(destination: &Path) -> Result<(), StoreError> {
@@ -21,10 +22,7 @@ pub fn ensure_available(destination: &Path) -> Result<(), StoreError> {
 }
 
 pub fn write_atomically(plan: &ExportPlan, destination: &Path) -> io::Result<()> {
-    let parent = match destination.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent,
-        _ => Path::new("."),
-    };
+    let parent = parent_directory_of(destination);
     fs::create_dir_all(parent)?;
     let staging = tempfile::Builder::new()
         .prefix(".bourbon-export-")

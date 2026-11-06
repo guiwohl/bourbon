@@ -10,6 +10,7 @@ mod tests;
 use std::fs;
 use std::path::Path;
 
+use crate::parent_directory::parent_directory_of;
 use crate::store::{NoteStore, verify_integrity};
 
 pub use error::BackupError;
@@ -75,10 +76,7 @@ pub fn restore(
     )?;
     let fetched = staging.path().join("fetched").join(DATABASE_FILE);
     verify_integrity(&fetched)?;
-    let parent = match destination_db.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent,
-        _ => Path::new("."),
-    };
+    let parent = parent_directory_of(destination_db);
     fs::create_dir_all(parent)?;
     let replacement = tempfile::NamedTempFile::new_in(parent)?;
     fs::copy(&fetched, replacement.path())?;
