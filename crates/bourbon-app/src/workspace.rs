@@ -352,6 +352,42 @@ impl Focusable for Workspace {
     }
 }
 
+impl Workspace {
+    fn sidebar_column(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+        if self.focus_mode {
+            return None;
+        }
+        sidebar::render(
+            &SidebarData {
+                current: &self.listing.navigation,
+                notebooks: &self.notebooks,
+                tags: &self.tags,
+                state: &self.sidebar,
+                width: f32::from(self.settings.sidebar_width()),
+            },
+            cx,
+        )
+    }
+
+    fn note_list_column(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+        (!self.focus_mode).then(|| {
+            note_list::render(
+                &NoteListData {
+                    navigation: &self.listing.navigation,
+                    sort: self.listing.sort,
+                    notebooks: &self.notebooks,
+                    tags: &self.tags,
+                    notes: &self.notes,
+                    templates: &self.templates,
+                    selected: self.selected.as_ref(),
+                    width: f32::from(self.settings.note_list_width()),
+                },
+                cx,
+            )
+        })
+    }
+}
+
 impl Render for Workspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pane = if self.settings_open {
@@ -371,36 +407,8 @@ impl Render for Workspace {
         } else {
             editor::render_empty(cx).into_any_element()
         };
-        let columns_visible = !self.focus_mode;
-        let sidebar = columns_visible
-            .then(|| {
-                sidebar::render(
-                    &SidebarData {
-                        current: &self.listing.navigation,
-                        notebooks: &self.notebooks,
-                        tags: &self.tags,
-                        state: &self.sidebar,
-                        width: f32::from(self.settings.sidebar_width()),
-                    },
-                    cx,
-                )
-            })
-            .flatten();
-        let note_list = columns_visible.then(|| {
-            note_list::render(
-                &NoteListData {
-                    navigation: &self.listing.navigation,
-                    sort: self.listing.sort,
-                    notebooks: &self.notebooks,
-                    tags: &self.tags,
-                    notes: &self.notes,
-                    templates: &self.templates,
-                    selected: self.selected.as_ref(),
-                    width: f32::from(self.settings.note_list_width()),
-                },
-                cx,
-            )
-        });
+        let sidebar = self.sidebar_column(cx);
+        let note_list = self.note_list_column(cx);
         div()
             .track_focus(&self.focus_handle)
             .relative()
