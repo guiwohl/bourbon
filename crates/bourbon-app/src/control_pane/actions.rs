@@ -32,7 +32,7 @@ pub(crate) enum PaneAction {
     ToggleFocusMode,
 }
 
-const ALL: [PaneAction; 29] = [
+const ALL: [PaneAction; 30] = [
     PaneAction::NewNote,
     PaneAction::NewTemplate,
     PaneAction::ToggleSidebar,
