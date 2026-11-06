@@ -8,6 +8,9 @@ use crate::sidebar::{DeletionTarget, NameTarget, Prompt, subtree_ids};
 
 impl Workspace {
     pub(crate) fn toggle_sidebar(&mut self, cx: &mut Context<Self>) {
+        if self.focus_mode {
+            return;
+        }
         self.sidebar.is_visible = !self.sidebar.is_visible;
         self.settings.sidebar_visible = self.sidebar.is_visible;
         self.persist_settings(cx);

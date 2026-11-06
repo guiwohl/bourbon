@@ -23,9 +23,13 @@ pub(crate) enum PaneAction {
     EmptyTrash,
     HistoryBack,
     HistoryForward,
+    CycleViewMode,
+    Find,
+    Replace,
+    ToggleFocusMode,
 }
 
-const ALL: [PaneAction; 23] = [
+const ALL: [PaneAction; 27] = [
     PaneAction::NewNote,
     PaneAction::NewTemplate,
     PaneAction::ToggleSidebar,
@@ -49,6 +53,10 @@ const ALL: [PaneAction; 23] = [
     PaneAction::EmptyTrash,
     PaneAction::HistoryBack,
     PaneAction::HistoryForward,
+    PaneAction::CycleViewMode,
+    PaneAction::Find,
+    PaneAction::Replace,
+    PaneAction::ToggleFocusMode,
 ];
 
 impl PaneAction {
@@ -73,6 +81,10 @@ impl PaneAction {
             Self::EmptyTrash => "Empty Trash".to_owned(),
             Self::HistoryBack => "History back".to_owned(),
             Self::HistoryForward => "History forward".to_owned(),
+            Self::CycleViewMode => "Cycle view mode".to_owned(),
+            Self::Find => "Find in note".to_owned(),
+            Self::Replace => "Replace in note".to_owned(),
+            Self::ToggleFocusMode => "Toggle focus mode".to_owned(),
         }
     }
 
@@ -89,6 +101,10 @@ impl PaneAction {
             Self::MoveToNotebook => Some("Ctrl+Alt+M"),
             Self::HistoryBack => Some("Alt+Left"),
             Self::HistoryForward => Some("Alt+Right"),
+            Self::CycleViewMode => Some("Ctrl+E"),
+            Self::Find => Some("Ctrl+F"),
+            Self::Replace => Some("Ctrl+H"),
+            Self::ToggleFocusMode => Some("Ctrl+Shift+F"),
             _ => None,
         }
     }
@@ -102,6 +118,10 @@ impl PaneAction {
                 | Self::TogglePin
                 | Self::CopyCliCommand
                 | Self::MoveToTrash
+                | Self::CycleViewMode
+                | Self::Find
+                | Self::Replace
+                | Self::ToggleFocusMode
         )
     }
 }
@@ -262,7 +282,7 @@ mod tests {
         assert!(!without.contains(&PaneAction::SetStatus(NoteStatus::Active)));
         assert!(without.contains(&PaneAction::NewNote));
         assert!(without.contains(&PaneAction::EmptyTrash));
-        assert_eq!(without.len(), ALL.len() - 10);
+        assert_eq!(without.len(), ALL.len() - 14);
     }
 
     #[test]

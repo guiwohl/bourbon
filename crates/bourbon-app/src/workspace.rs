@@ -6,6 +6,7 @@ mod editor_intents;
 mod note_list_intents;
 mod settings_intents;
 mod sidebar_intents;
+mod writing_intents;
 
 use std::time::Duration;
 
@@ -22,7 +23,7 @@ use gpui_kit::{
 };
 
 use crate::control_pane::{self, ControlPane};
-use crate::editor::{self, EditorPane, History};
+use crate::editor::{self, EditorPane, EditorView, History, ViewMode};
 use crate::locations::Locations;
 use crate::navigation::{Listing, Navigation};
 use crate::note_list::NoteListData;
@@ -49,6 +50,8 @@ pub struct Workspace {
     editor: EditorPane,
     history: History,
     control_pane: Option<ControlPane>,
+    view_mode: ViewMode,
+    focus_mode: bool,
     pending_save: Option<Task<()>>,
     locations: Locations,
     settings: Settings,
@@ -91,6 +94,8 @@ impl Workspace {
             editor,
             history: History::default(),
             control_pane: None,
+            view_mode: ViewMode::default(),
+            focus_mode: false,
             pending_save: None,
             locations,
             settings,
@@ -308,6 +313,7 @@ impl Workspace {
 
     fn show(&mut self, note: Note, window: &mut Window, cx: &mut Context<Self>) {
         self.settings_open = false;
+        self.editor.link_picker = None;
         self.editor.load(note.clone(), window, cx);
         self.history.visit(&note.id);
         self.selected = Some(note.id);
@@ -352,34 +358,49 @@ impl Render for Workspace {
             settings_view::render(&self.settings, cx).into_any_element()
         } else if self.selected.is_some() {
             self.editor
-                .render(&self.notebooks, &self.tags, cx)
+                .render(
+                    &EditorView {
+                        notebooks: &self.notebooks,
+                        tags: &self.tags,
+                        mode: self.view_mode,
+                        focus_mode: self.focus_mode,
+                    },
+                    cx,
+                )
                 .into_any_element()
         } else {
             editor::render_empty(cx).into_any_element()
         };
-        let sidebar = sidebar::render(
-            &SidebarData {
-                current: &self.listing.navigation,
-                notebooks: &self.notebooks,
-                tags: &self.tags,
-                state: &self.sidebar,
-                width: f32::from(self.settings.sidebar_width()),
-            },
-            cx,
-        );
-        let note_list = note_list::render(
-            &NoteListData {
-                navigation: &self.listing.navigation,
-                sort: self.listing.sort,
-                notebooks: &self.notebooks,
-                tags: &self.tags,
-                notes: &self.notes,
-                templates: &self.templates,
-                selected: self.selected.as_ref(),
-                width: f32::from(self.settings.note_list_width()),
-            },
-            cx,
-        );
+        let columns_visible = !self.focus_mode;
+        let sidebar = columns_visible
+            .then(|| {
+                sidebar::render(
+                    &SidebarData {
+                        current: &self.listing.navigation,
+                        notebooks: &self.notebooks,
+                        tags: &self.tags,
+                        state: &self.sidebar,
+                        width: f32::from(self.settings.sidebar_width()),
+                    },
+                    cx,
+                )
+            })
+            .flatten();
+        let note_list = columns_visible.then(|| {
+            note_list::render(
+                &NoteListData {
+                    navigation: &self.listing.navigation,
+                    sort: self.listing.sort,
+                    notebooks: &self.notebooks,
+                    tags: &self.tags,
+                    notes: &self.notes,
+                    templates: &self.templates,
+                    selected: self.selected.as_ref(),
+                    width: f32::from(self.settings.note_list_width()),
+                },
+                cx,
+            )
+        });
         div()
             .track_focus(&self.focus_handle)
             .relative()
@@ -410,6 +431,7 @@ impl Render for Workspace {
             .on_action(cx.listener(|view, _: &OpenActionSearch, window, cx| {
                 view.open_action_search(window, cx);
             }))
+            .map(|root| editor::actions::register_writing(root, cx))
             .map(|root| editor::actions::register(root, cx))
             .when_some(self.error_message.clone(), |root, message| {
                 root.child(editor::error_banner(message, cx))
@@ -426,12 +448,13 @@ impl Render for Workspace {
                             cx,
                         ))
                     }))
-                    .child(note_list)
-                    .child(panes::divider(
-                        "note-list-divider",
-                        Divider::AfterNoteList,
-                        cx,
-                    ))
+                    .children(note_list.map(|note_list| {
+                        div().flex().child(note_list).child(panes::divider(
+                            "note-list-divider",
+                            Divider::AfterNoteList,
+                            cx,
+                        ))
+                    }))
                     .child(pane),
             )
             .children(

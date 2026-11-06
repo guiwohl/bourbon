@@ -15,6 +15,11 @@ use crate::navigation::Navigation;
 mod control_pane;
 mod drag;
 mod editor;
+mod find;
+mod focus;
+mod links;
+mod tasks;
+mod view_modes;
 
 struct Seeded {
     older: NoteId,
