@@ -4,8 +4,8 @@ mod note_filter;
 mod note_state;
 mod notebooks;
 mod notes;
-mod snapshot;
 mod search;
+mod snapshot;
 mod tag_rows;
 mod tags;
 mod templates;
@@ -21,8 +21,8 @@ use crate::identifier::{NoteId, NotebookId, TagId};
 use crate::migrations::migrate;
 
 pub use notes::NoteSeed;
-pub(crate) use snapshot::verify_integrity;
 pub use search::SearchHit;
+pub(crate) use snapshot::verify_integrity;
 pub use tags::TagSummary;
 pub use trash::TRASH_RETENTION;
 
