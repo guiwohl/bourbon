@@ -3,6 +3,7 @@ mod note_filter;
 mod notebooks;
 mod notes;
 mod tag_rows;
+mod tags;
 #[cfg(test)]
 mod tests;
 
@@ -10,8 +11,10 @@ use std::path::Path;
 
 use rusqlite::Connection;
 
-use crate::identifier::{NoteId, NotebookId};
+use crate::identifier::{NoteId, NotebookId, TagId};
 use crate::migrations::migrate;
+
+pub use tags::TagSummary;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -21,6 +24,12 @@ pub enum StoreError {
     NoteNotFound(NoteId),
     #[error("notebook not found: {0}")]
     NotebookNotFound(NotebookId),
+    #[error("tag name must not be empty")]
+    EmptyTagName,
+    #[error("tag name already taken: {0}")]
+    TagNameTaken(String),
+    #[error("tag not found: {0}")]
+    TagNotFound(TagId),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
     #[error("database schema version {found} is newer than supported version {supported}")]
