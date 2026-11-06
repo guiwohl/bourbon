@@ -160,6 +160,8 @@ Matching is exact and case-sensitive; every occurrence is replaced; anything els
 
 ## Export
 
+`NoteStore::note_markdown(&NoteId) -> Option<String>` renders one note exactly as the export writes it (same renderer); trashed or unknown notes give `None`. The CLI uses it.
+
 `export_markdown(destination) -> ExportSummary { notebooks, notes, templates }`. Layout, naming, frontmatter and atomicity rules are in [the M6 decision](../decisions/2026-11-06-m6-data-core.md). Pure planning lives in `export/layout.rs` (no I/O); `export/destination.rs` checks the destination and writes through a staging folder. A destination that is not an empty directory gives `StoreError::ExportDestinationNotEmpty`.
 
 ## Backup

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/bourbon-core", "crates/bourbon-app"]
+members = ["crates/bourbon-core", "crates/bourbon-app", "crates/bourbon-cli"]
 
 [workspace.package]
 edition = "2024"

@@ -1,4 +1,4 @@
-use bourbon_core::{Note, NoteStatus, NotebookId, NotebookNode, Tag, TagId, TagSummary};
+use bourbon_core::{Note, NoteId, NoteStatus, NotebookId, NotebookNode, Tag, TagId, TagSummary};
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputState, MoveDown, MoveUp};
@@ -15,6 +15,7 @@ use gpui_kit::{
 use super::actions::{
     SetStatusActive, SetStatusCompleted, SetStatusDropped, SetStatusNone, SetStatusOnHold,
 };
+use crate::cli_command::copy_cli_command;
 use crate::presentation::{chip_color, status_label};
 use crate::workspace::Workspace;
 
@@ -50,6 +51,7 @@ const STATUS_OPTIONS: [StatusOption; 5] = [
 ];
 
 pub(crate) struct NoteHeader {
+    id: NoteId,
     notebook: NotebookId,
     status: NoteStatus,
     tags: Vec<Tag>,
@@ -59,6 +61,7 @@ pub(crate) struct NoteHeader {
 impl NoteHeader {
     pub(crate) fn of(note: &Note) -> Self {
         Self {
+            id: note.id.clone(),
             notebook: note.notebook.clone(),
             status: note.status,
             tags: note.tags.clone(),
@@ -141,7 +144,11 @@ pub(crate) fn render(view: &HeaderView, cx: &mut Context<Workspace>) -> impl Int
                 .gap_2()
                 .child(notebook_selector(view, rows, cx))
                 .child(status_button(view.header.status))
-                .child(note_actions_button(view.header.is_template, cx))
+                .child(note_actions_button(
+                    view.header.is_template,
+                    view.header.id.clone(),
+                    cx,
+                ))
                 .children(
                     view.header
                         .tags
@@ -248,19 +255,29 @@ fn template_action_label(is_template: bool) -> &'static str {
     }
 }
 
-fn note_actions_button(is_template: bool, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
+fn note_actions_button(
+    is_template: bool,
+    id: NoteId,
+    cx: &mut Context<Workspace>,
+) -> impl IntoElement + use<> {
     let owner = cx.entity();
     Button::new("note-actions")
         .ghost()
         .small()
         .icon(IconName::Ellipsis)
         .dropdown_menu(move |menu, _, _| {
-            let owner = owner.clone();
+            let template_owner = owner.clone();
+            let id = id.clone();
             menu.item(
                 PopupMenuItem::new(template_action_label(is_template)).on_click(move |_, _, cx| {
-                    owner.update(cx, |workspace, cx| {
+                    template_owner.update(cx, |workspace, cx| {
                         workspace.set_selected_template(!is_template, cx);
                     });
+                }),
+            )
+            .item(
+                PopupMenuItem::new("Copy CLI command").on_click(move |_, _, cx| {
+                    copy_cli_command(&id, cx);
                 }),
             )
         })

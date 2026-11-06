@@ -6,3 +6,4 @@
 |---|---|
 | [core.md](core.md) | bourbon-core: API, schema v2, listing rules |
 | [app.md](app.md) | bourbon-app: modules, autosave, error banner, tests, dependency guard |
+| [cli.md](cli.md) | bourbon-cli: `bourbon get`, launching the app, exit codes, tests, copy-command action |

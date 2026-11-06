@@ -282,7 +282,10 @@ fn the_note_actions_menu_offers_mark_as_template_for_a_plain_note(cx: &mut TestA
 
     open_note_actions(cx, handle);
 
-    assert_eq!(popup_labels(cx, handle), ["Mark as template"]);
+    assert_eq!(
+        popup_labels(cx, handle),
+        ["Mark as template", "Copy CLI command"]
+    );
 }
 
 #[gpui_kit::test]
@@ -295,7 +298,10 @@ fn the_note_actions_menu_offers_unmark_for_a_template(cx: &mut TestAppContext) {
 
     open_note_actions(cx, handle);
 
-    assert_eq!(popup_labels(cx, handle), ["Unmark template"]);
+    assert_eq!(
+        popup_labels(cx, handle),
+        ["Unmark template", "Copy CLI command"]
+    );
 }
 
 #[gpui_kit::test]
@@ -314,7 +320,10 @@ fn marking_the_open_note_keeps_it_open_and_moves_it_to_templates(cx: &mut TestAp
     click(cx, handle, "nav-templates");
     assert_eq!(listed_titles(cx, &view), ["Plain"]);
     open_note_actions(cx, handle);
-    assert_eq!(popup_labels(cx, handle), ["Unmark template"]);
+    assert_eq!(
+        popup_labels(cx, handle),
+        ["Unmark template", "Copy CLI command"]
+    );
 }
 
 #[gpui_kit::test]
@@ -352,4 +361,19 @@ fn marking_saves_the_pending_edit_first(cx: &mut TestAppContext) {
 
 fn no_titles() -> Vec<String> {
     Vec::new()
+}
+
+#[gpui_kit::test]
+fn the_note_actions_menu_copies_the_cli_command_of_the_open_note(cx: &mut TestAppContext) {
+    let fixture = fixture();
+    let plain = note_in(&fixture.store, &fixture.inbox, "Plain", 2);
+    let (handle, _) = open_view(cx, fixture.store);
+
+    open_note_actions(cx, handle);
+    choose_popup_item(cx, handle, 1);
+
+    assert_eq!(
+        cx.read_from_clipboard().and_then(|item| item.text()),
+        Some(format!("bourbon get {plain}"))
+    );
 }

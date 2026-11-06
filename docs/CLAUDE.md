@@ -6,7 +6,7 @@
 |---|---|
 | [decisions/](decisions/CLAUDE.md) | Decisions taken with the user |
 | [development/](development/CLAUDE.md) | How to build, test and lint |
-| [architecture/](architecture/CLAUDE.md) | How the crates are built: core and app |
+| [architecture/](architecture/CLAUDE.md) | How the crates are built: core, app and cli |
 | [brand/](brand/CLAUDE.md) | Logo and icon assets |
 
 ## How to use this folder
