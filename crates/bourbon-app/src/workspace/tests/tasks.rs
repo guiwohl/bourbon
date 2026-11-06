@@ -201,7 +201,7 @@ fn a_cursor_before_the_edit_does_not_move(cx: &mut TestAppContext) {
     let start_of_plain = BODY.find("- plain").unwrap();
     cx.update_window(handle, |_, _, cx| {
         view.update(cx, |view, cx| {
-            view.editor.place_cursor_at(start_of_plain, cx)
+            view.editor.place_cursor_at(start_of_plain, cx);
         });
     })
     .unwrap();
