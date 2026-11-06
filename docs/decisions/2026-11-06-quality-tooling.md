@@ -20,6 +20,7 @@
 - GPUI pulls sub-crates (e.g. `gpui_*` platform crates) that the three banned names may not cover. Re-check the real dependency tree when GPUI is added.
 - The ban was proven on 2026-11-06 with a stand-in crate: a dependency from `bourbon-core` fails with `error[banned]`; the same dependency from `bourbon-app` passes.
 
-## Not decided yet
+## Enforcement
 
-- Where checks are enforced: local pre-commit hook, GitHub Actions, or both.
+- Locally: manual, no git hook.
+- On GitHub: the `check` workflow plus a `main` ruleset (PR required, `check` required, no force push, no deletion). See [ci.md](../development/ci.md).
