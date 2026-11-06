@@ -393,7 +393,7 @@ impl Render for Workspace {
                 match event.drag(cx) {
                     Divider::AfterSidebar => view.resize_sidebar(pointer, cx),
                     Divider::AfterNoteList => {
-                        view.resize_note_list(pointer - view.sidebar_edge(), cx);
+                        view.resize_note_list_to_pointer(pointer, cx);
                     }
                 }
             }))

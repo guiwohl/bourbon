@@ -69,10 +69,10 @@ impl Palette {
             muted: background.mix(foreground, 0.09),
             muted_foreground: colors.muted,
             accent: colors.accent,
-            accent_foreground: if colors.accent.luminance() > 0.5 {
-                BLACK
-            } else {
+            accent_foreground: if colors.accent.is_dark() {
                 WHITE
+            } else {
+                BLACK
             },
             selection: background.mix(colors.selection, 0.4),
             danger: colors.danger,

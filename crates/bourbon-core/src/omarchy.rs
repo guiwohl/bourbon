@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+const HALF_WEIGHTED_LUMINANCE: u32 = 1_275_000;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rgb {
     pub red: u8,
@@ -43,11 +45,10 @@ impl Rgb {
     }
 
     #[must_use]
-    pub fn luminance(self) -> f32 {
-        (0.2126 * f32::from(self.red)
-            + 0.7152 * f32::from(self.green)
-            + 0.0722 * f32::from(self.blue))
-            / 255.
+    pub fn is_dark(self) -> bool {
+        let weighted =
+            2126 * u32::from(self.red) + 7152 * u32::from(self.green) + 722 * u32::from(self.blue);
+        weighted < HALF_WEIGHTED_LUMINANCE
     }
 }
 
@@ -78,7 +79,7 @@ impl OmarchyColors {
 
     #[must_use]
     pub fn is_dark(&self) -> bool {
-        self.background.luminance() < 0.5
+        self.background.is_dark()
     }
 }
 
@@ -148,11 +149,23 @@ color8 = "#5f6f74"
     }
 
     #[test]
-    fn luminance_separates_black_from_white() {
-        assert!(rgb(0, 0, 0).luminance() < 0.01);
-        assert!(rgb(255, 255, 255).luminance() > 0.99);
-        assert!(rgb(0, 255, 0).luminance() > rgb(255, 0, 0).luminance());
-        assert!(rgb(255, 0, 0).luminance() > rgb(0, 0, 255).luminance());
+    fn black_is_dark_and_white_is_light() {
+        assert!(rgb(0, 0, 0).is_dark());
+        assert!(!rgb(255, 255, 255).is_dark());
+    }
+
+    #[test]
+    fn green_weighs_more_than_red_and_red_more_than_blue() {
+        assert!(!rgb(0, 255, 0).is_dark());
+        assert!(rgb(255, 0, 0).is_dark());
+        assert!(rgb(0, 0, 255).is_dark());
+        assert!(rgb(255, 0, 255).is_dark());
+    }
+
+    #[test]
+    fn a_color_exactly_at_half_luminance_counts_as_light() {
+        assert!(!rgb(242, 92, 142).is_dark());
+        assert!(rgb(242, 92, 141).is_dark());
     }
 
     #[test]
