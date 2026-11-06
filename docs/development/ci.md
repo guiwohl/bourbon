@@ -7,7 +7,8 @@
 | Job | When | Runs |
 |---|---|---|
 | `check` | every PR and push to `main` | `just check` with `NEXTEST_PROFILE=ci` |
-| `mutants` | every PR | `cargo mutants --in-diff` on the PR diff against the base branch; fails on any missed mutant |
+| `mutants shard 0..3` | every PR | `cargo mutants --in-diff --shard k/4 --baseline skip` on the PR diff, 4 runners in parallel (the `check` job already proves the tests pass) |
+| `mutants` | every PR | Passes only if every shard passed. This is the required check |
 
 Before `just check`, one apt step runs `apt-get update` and installs `ripgrep`, `build-essential`, `clang`, `cmake`, `libfontconfig-dev`, `libwayland-dev`, `libx11-xcb-dev`, `libxkbcommon-x11-dev`. The list is taken from the apt branch of Zed's `script/linux` (keeping only what the lockfile needs: `yeslogic-fontconfig-sys`, `freetype-sys` via cmake, `wayland-sys`, `xcb`, `xkbcommon`). It could not be run locally; the first CI run is its proof. Tests are headless and need no display or GPU.
 
