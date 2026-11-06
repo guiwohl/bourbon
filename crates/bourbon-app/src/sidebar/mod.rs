@@ -1,5 +1,4 @@
 mod notebooks;
-mod palette;
 mod prompt;
 mod state;
 mod tags;
@@ -17,6 +16,7 @@ pub(crate) use state::{DeletionTarget, NameTarget, Prompt, SidebarState};
 pub(crate) use tree::subtree_ids;
 
 use crate::navigation::Navigation;
+use crate::presentation::status_label;
 use crate::workspace::Workspace;
 
 gpui_kit::actions!(bourbon, [ToggleSidebar]);
@@ -25,11 +25,11 @@ const SIDEBAR_WIDTH: f32 = 240.;
 const BASE_INDENT: f32 = 8.;
 const INDENT_STEP: f32 = 12.;
 
-const STATUS_ROWS: [(NoteStatus, &str); 4] = [
-    (NoteStatus::Active, "Active"),
-    (NoteStatus::OnHold, "On Hold"),
-    (NoteStatus::Completed, "Completed"),
-    (NoteStatus::Dropped, "Dropped"),
+const STATUS_ROWS: [NoteStatus; 4] = [
+    NoteStatus::Active,
+    NoteStatus::OnHold,
+    NoteStatus::Completed,
+    NoteStatus::Dropped,
 ];
 
 pub(crate) struct SidebarData<'a> {
@@ -68,11 +68,11 @@ pub(crate) fn render(
         );
     }
     rows.push(header("Status", cx).into_any_element());
-    for (status, label) in STATUS_ROWS {
+    for status in STATUS_ROWS {
         rows.push(
             simple_row(
                 &format!("nav-status-{}", status.as_stored()),
-                label,
+                status_label(status),
                 Navigation::Status(status),
                 data.current,
                 cx,

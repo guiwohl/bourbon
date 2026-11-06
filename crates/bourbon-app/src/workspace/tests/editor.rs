@@ -717,3 +717,51 @@ fn the_status_menu_checks_the_current_status(cx: &mut TestAppContext) {
         ]
     );
 }
+
+fn selected_of(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> Option<bool> {
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.find(id.to_owned()).selected()
+    })
+    .unwrap()
+}
+
+#[gpui_kit::test]
+fn the_selector_marks_only_the_notebook_of_the_note_as_selected(cx: &mut TestAppContext) {
+    let (store, _) = seeded_store();
+    let work = work_notebook(&store);
+    let inbox = store.default_notebook().unwrap();
+    let (handle, _) = open_view(cx, store);
+
+    click(cx, handle, "notebook-selector");
+
+    assert_eq!(
+        selected_of(cx, handle, &format!("notebook-option-{inbox}")),
+        Some(true)
+    );
+    assert_eq!(
+        selected_of(cx, handle, &format!("notebook-option-{work}")),
+        Some(false)
+    );
+}
+
+#[gpui_kit::test]
+fn only_the_highlighted_suggestion_is_marked_as_selected(cx: &mut TestAppContext) {
+    let (store, _, rust, _) = store_with_tags();
+    let rustacean = store
+        .create_tag("rustacean", TagColor::Default, at(8))
+        .unwrap();
+    let (handle, _) = open_view(cx, store);
+
+    type_into_tag_input(cx, handle, "rust");
+    press_in_window(cx, handle, "down");
+
+    assert_eq!(
+        selected_of(cx, handle, &format!("tag-suggestion-{}", rust.id)),
+        Some(true)
+    );
+    assert_eq!(
+        selected_of(cx, handle, &format!("tag-suggestion-{}", rustacean.id)),
+        Some(false)
+    );
+}

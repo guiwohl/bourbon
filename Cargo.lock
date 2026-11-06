@@ -726,8 +726,8 @@ name = "bourbon-app"
 version = "0.1.0"
 dependencies = [
  "bourbon-core",
- "chrono",
  "gpui-kit",
+ "jiff",
 ]
 
 [[package]]

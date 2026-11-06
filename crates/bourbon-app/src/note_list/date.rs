@@ -1,42 +1,41 @@
 use bourbon_core::Timestamp;
-use chrono::{DateTime, Datelike as _, TimeZone};
+use jiff::Zoned;
+use jiff::tz::TimeZone;
 
-pub(crate) fn short_date<Zone: TimeZone>(updated: Timestamp, now: Timestamp, zone: &Zone) -> String
-where
-    Zone::Offset: std::fmt::Display,
-{
+pub(crate) fn short_date(updated: Timestamp, now: Timestamp, zone: &TimeZone) -> String {
     let updated = local(updated, zone);
     let now = local(now, zone);
-    if updated.date_naive() == now.date_naive() {
-        updated.format("%H:%M").to_string()
+    if updated.date() == now.date() {
+        updated.strftime("%H:%M").to_string()
     } else if updated.year() == now.year() {
-        updated.format("%b %-d").to_string()
+        updated.strftime("%b %-d").to_string()
     } else {
-        updated.format("%b %-d, %Y").to_string()
+        updated.strftime("%b %-d, %Y").to_string()
     }
 }
 
-fn local<Zone: TimeZone>(timestamp: Timestamp, zone: &Zone) -> DateTime<Zone> {
-    DateTime::from_timestamp_millis(timestamp.as_millis())
+fn local(timestamp: Timestamp, zone: &TimeZone) -> Zoned {
+    jiff::Timestamp::from_millisecond(timestamp.as_millis())
         .unwrap_or_default()
-        .with_timezone(zone)
+        .to_zoned(zone.clone())
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::FixedOffset;
+    use jiff::civil::date;
 
     use super::*;
 
-    fn zone() -> FixedOffset {
-        FixedOffset::west_opt(3 * 3600).unwrap()
+    fn zone() -> TimeZone {
+        TimeZone::get("America/Sao_Paulo").unwrap()
     }
 
-    fn at(year: i32, month: u32, day: u32, hour: u32, minute: u32) -> Timestamp {
-        let moment = zone()
-            .with_ymd_and_hms(year, month, day, hour, minute, 0)
+    fn at(year: i16, month: i8, day: i8, hour: i8, minute: i8) -> Timestamp {
+        let moment = date(year, month, day)
+            .at(hour, minute, 0, 0)
+            .to_zoned(zone())
             .unwrap();
-        Timestamp::from_millis(moment.timestamp_millis())
+        Timestamp::from_millis(moment.timestamp().as_millisecond())
     }
 
     #[test]

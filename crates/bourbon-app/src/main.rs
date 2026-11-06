@@ -2,13 +2,12 @@ mod autosave;
 mod editor;
 mod navigation;
 mod note_list;
+mod presentation;
 mod sidebar;
 mod window;
 mod workspace;
 
 use bourbon_core::{NoteStore, default_database_path};
-
-const UNTITLED: &str = "Untitled";
 
 fn main() {
     let database_path = default_database_path();

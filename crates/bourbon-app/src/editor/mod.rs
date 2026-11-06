@@ -7,7 +7,7 @@ use gpui_kit::{
     ParentElement as _, SharedString, Styled as _, Subscription, TestSupportExt as _, Window, div,
 };
 
-use crate::UNTITLED;
+use crate::presentation::UNTITLED;
 use crate::workspace::Workspace;
 
 pub(crate) mod actions;
