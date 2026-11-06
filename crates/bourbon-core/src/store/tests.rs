@@ -5,3 +5,4 @@ mod notebooks;
 mod notes;
 mod support;
 mod tags;
+mod trash;

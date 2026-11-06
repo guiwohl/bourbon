@@ -7,6 +7,7 @@ mod tag_rows;
 mod tags;
 #[cfg(test)]
 mod tests;
+mod trash;
 
 use std::path::Path;
 
@@ -16,6 +17,7 @@ use crate::identifier::{NoteId, NotebookId, TagId};
 use crate::migrations::migrate;
 
 pub use tags::TagSummary;
+pub use trash::TRASH_RETENTION;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -31,6 +33,8 @@ pub enum StoreError {
     TagNameTaken(String),
     #[error("tag not found: {0}")]
     TagNotFound(TagId),
+    #[error("the default notebook cannot be deleted")]
+    DefaultNotebookUndeletable,
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
     #[error("database schema version {found} is newer than supported version {supported}")]

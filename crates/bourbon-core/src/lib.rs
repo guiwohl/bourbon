@@ -16,6 +16,6 @@ pub use note::{Note, NoteSummary};
 pub use notebook::{Notebook, NotebookNode};
 pub use query::{NoteQuery, NoteScope, NoteSort, NotebookDepth};
 pub use status::NoteStatus;
-pub use store::{NoteStore, StoreError, TagSummary};
+pub use store::{NoteStore, StoreError, TRASH_RETENTION, TagSummary};
 pub use tag::{Tag, TagColor};
 pub use timestamp::Timestamp;
