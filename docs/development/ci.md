@@ -10,6 +10,7 @@
 |---|---|
 | Pull request required | Nothing reaches `main` without a PR. No approvals needed (solo project) |
 | Required status check `check` | The PR can only merge with the workflow green |
+| Branch up to date | The PR branch must contain the latest `main` before merging; rebase first |
 | Block force push | History of `main` cannot be rewritten |
 | Block deletion | `main` cannot be deleted |
 
