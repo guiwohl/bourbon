@@ -29,6 +29,7 @@ Bourbon is a Markdown notes app in the spirit of InkDrop: opinionated, open sour
 | 17 | CLI binary name | **`bourbon`, with no alias** | One name to remember and package; agents copy the command from the app anyway |
 | 18 | Organization | **Nested notebooks (folders) + tags**, as in InkDrop | Folders give structure; tags cut across it |
 | 19 | Export format | **Each notebook becomes a folder, each note a `<title-slug>.md` file. Frontmatter carries `id`, `title`, `tags`, `created`, `updated`.** Inside the app, duplicate titles are allowed, since the ID identifies the note. On export, notes with the same title in the same folder are numbered by age: the oldest keeps `<title-slug>.md`, the next become `<title-slug>-1.md`, `<title-slug>-2.md` and so on. Notes in the trash are not exported | Mirrors the app's structure; the output is readable by any Markdown tool |
+| 20 | License | **GPL-3.0-only** (decided 2026-11-06) | Forks must stay open source |
 
 ## Out of scope for now
 
