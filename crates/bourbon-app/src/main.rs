@@ -1,4 +1,5 @@
 mod autosave;
+mod dragged_note;
 mod editor;
 mod navigation;
 mod note_list;

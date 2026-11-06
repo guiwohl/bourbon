@@ -46,7 +46,8 @@ Each column is a module owned by one concern. Columns render from data the works
 | `autosave.rs` | The 500 ms delayed task |
 | `navigation.rs` | `Navigation`, `Listing`, the pure mapping to `NoteQuery` |
 | `workspace.rs` | Root view: owns `NoteStore`, listing, selection, autosave and flush, trash purge, error banner state; lays out the three columns |
-| `presentation.rs` | Labels and colours shared by the columns: `UNTITLED`, `status_label`, `chip_color` (`TagColor` to `ColorName`, note list and editor header chips), `dot_color`, `color_label`, `is_current_color` (sidebar) |
+| `dragged_note.rs` | `DraggedNote` drag payload and preview, built from a `NoteSummary` |
+| `presentation.rs` | Labels and colours shared by the columns: `UNTITLED`, `display_title`, `status_label`, `chip_color` (`TagColor` to `ColorName`, note list and editor header chips), `dot_color`, `color_label`, `is_current_color` (sidebar) |
 | `sidebar/mod.rs` | `render(SidebarData, cx)`: navigation rows, notebook tree flattening, selection rule |
 | `note_list/mod.rs` | `render(notes, selected, cx)`: header with the New note button, note rows |
 | `editor/mod.rs` | `EditorPane` (title input, Markdown editor, load/read/focus, change subscriptions), empty state, error banner element |
@@ -75,7 +76,8 @@ Implements decision rows 2, 4, 7, 11, 12 and 23 of [M2 organization](../decision
 | Prompt | One inline panel at the top of the sidebar (`SidebarState::prompt`): a name field with Save/Cancel (Enter also saves) for create and rename, a question with Delete/Cancel for deletions ("Delete notebook X? Its notes move to Trash."). No dialog: the dialog layer needs `Root` as the window root view, which the app does not use. A core error (empty name, duplicate tag) goes to the banner and the prompt stays open; success clears the banner and the prompt |
 | After a mutation | `refresh_listing` once (sidebar data and list). Deleting a notebook first flushes the pending save, and afterwards deselects the open note if it is now trashed or gone (empty state). Creating a sub-notebook re-applies the parent's depth to the navigation without reloading, so the single reload covers it. Deleting a notebook whose subtree contains the current notebook, or deleting a selected tag, adjusts the navigation first (All Notes, or the remaining tags) |
 | `Ctrl+/` | `ToggleSidebar` action bound in `window::bind_keys`; `SidebarState::is_visible`, the other two columns take the space |
-| Not in this slice | Drag and drop, sidebar sorting, templates |
+| Drop target | Notebook rows accept a dragged note (`on_drop::<DraggedNote>`) and highlight with the theme `drop_target` colour while one is over them. The drop calls `Workspace::drop_note_on_notebook` |
+| Not in this slice | Sidebar sorting, templates |
 
 Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure clicks, `Ctrl+click`, right click plus keyboard choice in the popup menu, typing into the prompt, and `Ctrl+/` through the key binding. Counts are checked from painted text inside each row's bounds.
 
@@ -100,9 +102,12 @@ Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure cli
 - Duplicate selects the copy. Move to Trash on the selected note selects the next row, else the previous, else nothing (editor empty state); on another row the selection is untouched.
 - "Empty trash" opens an alert dialog ("Permanently delete N notes?"); only OK calls `empty_trash`. A selected note that was purged is deselected.
 - A tag chip navigates to that single tag. Its mouse-down stops propagation so the row is not selected.
+- Rows outside Trash are draggable (`on_drag` with a `DraggedNote { id, title }`, defined in `dragged_note.rs`; the preview is a compact chip with the title, `UNTITLED` when empty). Dropped on a sidebar notebook row, the note moves through `move_note_to`, the same path as the notebook selector and `Ctrl+Alt+M`: `flush_then`, `move_note`, `refresh_listing`. The header is reloaded only when the dropped note is the open one; the open note stays open. Trash rows are not draggable.
 - Tag colours map from `TagColor` to the component palette (`ColorName`) in `presentation.rs`, shared with the editor header chips.
 
 ### Tests
+
+`workspace/tests/drag.rs`: real drags (`drag_to` from `note-<id>` to `nav-notebook-<id>`) check the move, the open note staying open, the list refresh, the header, the pending-edit flush and Trash rows not being draggable.
 
 `workspace/tests/note_list.rs`: the context menu and the sort dropdown are driven through the real popup (right click on `note-<id>`, then `down`/`enter` keystrokes; menu labels are checked with `find_by_label`), the dialog through `enter` and `escape`, chips through `chip-<note>-<tag>`, pins through `pin-<note>`. Date, title and prompt text are pure unit tests.
 
