@@ -61,7 +61,24 @@ CREATE INDEX note_tags_by_tag ON note_tags (tag_id);
 
 const TEMPLATES: &str = "ALTER TABLE notes ADD COLUMN is_template INTEGER NOT NULL DEFAULT 0";
 
-const MIGRATIONS: &[&str] = &[NOTES_TABLE, ORGANIZATION, TEMPLATES];
+const FULL_TEXT_SEARCH: &str = "
+CREATE VIRTUAL TABLE notes_fts USING fts5(title, body, content='notes');
+INSERT INTO notes_fts (notes_fts) VALUES ('rebuild');
+CREATE TRIGGER notes_fts_insert AFTER INSERT ON notes BEGIN
+    INSERT INTO notes_fts (rowid, title, body) VALUES (new.rowid, new.title, new.body);
+END;
+CREATE TRIGGER notes_fts_delete AFTER DELETE ON notes BEGIN
+    INSERT INTO notes_fts (notes_fts, rowid, title, body)
+    VALUES ('delete', old.rowid, old.title, old.body);
+END;
+CREATE TRIGGER notes_fts_update AFTER UPDATE OF title, body ON notes BEGIN
+    INSERT INTO notes_fts (notes_fts, rowid, title, body)
+    VALUES ('delete', old.rowid, old.title, old.body);
+    INSERT INTO notes_fts (rowid, title, body) VALUES (new.rowid, new.title, new.body);
+END;
+";
+
+const MIGRATIONS: &[&str] = &[NOTES_TABLE, ORGANIZATION, TEMPLATES, FULL_TEXT_SEARCH];
 
 pub fn migrate(connection: &mut Connection) -> Result<(), StoreError> {
     let applied: usize = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;

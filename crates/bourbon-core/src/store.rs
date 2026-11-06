@@ -5,6 +5,7 @@ mod note_state;
 mod notebooks;
 mod notes;
 mod snapshot;
+mod search;
 mod tag_rows;
 mod tags;
 mod templates;
@@ -21,6 +22,7 @@ use crate::migrations::migrate;
 
 pub use notes::NoteSeed;
 pub(crate) use snapshot::verify_integrity;
+pub use search::SearchHit;
 pub use tags::TagSummary;
 pub use trash::TRASH_RETENTION;
 

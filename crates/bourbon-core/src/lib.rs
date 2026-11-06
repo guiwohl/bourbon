@@ -24,7 +24,7 @@ pub use note::{Note, NoteSummary};
 pub use notebook::{Notebook, NotebookNode};
 pub use query::{NoteQuery, NoteScope, NoteSort, NotebookDepth};
 pub use status::NoteStatus;
-pub use store::{NoteSeed, NoteStore, StoreError, TRASH_RETENTION, TagSummary};
+pub use store::{NoteSeed, NoteStore, SearchHit, StoreError, TRASH_RETENTION, TagSummary};
 pub use tag::{Tag, TagColor};
 pub use template_variables::TemplateTimeZone;
 pub use timestamp::Timestamp;

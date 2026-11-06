@@ -98,7 +98,7 @@ fn open_rejects_schema_newer_than_supported() {
         error,
         StoreError::SchemaTooNew {
             found: 99,
-            supported: 3
+            supported: 4
         }
     ));
 }
@@ -139,7 +139,7 @@ fn build_version_two_database(path: &std::path::Path) {
 }
 
 #[test]
-fn version_two_notes_migrate_to_version_three_as_ordinary_notes() {
+fn version_two_notes_migrate_to_the_latest_version_as_ordinary_notes() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("bourbon.db");
     build_version_two_database(&path);
@@ -160,7 +160,8 @@ fn version_two_notes_migrate_to_version_three_as_ordinary_notes() {
         .unwrap()
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 3);
+    assert_eq!(version, 4);
+    assert_eq!(store.search_notes("kept", 10).unwrap().len(), 1);
     let templates = store
         .list_notes(&crate::NoteQuery {
             scope: crate::NoteScope::Templates,

@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests;
 
+mod control_pane_intents;
 mod editor_intents;
 mod note_list_intents;
 mod sidebar_intents;
@@ -16,6 +17,7 @@ use gpui_kit::{
     Render, SharedString, Styled as _, Subscription, Task, Window, div,
 };
 
+use crate::control_pane::{self, ControlPane};
 use crate::editor::{self, EditorPane, History};
 use crate::navigation::{Listing, Navigation};
 use crate::note_list::NoteListData;
@@ -23,7 +25,7 @@ use crate::sidebar::SidebarData;
 use crate::sidebar::{SidebarState, ToggleSidebar};
 use crate::{autosave, note_list, sidebar};
 
-gpui_kit::actions!(bourbon, [NewNote]);
+gpui_kit::actions!(bourbon, [NewNote, OpenNoteSearch, OpenActionSearch]);
 
 pub struct Workspace {
     store: NoteStore,
@@ -36,6 +38,7 @@ pub struct Workspace {
     sidebar: SidebarState,
     editor: EditorPane,
     history: History,
+    control_pane: Option<ControlPane>,
     pending_save: Option<Task<()>>,
     error_message: Option<SharedString>,
     focus_handle: FocusHandle,
@@ -62,6 +65,7 @@ impl Workspace {
             sidebar,
             editor,
             history: History::default(),
+            control_pane: None,
             pending_save: None,
             error_message: None,
             focus_handle: cx.focus_handle(),
@@ -71,9 +75,8 @@ impl Workspace {
         view.refresh_listing(cx);
         if let Some(most_recent) = view.notes.first().map(|summary| summary.id.clone()) {
             view.select(&most_recent, window, cx);
-        } else {
-            window.focus(&view.focus_handle, cx);
         }
+        window.focus(&view.focus_handle, cx);
         view
     }
 
@@ -329,6 +332,7 @@ impl Render for Workspace {
         );
         div()
             .track_focus(&self.focus_handle)
+            .relative()
             .size_full()
             .flex()
             .flex_col()
@@ -336,6 +340,12 @@ impl Render for Workspace {
             .text_color(cx.theme().foreground)
             .on_action(cx.listener(|view, _: &NewNote, window, cx| view.create_note(window, cx)))
             .on_action(cx.listener(|view, _: &ToggleSidebar, _, cx| view.toggle_sidebar(cx)))
+            .on_action(cx.listener(|view, _: &OpenNoteSearch, window, cx| {
+                view.open_note_search(window, cx);
+            }))
+            .on_action(cx.listener(|view, _: &OpenActionSearch, window, cx| {
+                view.open_action_search(window, cx);
+            }))
             .map(|root| editor::actions::register(root, cx))
             .when_some(self.error_message.clone(), |root, message| {
                 root.child(editor::error_banner(message, cx))
@@ -348,6 +358,11 @@ impl Render for Workspace {
                     .children(sidebar)
                     .child(note_list)
                     .child(pane),
+            )
+            .children(
+                self.control_pane
+                    .as_ref()
+                    .map(|open_pane| control_pane::render(open_pane, cx)),
             )
     }
 }

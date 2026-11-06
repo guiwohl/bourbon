@@ -45,6 +45,7 @@ Each column is a module owned by one concern. Columns render from data the works
 | `main.rs` | Opens the store, aborts on error |
 | `window.rs` | GPUI application, key binding, window options, the close hook |
 | `autosave.rs` | The 500 ms delayed task |
+| `control_pane/` | The centred search and command overlay (see Control pane) |
 | `navigation.rs` | `Navigation`, `Listing`, the pure mapping to `NoteQuery` |
 | `workspace.rs` | Root view: owns `NoteStore`, listing, selection, autosave and flush, trash purge, error banner state; lays out the three columns |
 | `dragged_note.rs` | `DraggedNote` drag payload and preview, built from a `NoteSummary` |
@@ -134,6 +135,8 @@ Bound in `window::bind_keys` with no key context, so they work from any focus.
 | `Shift+Alt+1` … `5` | Status None, Active, On Hold, Completed, Dropped |
 | `Ctrl+Alt+M` | Open the notebook selector (no-op without an open note) |
 | `Alt+Left` / `Alt+Right` | History back / forward |
+| `Ctrl+O` | Open the control pane in Notes mode |
+| `Ctrl+P` | Open the control pane in Actions mode (`>` prefilled) |
 
 On Linux `gpui-base` binds word movement to `Ctrl+Left/Right`, so `Alt+Left/Right` is free. On macOS it binds `Alt+Left/Right` inside inputs and would shadow these.
 
@@ -158,3 +161,26 @@ Implements decision rows 18 and 24 to 28 of [M2 organization](../decisions/2026-
 | Mark and unmark | The editor header "..." button (`note-actions`) offers "Mark as template" or "Unmark template" by `Note::is_template`. The intent runs through `edit_selected` (flush, change, refresh header and listing); the note stays open even though it leaves the current list |
 
 Tests: `workspace/tests/templates.rs`.
+
+## Control pane
+
+Decisions in [M3 navigation](../decisions/2026-11-06-m3-navigation.md). `Workspace::control_pane: Option<ControlPane>`; rendered last in the root view as an absolute overlay (`pane-backdrop` > `pane-panel` with `pane-input` and `pane-row-<n>`).
+
+| File | Responsibility |
+|---|---|
+| `control_pane/query.rs` | Pure `parse(query) -> ParsedQuery { mode, text }`: a leading `>` is `Mode::Actions` (text trimmed, `>` dropped), anything else `Mode::Notes` |
+| `control_pane/actions.rs` | `PaneAction` (21 commands), `name`, `shortcut`, `needs_selected_note`, pure `matching(text, has_selected_note)`: filter and rank |
+| `control_pane/highlight.rs` | Pure `next(current, length)` and `previous(current)`, clamped at both ends |
+| `control_pane/mod.rs` | `ControlPane` state: the input, the highlighted row, `Results::{Notes(Vec<SearchHit>), Actions(Vec<PaneAction>)}`; `search(query, store, has_selected_note)` |
+| `control_pane/render.rs` | Overlay: input, rows (note: title or `UNTITLED` plus snippet; action: name plus the shortcut on the right) |
+| `workspace/control_pane_intents.rs` | `open_note_search`, `open_action_search`, `close_control_pane`, query change, highlight movement, activation and `run_pane_action` |
+
+Behaviour:
+
+- Every query change recomputes the results and resets the highlight to the first row. `set_value` emits no change, so opening computes the first results itself.
+- `Up`, `Down` and `Esc` are captured at the overlay (like the tag suggestions) so the single-line input does not swallow them. `Enter` is the input's `PressEnter`. A mouse down on the backdrop closes; the panel stops propagation.
+- Activating a row closes the pane, restores focus to the workspace root, then runs the target. A note goes through `flush_then`: if it is not in `Workspace::notes` the navigation becomes All Notes, then `select`. An action calls the existing intent: `create_note`, `create_template`, `toggle_sidebar`, `navigate`, `sort_by`, `set_selected_status`, `open_notebook_selector`, `duplicate`, `toggle_pin`, `move_to_trash`, `history_back`, `history_forward`; Empty Trash navigates to Trash and opens `confirm_empty_trash`.
+- No selected note: the actions that need one are hidden from the list.
+- Startup now always focuses the workspace root, so `Ctrl+O` and `Ctrl+P` work before any click.
+
+Tests: pure unit tests next to each file; `workspace/tests/control_pane.rs` drives the real keys (`Ctrl+O`, `Ctrl+P`, `Up`, `Down`, `Enter`, `Escape`, typing into `pane-input`) and clicks (`pane-row-<n>`, backdrop, inside the input).
