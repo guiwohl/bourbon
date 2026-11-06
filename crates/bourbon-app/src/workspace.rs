@@ -117,7 +117,6 @@ impl Workspace {
     fn save_and_reload(&mut self, cx: &mut Context<Self>) -> Result<(), StoreError> {
         self.save_selected(cx)?;
         self.reload_list(cx);
-        self.reload_sidebar(cx);
         Ok(())
     }
 
@@ -156,9 +155,13 @@ impl Workspace {
             self.report(&error, cx);
             return;
         }
-        match self.create_note_in_current_notebook() {
+        if self.listing.navigation == Navigation::Trash {
+            self.listing.navigation = Navigation::AllNotes;
+        }
+        let created = self.create_note_for_navigation();
+        self.reload_list(cx);
+        match created {
             Ok(note) => {
-                self.reload_list(cx);
                 self.reload_sidebar(cx);
                 self.show(note, window, cx);
                 self.editor.focus_title(window, cx);
@@ -167,12 +170,24 @@ impl Workspace {
         }
     }
 
-    fn create_note_in_current_notebook(&self) -> Result<Note, StoreError> {
-        let notebook = match self.listing.selected_notebook() {
-            Some(selected) => selected.clone(),
-            None => self.store.default_notebook()?,
-        };
-        self.store.create_note(&notebook, Timestamp::now())
+    fn create_note_for_navigation(&self) -> Result<Note, StoreError> {
+        let now = Timestamp::now();
+        if let Navigation::Notebook(notebook) = &self.listing.navigation {
+            return self.store.create_note(notebook, now);
+        }
+        let note = self
+            .store
+            .create_note(&self.store.default_notebook()?, now)?;
+        match &self.listing.navigation {
+            Navigation::Tags(tags) => {
+                for tag in tags {
+                    self.store.add_tag_to_note(&note.id, tag, now)?;
+                }
+            }
+            Navigation::Status(status) => self.store.set_status(&note.id, *status, now)?,
+            _ => {}
+        }
+        Ok(note)
     }
 
     fn show(&mut self, note: Note, window: &mut Window, cx: &mut Context<Self>) {

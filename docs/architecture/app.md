@@ -13,12 +13,13 @@ GPUI window over `bourbon-core`. Holds no business rule: it presents state and f
 | Note list | Header with a "New note" button (top right); rows show the title (or "Untitled") and the excerpt; the selected row is highlighted; clicking selects |
 | Editor | Title input and Markdown editor (soft wrap, no line numbers). Empty state: "No notes yet" with a "New note" button |
 | Navigation | `Navigation { AllNotes, Notebook, Status, Tags, Trash }` plus the current sort form a `Listing`; `Listing::query()` maps it to a core `NoteQuery` (table below) |
-| New note | Button or `Ctrl+N`: flush, create in the selected notebook when the navigation is a notebook, else in `default_notebook()`; reload list and sidebar, select, focus the title. The root view tracks its own focus handle, focused at startup when no note is selected, so `Ctrl+N` works with nothing else focused |
-| Autosave | Any title or body change restarts one pending 500 ms task; when it fires: `save_note`, then reload list and sidebar counts. No manual save |
+| New note | Button or `Ctrl+N`: flush, then create so the note is visible in the current list: `Notebook(id)` creates in that notebook; `AllNotes` in `default_notebook()`; `Tags(ids)` in `default_notebook()` with every tag added; `Status(s)` in `default_notebook()` with status `s`; `Trash` switches to `AllNotes` first, then as `AllNotes`. Then reload the list and the sidebar, select, focus the title. The root view tracks its own focus handle, focused at startup when no note is selected, so `Ctrl+N` works with nothing else focused |
+| Autosave | Any title or body change restarts one pending 500 ms task; when it fires: `save_note`, then reload the list only. No manual save |
 | Flush | Selecting or creating a note first saves the current one immediately; if that save fails the switch is cancelled. Changing the navigation does not flush: the open note stays open |
 | Close | `on_window_should_close` flushes the pending save while the view is alive. Success closes the window; failure keeps it open with the banner shown |
 | Quit | `on_app_quit` flushes synchronously for quits that happen while the window is open. On Linux, closing the last window quits after the window and view are dropped, so the close hook is the one that matters there |
 | Errors | `save_selected` and `flush_pending_save` return `Result<(), StoreError>`; the error is reported once at the boundary (autosave timer, select, create, close, quit). The banner is rendered once by the root view, above the columns, until the next successful save |
+| Sidebar reload | The sidebar (notebook tree, tag counts) reloads on startup and on create only; saving does not touch it. Later slices (move, trash, tag changes) add their own reloads |
 | Save vs reload | Only a save failure blocks switching, creating or closing. A failed list or sidebar reload is reported but blocks nothing |
 | Loading a note | `set_value` emits no `Change` event, so loading never schedules a save |
 

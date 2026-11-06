@@ -8,6 +8,8 @@ mod workspace;
 
 use bourbon_core::{NoteStore, default_database_path};
 
+const UNTITLED: &str = "Untitled";
+
 fn main() {
     let database_path = default_database_path();
     let store = NoteStore::open(&database_path).unwrap_or_else(|error| {

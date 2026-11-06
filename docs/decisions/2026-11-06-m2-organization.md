@@ -43,7 +43,7 @@ Rule: follow InkDrop exactly, unless a row says otherwise. Sources: [How to orga
 |---|---|---|
 | 16 | Pinned | **Pinned notes stay at the top of any list they appear in** (InkDrop docs do not cover this; our rule) |
 | 17 | Sorting | **By updated (default), created or title** |
-| 18 | New note | **Button at the top right of the note list; `Ctrl+N`** |
+| 18 | New note | **Button at the top right of the note list; `Ctrl+N`. The new note is always visible in the current list: in a notebook it goes there; in All Notes it goes to Inbox; in Tags it goes to Inbox with those tags; in a Status it goes to Inbox with that status; from Trash the view switches to All Notes first.** Changing the view keeps the open note open |
 | 19 | History | **`Alt+←` / `Alt+→` move back and forward between viewed notes** |
 | 20 | Duplicate | **Duplicating creates a copy in the same notebook** |
 
@@ -55,7 +55,13 @@ Rule: follow InkDrop exactly, unless a row says otherwise. Sources: [How to orga
 | 22 | Trash view | **Restore a note, or empty the trash** |
 | 23 | Deleting a notebook | **The notebook and all its sub-notebooks are removed; every note inside goes to Trash.** A note restored after its notebook is gone lands in Inbox |
 
-## Out of scope
+## Templates
 
-- Templates (InkDrop has them; not in our scope).
+| # | Topic | Decision |
+|---|---|---|
+| 24 | What a template is | **A note flagged as template. Listed only under a "Templates" sidebar section; never in All Notes, notebooks, tags, status or trash lists** |
+| 25 | Creating templates | **"New template" in the Templates section, or mark/unmark an existing note as template** |
+| 26 | Using a template | **"New from template" next to "New note". The new note copies the template's title, body and tags; its notebook follows rule #18 (visible in the current list)** |
+| 27 | Variables | **`{{date}}` → `YYYY-MM-DD`, `{{time}}` → `HH:MM` (24h), in the local time zone, expanded in title and body at creation** |
+| 28 | Storage | **Schema v3 adds `notes.is_template`** |
 
