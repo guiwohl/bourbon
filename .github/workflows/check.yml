@@ -27,3 +27,22 @@ jobs:
           tool: just,cargo-nextest,cargo-deny
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ripgrep build-essential clang cmake libfontconfig-dev libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev
       - run: just check
+        env:
+          NEXTEST_PROFILE: ci
+
+  mutants:
+    name: mutants
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2.9.3
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,cargo-mutants
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential clang cmake libfontconfig-dev libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev
+      - run: git diff origin/${{ github.base_ref }}...HEAD > pr.diff
+      - run: cargo mutants --workspace --test-tool nextest --in-diff pr.diff

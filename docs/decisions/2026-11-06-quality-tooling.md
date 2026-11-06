@@ -10,7 +10,7 @@
 | 4 | Architecture guard | **`just architecture` fails if `bourbon-core`'s dependency tree contains any `gpui*` crate. `cargo-deny` also bans `gpui-kit`, `gpui-component`, `gpui-base` and `gpui-pre` outside their known parents** | `bourbon-core` can never import the UI framework. The tree check covers every GPUI sub-crate and cannot go stale on a GPUI bump |
 | 5 | Comment ban | **`just comments` fails on any `//` or `/*` in `crates/**/*.rs`, except `://` (URLs); it also fails if ripgrep itself errors** | Enforces the zero-comments rule mechanically |
 | 6 | Tests | **`cargo nextest`** | Fast, isolated test runs |
-| 7 | Test quality | **`cargo-mutants`**, run separately with `just mutants` | Proves tests fail when the code is broken; too slow for every check |
+| 7 | Test quality | **`cargo-mutants`**, run separately with `just mutants` (moved to CI on the PR diff, see [dev-loop-and-cpu](2026-11-06-dev-loop-and-cpu.md) #4) | Proves tests fail when the code is broken; too slow for every check |
 
 ## Known limits
 
