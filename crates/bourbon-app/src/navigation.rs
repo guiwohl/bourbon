@@ -7,6 +7,7 @@ pub(crate) enum Navigation {
     Notebook(NotebookId, NotebookDepth),
     Status(NoteStatus),
     Tags(Vec<TagId>),
+    Templates,
     Trash,
 }
 
@@ -37,6 +38,10 @@ impl Navigation {
         }
     }
 
+    pub(crate) fn hides_new_notes(&self) -> bool {
+        matches!(self, Self::Trash | Self::Templates)
+    }
+
     pub(crate) fn shows_notebook(&self, notebook: &NotebookId) -> bool {
         matches!(self, Self::Notebook(shown, _) if shown == notebook)
     }
@@ -57,6 +62,7 @@ impl Listing {
             Navigation::Notebook(id, depth) => NoteScope::Notebook(id.clone(), *depth),
             Navigation::Status(status) => NoteScope::Status(*status),
             Navigation::Tags(ids) => NoteScope::Tags(ids.clone()),
+            Navigation::Templates => NoteScope::Templates,
             Navigation::Trash => NoteScope::Trash,
         };
         NoteQuery {
@@ -101,6 +107,7 @@ mod tests {
                 NoteScope::Status(NoteStatus::OnHold),
             ),
             (Navigation::Tags(tags.clone()), NoteScope::Tags(tags)),
+            (Navigation::Templates, NoteScope::Templates),
             (Navigation::Trash, NoteScope::Trash),
         ];
         for (navigation, scope) in cases {
@@ -159,6 +166,15 @@ mod tests {
         let other = TagId::generate();
         let tags = Navigation::Tags(vec![other]);
         assert_eq!(tags.without_tag(&tag), tags);
+    }
+
+    #[test]
+    fn only_trash_and_templates_hide_new_notes() {
+        assert!(Navigation::Trash.hides_new_notes());
+        assert!(Navigation::Templates.hides_new_notes());
+        assert!(!Navigation::AllNotes.hides_new_notes());
+        assert!(!Navigation::Status(NoteStatus::Active).hides_new_notes());
+        assert!(!Navigation::Tags(vec![TagId::generate()]).hides_new_notes());
     }
 
     #[test]

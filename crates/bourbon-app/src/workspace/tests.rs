@@ -606,3 +606,4 @@ fn startup_purges_trash_older_than_the_retention(cx: &mut TestAppContext) {
 
 mod note_list;
 mod sidebar;
+mod templates;

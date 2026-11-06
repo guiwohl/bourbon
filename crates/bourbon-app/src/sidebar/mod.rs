@@ -2,6 +2,7 @@ mod notebooks;
 mod prompt;
 mod state;
 mod tags;
+mod templates;
 mod tree;
 
 use bourbon_core::{NoteStatus, NotebookNode, TagSummary};
@@ -84,6 +85,17 @@ pub(crate) fn render(
     for summary in data.tags {
         rows.push(tags::row(summary, data.current, cx).into_any_element());
     }
+    rows.push(
+        simple_row(
+            "nav-templates",
+            "Templates",
+            Navigation::Templates,
+            data.current,
+            cx,
+        )
+        .into_any_element(),
+    );
+    rows.push(templates::new_row(cx).into_any_element());
     rows.push(
         simple_row("nav-trash", "Trash", Navigation::Trash, data.current, cx).into_any_element(),
     );

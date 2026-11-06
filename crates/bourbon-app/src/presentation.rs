@@ -78,6 +78,12 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_blank_title_is_shown_as_untitled() {
+        assert_eq!(display_title(""), "Untitled");
+        assert_eq!(display_title("Plan"), "Plan");
+    }
+
+    #[test]
     fn every_tag_colour_has_its_own_dot_colour() {
         let mut values: Vec<_> = TagColor::ALL.into_iter().map(rgb_value).collect();
         values.sort_unstable();
