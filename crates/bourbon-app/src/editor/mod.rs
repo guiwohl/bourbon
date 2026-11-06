@@ -239,6 +239,12 @@ impl EditorPane {
     }
 
     #[cfg(test)]
+    pub(crate) fn place_cursor_at(&self, offset: usize, cx: &mut Context<Workspace>) {
+        self.body_editor
+            .update(cx, |body, cx| body.set_selected_range(offset..offset, cx));
+    }
+
+    #[cfg(test)]
     pub(crate) fn place_cursor_at_end(&self, cx: &mut Context<Workspace>) {
         let end = self.body(cx).len();
         self.body_editor

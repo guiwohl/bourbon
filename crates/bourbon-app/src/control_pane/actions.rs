@@ -293,6 +293,14 @@ mod tests {
     }
 
     #[test]
+    fn editor_actions_show_their_shortcuts() {
+        assert_eq!(PaneAction::CycleViewMode.shortcut(), Some("Ctrl+E"));
+        assert_eq!(PaneAction::Find.shortcut(), Some("Ctrl+F"));
+        assert_eq!(PaneAction::Replace.shortcut(), Some("Ctrl+H"));
+        assert_eq!(PaneAction::ToggleFocusMode.shortcut(), Some("Ctrl+Shift+F"));
+    }
+
+    #[test]
     fn shortcuts_match_the_bound_keys() {
         assert_eq!(PaneAction::NewNote.shortcut(), Some("Ctrl+N"));
         assert_eq!(PaneAction::ToggleSidebar.shortcut(), Some("Ctrl+/"));
