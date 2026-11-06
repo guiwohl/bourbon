@@ -11,6 +11,8 @@ use gpui_kit::{
 use super::Workspace;
 use crate::navigation::Navigation;
 
+mod editor;
+
 struct Seeded {
     older: NoteId,
     newer: NoteId,

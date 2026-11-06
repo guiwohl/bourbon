@@ -104,3 +104,36 @@ Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure cli
 ### Tests
 
 `workspace/tests/note_list.rs`: the context menu and the sort dropdown are driven through the real popup (right click on `note-<id>`, then `down`/`enter` keystrokes; menu labels are checked with `find_by_label`), the dialog through `enter` and `escape`, chips through `chip-<note>-<tag>`, pins through `pin-<note>`. Date, title and prompt text are pure unit tests.
+
+## Editor header
+
+Rows 3, 8, 10, 13, 15 and 19 of the [M2 decisions](../decisions/2026-11-06-m2-organization.md). Rendered above the Markdown editor, under the title, only while a note is open. All logic is in `workspace/editor_intents.rs`; `editor/` only draws and keeps view state.
+
+| Part | Behaviour |
+|---|---|
+| Notebook selector | Button (id `notebook-selector`) labelled with the note's notebook; opens a popover listing every notebook, depth-first, indented by depth (rows `notebook-option-<id>`). Choosing one calls `move_note` and closes the popover. The open state is the editor's own (`Popover::open` controlled), so `Ctrl+Alt+M` can open it |
+| Status button | Button (id `status-button`) labelled with the current status; dropdown menu None, Active, On Hold, Completed, Dropped, current one checked. Each item dispatches its `SetStatus*` action, the same actions the shortcuts use, so button and keys share one path to `set_status` |
+| Tags field | One removable chip per tag (`tag-chip-<id>`, × is `remove-tag-<id>` → `remove_tag_from_note`), then an "Add tags" input (`tag-input`) |
+| Autocomplete | While typing, rows `tag-suggestion-<id>` list existing tags, not already on the note, whose name contains the typed text (case-insensitive). `Down`/`Up` move the highlight (captured before the single-line input swallows them); clicking a row adds it |
+| `Enter` | Highlighted suggestion if any; else the existing tag named exactly as typed (case-insensitive, trimmed); else `create_tag(name, TagColor::Default)` then add. Blank input does nothing. The input is cleared on success |
+| Every header action | Flush the pending save, call core, reload the note into the header, then reload the sidebar data and the list. The note may leave the current list; it stays open. A failure goes to the banner and the input keeps its text |
+
+### Shortcuts
+
+Bound in `window::bind_keys` with no key context, so they work from any focus.
+
+| Keys | Action |
+|---|---|
+| `Shift+Alt+1` … `5` | Status None, Active, On Hold, Completed, Dropped |
+| `Ctrl+Alt+M` | Open the notebook selector (no-op without an open note) |
+| `Alt+Left` / `Alt+Right` | History back / forward |
+
+On Linux `gpui-base` binds word movement to `Ctrl+Left/Right`, so `Alt+Left/Right` is free. On macOS it binds `Alt+Left/Right` inside inputs and would shadow these.
+
+### History
+
+`editor::History` holds the viewed note ids and a position. `Workspace::show` calls `visit`: a note equal to the current entry adds nothing; otherwise forward entries are dropped and the note is pushed. Back and forward flush, then step to the nearest entry whose note exists and is not trashed, and call `show`, which finds the current entry already in place and pushes nothing. With nothing usable in that direction nothing happens.
+
+### Tests
+
+`workspace/tests/editor.rs`: moving through the real selector, status through the real menu (`popup-menu` items) and `Shift+Alt+1`…`5`, `Ctrl+Alt+M`, chips, suggestions, keyboard and click picking, create-on-Enter, chip removal, flush before each action, banner on failure, history across three notes including a trashed and a purged one, and `History` itself (forward entries dropped).
