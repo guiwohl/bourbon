@@ -34,6 +34,7 @@ Everything runs through `just`. Full reference: `docs/development/justfile.md`.
 - `just build` / `just run` / `just test`
 - `just fmt` — format before `check`.
 - `just mutants` — slow; run before a PR that touches logic.
+- `main` only accepts PRs with the `check` workflow green. See `docs/development/ci.md`.
 
 ## Writing style
 
