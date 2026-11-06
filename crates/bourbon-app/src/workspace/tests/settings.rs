@@ -2,7 +2,7 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use bourbon_core::{Appearance, NoteStore, Settings, ThemeSource};
-use gpui_kit::component::ActiveTheme as _;
+use gpui_kit::component::{ActiveTheme as _, Theme};
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, Hsla, TestAppContext, VisualTestContext};
 
@@ -18,6 +18,12 @@ fn press(cx: &mut TestAppContext, handle: AnyWindowHandle, keystrokes: &str) {
     cx.update_window(handle, |_, window, cx| window.render_frame(cx))
         .unwrap();
     VisualTestContext::from_window(handle, cx).simulate_keystrokes(keystrokes);
+}
+
+const TAMPERED: u32 = 0x00ff_0000;
+
+fn tamper_with_the_background(cx: &mut TestAppContext) {
+    cx.update(|cx| Theme::update(cx, |theme| theme.colors.background = color(TAMPERED)));
 }
 
 fn background(cx: &mut TestAppContext) -> Hsla {
@@ -207,29 +213,6 @@ fn a_changed_omarchy_file_is_reapplied_within_two_seconds(cx: &mut TestAppContex
 }
 
 #[gpui_kit::test]
-fn an_unchanged_omarchy_file_leaves_the_theme_alone(cx: &mut TestAppContext) {
-    let locations = locations_with_scheme(DARK_SCHEME);
-    set_modified(&locations.omarchy_colors, 1_000);
-    let mut stored = Settings::default();
-    stored.theme_source = ThemeSource::Omarchy;
-    locations.settings.save(&stored).unwrap();
-    let (_, view) = open_view_with(
-        cx,
-        NoteStore::open_in_memory().unwrap(),
-        copy_of(&locations),
-    );
-    view.update(cx, |view, cx| {
-        view.settings.theme_source = ThemeSource::Bourbon;
-        cx.notify();
-    });
-
-    cx.executor().advance_clock(Duration::from_secs(4));
-    cx.run_until_parked();
-
-    assert_eq!(background(cx), color(0x0000_1c2b));
-}
-
-#[gpui_kit::test]
 fn toggling_the_sidebar_is_saved(cx: &mut TestAppContext) {
     let locations = isolated_locations();
     let (handle, _view) = open_view_with(
@@ -270,13 +253,54 @@ fn resizing_clamps_the_widths_and_saves_only_when_the_drag_ends(cx: &mut TestApp
 }
 
 #[gpui_kit::test]
-fn the_note_list_edge_follows_the_sidebar_only_while_it_is_visible(cx: &mut TestAppContext) {
+fn dragging_the_note_list_divider_measures_from_the_sidebar_edge(cx: &mut TestAppContext) {
     let (handle, view) = open_view(cx, NoteStore::open_in_memory().unwrap());
-    view.read_with(cx, |view, _| assert_eq!(view.sidebar_edge(), 240.));
+
+    view.update(cx, |view, cx| view.resize_note_list_to_pointer(540., cx));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.settings.note_list_width(), 300);
+    });
 
     press(cx, handle, "ctrl-/");
+    view.update(cx, |view, cx| view.resize_note_list_to_pointer(540., cx));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.settings.note_list_width(), 540);
+    });
+}
 
-    view.read_with(cx, |view, _| assert_eq!(view.sidebar_edge(), 0.));
+#[gpui_kit::test]
+fn the_theme_is_not_repainted_while_the_omarchy_file_is_unchanged(cx: &mut TestAppContext) {
+    let locations = locations_with_scheme(DARK_SCHEME);
+    set_modified(&locations.omarchy_colors, 1_000);
+    let mut stored = Settings::default();
+    stored.theme_source = ThemeSource::Omarchy;
+    locations.settings.save(&stored).unwrap();
+    open_view_with(cx, NoteStore::open_in_memory().unwrap(), locations);
+    tamper_with_the_background(cx);
+
+    cx.executor().advance_clock(Duration::from_secs(4));
+    cx.run_until_parked();
+
+    assert_eq!(background(cx), color(TAMPERED));
+}
+
+#[gpui_kit::test]
+fn a_changed_omarchy_file_is_ignored_while_bourbon_is_the_theme_source(cx: &mut TestAppContext) {
+    let locations = locations_with_scheme(DARK_SCHEME);
+    set_modified(&locations.omarchy_colors, 1_000);
+    open_view_with(
+        cx,
+        NoteStore::open_in_memory().unwrap(),
+        copy_of(&locations),
+    );
+    tamper_with_the_background(cx);
+
+    std::fs::write(&locations.omarchy_colors, LIGHT_SCHEME).unwrap();
+    set_modified(&locations.omarchy_colors, 2_000);
+    cx.executor().advance_clock(Duration::from_secs(2));
+    cx.run_until_parked();
+
+    assert_eq!(background(cx), color(TAMPERED));
 }
 
 #[gpui_kit::test]

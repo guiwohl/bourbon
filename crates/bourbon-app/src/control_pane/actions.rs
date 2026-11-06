@@ -165,6 +165,12 @@ mod tests {
     }
 
     #[test]
+    fn open_settings_shows_its_shortcut() {
+        assert_eq!(PaneAction::OpenSettings.shortcut(), Some("Ctrl+,"));
+        assert_eq!(PaneAction::OpenSettings.name(), "Open settings");
+    }
+
+    #[test]
     fn empty_text_offers_every_action_in_declared_order() {
         assert_eq!(matching("", true), ALL);
     }

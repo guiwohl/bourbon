@@ -37,12 +37,13 @@ impl Workspace {
         cx.notify();
     }
 
-    pub(crate) fn sidebar_edge(&self) -> f32 {
-        if self.sidebar.is_visible {
+    pub(crate) fn resize_note_list_to_pointer(&mut self, pointer: f32, cx: &mut Context<Self>) {
+        let sidebar_edge = if self.sidebar.is_visible {
             f32::from(self.settings.sidebar_width())
         } else {
             0.
-        }
+        };
+        self.resize_note_list(pointer - sidebar_edge, cx);
     }
 
     pub(crate) fn finish_resizing(&mut self, cx: &mut Context<Self>) {
