@@ -76,3 +76,11 @@ If title and body both equal what is stored, `save_note` is a no-op and `updated
 ## Database path
 
 `$XDG_DATA_HOME/bourbon/bourbon.db`; if unset or empty, `$HOME/.local/share/bourbon/bourbon.db`.
+
+## Tags
+
+Tag names are trimmed; an empty name is `EmptyTagName`. Uniqueness is case-insensitive (`TagNameTaken`); a tag may be renamed to its own name in another case. Unknown ids give `TagNotFound`.
+
+`list_tags` returns `TagSummary { tag, note_count }` ordered by name ignoring case; `note_count` counts non-trashed notes carrying the tag, any status. `delete_tag` also removes its `note_tags` rows.
+
+`add_tag_to_note` / `remove_tag_from_note` set the note's `updated_at = now` only when they change something; adding a present tag or removing an absent one is a no-op. Unknown note gives `NoteNotFound`.
