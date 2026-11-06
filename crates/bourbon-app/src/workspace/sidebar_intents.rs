@@ -110,6 +110,14 @@ impl Workspace {
         cx.notify();
     }
 
+    pub(crate) fn make_default_notebook(&mut self, notebook: &NotebookId, cx: &mut Context<Self>) {
+        match self.store.set_default_notebook(notebook) {
+            Ok(()) => self.sidebar.inbox = Some(notebook.clone()),
+            Err(error) => self.report(&error, cx),
+        }
+        cx.notify();
+    }
+
     pub(crate) fn begin_delete_notebook(
         &mut self,
         notebook: &NotebookId,

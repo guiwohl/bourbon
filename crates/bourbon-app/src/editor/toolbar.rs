@@ -5,8 +5,8 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div,
 };
 
-use super::view_mode::ViewMode;
 use crate::workspace::Workspace;
+use bourbon_core::ViewMode;
 
 fn button_id(mode: ViewMode) -> &'static str {
     match mode {

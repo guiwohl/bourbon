@@ -54,7 +54,7 @@ Each column is a module owned by one concern. Columns render from data the works
 | `sidebar/mod.rs` | `render(SidebarData, cx)`: navigation rows, notebook tree flattening, selection rule |
 | `note_list/mod.rs` | `render(notes, selected, cx)`: header with the New note button, note rows |
 | `editor/mod.rs` | `EditorPane` (title input, Markdown editor, load/read/focus, change subscriptions), empty state, error banner element |
-| `editor/{tasks,preview_blocks,link_trigger,link_picker,word_count,view_mode}.rs` | Pure, unit-tested editor logic: task toggling, preview block splitting, `[[` detection, suggestion matching, counts, mode cycle |
+| `editor/{tasks,preview_blocks,link_trigger,link_picker,word_count}.rs` | Pure, unit-tested editor logic: task toggling, preview block splitting, `[[` detection, suggestion matching, counts, mode cycle |
 | `editor/{preview,toolbar}.rs` | Preview pane and the mode switch |
 | `workspace/writing_intents.rs` | View mode, tasks, link picker and link opening, find, focus mode intents |
 
@@ -76,7 +76,7 @@ Implements decision rows 2, 4, 7, 11, 12 and 23 of [M2 organization](../decision
 | Tree | Depth-first rows indented per depth; each row shows name and `NotebookNode::note_count`. Rows with children have a disclosure triangle (`toggle-notebook-<id>`) that expands/collapses without navigating |
 | Expansion | `SidebarState::expanded` (set of `NotebookId`), all collapsed at startup, lives in the workspace |
 | Depth | `Navigation::Notebook(id, depth)`. Selecting an expanded notebook uses `DirectOnly`; a collapsed one `WithDescendants`. Toggling the disclosure of the selected notebook re-applies the depth and reloads the list |
-| Notebook menu | Right click: New sub-notebook (also expands the parent), Rename, Delete. The Inbox (`default_notebook()`, read once at startup) has no Delete |
+| Notebook menu | Right click: New sub-notebook (also expands the parent), Rename, Use for new notes (sets the default notebook), Delete. The Inbox (`default_notebook()`, read once at startup) has no Delete |
 | Tag rows | Colour dot (fixed palette in `presentation.rs`, independent of the theme), name, `TagSummary::note_count`. Click selects the tag alone; `Ctrl+click` toggles it in the `Navigation::Tags` selection (notes having all of them); removing the last tag goes to All Notes |
 | Tag menu | Rename, Change colour (submenu of the 14 `TagColor` values, current one checked), Delete |
 | Prompt | One inline panel at the top of the sidebar (`SidebarState::prompt`): a name field with Save/Cancel (Enter also saves) for create and rename, a question with Delete/Cancel for deletions ("Delete notebook X? Its notes move to Trash."). No dialog: the dialog layer needs `Root` as the window root view, which the app does not use. A core error (empty name, duplicate tag) goes to the banner and the prompt stays open; success clears the banner and the prompt |

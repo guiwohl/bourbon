@@ -61,6 +61,21 @@ fn typing_after_the_brackets_filters_the_titles_ignoring_case(cx: &mut TestAppCo
 }
 
 #[gpui_kit::test]
+fn suggestions_also_match_note_bodies(cx: &mut TestAppContext) {
+    let (store, _) = seeded_store();
+    let inbox = store.default_notebook().unwrap();
+    let hidden = store.create_note(&inbox, at(5)).unwrap();
+    store
+        .save_note(&hidden.id, "Zed", "contains pineapple", at(6))
+        .unwrap();
+    let (handle, view) = open_view(cx, store);
+
+    type_into_body(cx, handle, &view, "[[pineapple");
+
+    assert!(is_rendered(cx, handle, &suggestion(&hidden.id)));
+}
+
+#[gpui_kit::test]
 fn no_matching_note_closes_the_popup(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -162,7 +177,7 @@ fn an_untitled_note_is_linked_as_untitled(cx: &mut TestAppContext) {
         .unwrap();
     let (handle, view) = open_view(cx, store);
     click(cx, handle, &format!("note-{}", seeded.newer));
-    type_into_body(cx, handle, &view, "[[Untit");
+    type_into_body(cx, handle, &view, "[[");
 
     press(cx, handle, "enter");
 

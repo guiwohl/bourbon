@@ -22,6 +22,15 @@ impl NoteStore {
         Ok(id)
     }
 
+    pub fn set_default_notebook(&self, id: &NotebookId) -> Result<(), StoreError> {
+        self.ensure_notebook_exists(id)?;
+        self.connection.execute(
+            "UPDATE settings SET value = ?1 WHERE key = 'default_notebook_id'",
+            params![id],
+        )?;
+        Ok(())
+    }
+
     pub fn create_notebook(
         &self,
         name: &str,

@@ -16,7 +16,7 @@ Rule: follow InkDrop exactly, unless a row says otherwise. Sources: [How to orga
 |---|---|---|
 | 4 | Nesting | **Unlimited depth.** Each tree item shows its note count and expands/collapses |
 | 5 | Membership | **Every note belongs to exactly one notebook** |
-| 6 | Default notebook | **"Inbox", created on first run.** Notes created from All Notes, Status or Tags go there. Changeable in settings (M5). Notes from M1 databases move into Inbox on migration |
+| 6 | Default notebook | **"Inbox", created on first run.** Notes created from All Notes, Status or Tags go there. Changeable from a notebook's context menu ("Use for new notes"). Notes from M1 databases move into Inbox on migration |
 | 7 | Viewing | **An expanded notebook lists only its direct notes; a collapsed one also lists all its sub-notebooks' notes** |
 | 8 | Moving a note | **Notebook selector, `Ctrl+Alt+M`, or dragging the note onto a notebook in the sidebar** |
 

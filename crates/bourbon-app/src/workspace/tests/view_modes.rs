@@ -6,8 +6,8 @@ use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext, VisualTestContext};
 
 use super::{click, open_view, seeded_store};
-use crate::editor::ViewMode;
 use crate::workspace::Workspace;
+use bourbon_core::ViewMode;
 
 pub(super) fn press(cx: &mut TestAppContext, handle: AnyWindowHandle, keystrokes: &str) {
     VisualTestContext::from_window(handle, cx).simulate_keystrokes(keystrokes);

@@ -320,3 +320,32 @@ fn opening_a_note_leaves_the_settings_view(cx: &mut TestAppContext) {
 
     assert!(!is_open(cx, &view));
 }
+
+#[gpui_kit::test]
+fn the_view_mode_is_saved_when_it_changes(cx: &mut TestAppContext) {
+    let locations = isolated_locations();
+    let (store, _) = super::seeded_store();
+    let (handle, _view) = open_view_with(cx, store, copy_of(&locations));
+
+    click(cx, handle, "view-mode-preview");
+
+    assert_eq!(
+        saved(&locations).editor_view_mode,
+        bourbon_core::ViewMode::Preview
+    );
+}
+
+#[gpui_kit::test]
+fn the_saved_view_mode_is_restored_at_startup(cx: &mut TestAppContext) {
+    let locations = isolated_locations();
+    let mut stored = Settings::default();
+    stored.editor_view_mode = bourbon_core::ViewMode::SideBySide;
+    locations.settings.save(&stored).unwrap();
+
+    let (_, view) = open_view_with(cx, NoteStore::open_in_memory().unwrap(), locations);
+
+    assert_eq!(
+        view.read_with(cx, |view, _| view.view_mode),
+        bourbon_core::ViewMode::SideBySide
+    );
+}

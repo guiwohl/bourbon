@@ -1,8 +1,9 @@
-use bourbon_core::{NoteId, NoteQuery, StoreError, format_note_link, parse_note_link};
+use bourbon_core::ViewMode;
+use bourbon_core::{NoteId, StoreError, format_note_link, parse_note_link};
 use gpui_kit::{Context, Window};
 
 use super::{Workspace, load_note};
-use crate::editor::{LinkPicker, ViewMode, tasks};
+use crate::editor::{LinkPicker, MAX_SUGGESTIONS, tasks};
 use crate::editor::{closing_brackets_after, link_query_before_cursor};
 use crate::navigation::Navigation;
 use crate::presentation::display_title;
@@ -15,6 +16,8 @@ impl Workspace {
         cx: &mut Context<Self>,
     ) {
         self.view_mode = mode;
+        self.settings.editor_view_mode = mode;
+        self.persist_settings(cx);
         self.editor.link_picker = None;
         if mode.shows_editor() {
             self.editor.focus_body(window, cx);
@@ -58,8 +61,8 @@ impl Workspace {
         self.restart_autosave(cx);
         let before_cursor = self.editor.text_before_cursor(cx);
         self.editor.link_picker = link_query_before_cursor(&before_cursor).and_then(|query| {
-            let notes = self.store.list_notes(&NoteQuery::default()).ok()?;
-            LinkPicker::matching(query.start, query.text, &notes)
+            let hits = self.store.search_notes(query.text, MAX_SUGGESTIONS).ok()?;
+            LinkPicker::from_hits(query.start, hits)
         });
         cx.notify();
     }

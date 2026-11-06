@@ -32,6 +32,35 @@ fn the_default_notebook_survives_reopening() {
 }
 
 #[test]
+fn the_default_notebook_can_be_changed_and_survives_reopening() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("bourbon.db");
+    let store = NoteStore::open(&path).unwrap();
+    let work = store.create_notebook("Work", None, at(5)).unwrap();
+
+    store.set_default_notebook(&work.id).unwrap();
+
+    assert_eq!(store.default_notebook().unwrap(), work.id);
+    assert_eq!(
+        NoteStore::open(&path).unwrap().default_notebook().unwrap(),
+        work.id
+    );
+}
+
+#[test]
+fn an_unknown_notebook_cannot_become_the_default() {
+    let store = store();
+    let before = inbox(&store);
+    let missing = NotebookId::generate();
+
+    assert!(matches!(
+        store.set_default_notebook(&missing),
+        Err(StoreError::NotebookNotFound(_))
+    ));
+    assert_eq!(store.default_notebook().unwrap(), before);
+}
+
+#[test]
 fn created_notebook_is_returned_and_listed() {
     let store = store();
     let notebook = store.create_notebook("Work", None, at(5)).unwrap();

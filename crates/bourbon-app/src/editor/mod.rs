@@ -1,4 +1,4 @@
-use bourbon_core::{Note, NotebookNode, Tag, TagSummary};
+use bourbon_core::{Note, NotebookNode, Tag, TagSummary, ViewMode};
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Editor, EditorState, Input, InputEvent, InputState};
@@ -22,14 +22,13 @@ mod preview;
 mod preview_blocks;
 pub(crate) mod tasks;
 mod toolbar;
-mod view_mode;
 mod word_count;
 
 pub(crate) use history::History;
-pub(crate) use link_picker::LinkPicker;
+pub(crate) use link_picker::{LinkPicker, MAX_SUGGESTIONS};
 pub(crate) use link_trigger::{closing_brackets_after, link_query_before_cursor};
 pub(crate) use tasks::TextEdit;
-pub(crate) use view_mode::ViewMode;
+
 pub(crate) use word_count::WordCount;
 
 use header::{HeaderView, NoteHeader};
