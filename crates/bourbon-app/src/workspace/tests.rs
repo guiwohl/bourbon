@@ -484,7 +484,7 @@ fn creating_a_note_on_trash_switches_to_all_notes_and_lists_it(cx: &mut TestAppC
     let (handle, view) = open_view(cx, store);
 
     click(cx, handle, "nav-trash");
-    click(cx, handle, "new-note");
+    VisualTestContext::from_window(handle, cx).simulate_keystrokes("ctrl-n");
 
     assert_eq!(created_note(cx, &view).notebook, inbox);
     cx.read(|cx| assert_eq!(view.read(cx).listing.navigation, Navigation::AllNotes));
@@ -601,4 +601,5 @@ fn startup_purges_trash_older_than_the_retention(cx: &mut TestAppContext) {
     });
 }
 
+mod note_list;
 mod sidebar;

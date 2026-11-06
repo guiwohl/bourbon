@@ -77,3 +77,30 @@ Implements decision rows 2, 4, 7, 11, 12 and 23 of [M2 organization](../decision
 | Not in this slice | Drag and drop, sidebar sorting, templates |
 
 Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure clicks, `Ctrl+click`, right click plus keyboard choice in the popup menu, typing into the prompt, and `Ctrl+/` through the key binding. Counts are checked from painted text inside each row's bounds.
+
+## Note list
+
+`note_list::render(NoteListData, cx)` draws the second column from data the workspace passes in; every action is an intent method on `Workspace`, defined in `workspace/note_list_intents.rs`. The column never touches `NoteStore`.
+
+| File | Responsibility |
+|---|---|
+| `note_list/mod.rs` | Column layout, the "No notes" empty state, selection rule |
+| `note_list/header.rs` | View title, sort selector (Updated, Created, Title), "New note" or, in Trash, "Empty trash" |
+| `note_list/row.rs` | Row: title (or `UNTITLED`), excerpt, short date, pin icon, tag chips, context menu |
+| `note_list/title.rs` | Pure view title: "All Notes", notebook name, status label, tag names, "Trash" |
+| `note_list/date.rs` | Pure `short_date(updated, now, zone)`: `14:30` today, `Nov 6` this year, `Nov 6, 2025` otherwise; the app passes `chrono::Local` |
+| `workspace/note_list_intents.rs` | `sort_by`, `show_tag`, `toggle_pin`, `duplicate`, `move_to_trash`, `restore`, `confirm_empty_trash`, `empty_trash` |
+
+### Behaviour
+
+- The sort selector sets `Listing::sort` and reloads; pinned notes stay on top because the core guarantees it (decision 16).
+- The context menu (right click) outside Trash offers Pin or Unpin, Duplicate, Move to Trash; in Trash only Restore.
+- Every change goes through one path (`change_notes`): flush the pending save, call the core, reload the list and the sidebar data, report a store error in the banner.
+- Duplicate selects the copy. Move to Trash on the selected note selects the next row, else the previous, else nothing (editor empty state); on another row the selection is untouched.
+- "Empty trash" opens an alert dialog ("Permanently delete N notes?"); only OK calls `empty_trash`. A selected note that was purged is deselected.
+- A tag chip navigates to that single tag. Its mouse-down stops propagation so the row is not selected.
+- Tag colours map from `TagColor` to the component palette (`ColorName`) in `row.rs`.
+
+### Tests
+
+`workspace/tests/note_list.rs`: the context menu and the sort dropdown are driven through the real popup (right click on `note-<id>`, then `down`/`enter` keystrokes; menu labels are checked with `find_by_label`), the dialog through `enter` and `escape`, chips through `chip-<note>-<tag>`, pins through `pin-<note>`. Date, title and prompt text are pure unit tests.

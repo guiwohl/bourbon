@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests;
 
+mod note_list_intents;
 mod sidebar_intents;
 
 use bourbon_core::{
@@ -15,6 +16,7 @@ use gpui_kit::{
 
 use crate::editor::{self, EditorPane};
 use crate::navigation::{Listing, Navigation};
+use crate::note_list::NoteListData;
 use crate::sidebar::SidebarData;
 use crate::sidebar::{SidebarState, ToggleSidebar};
 use crate::{autosave, note_list, sidebar};
@@ -230,7 +232,17 @@ impl Render for Workspace {
             },
             cx,
         );
-        let note_list = note_list::render(&self.notes, self.selected.as_ref(), cx);
+        let note_list = note_list::render(
+            &NoteListData {
+                navigation: &self.listing.navigation,
+                sort: self.listing.sort,
+                notebooks: &self.notebooks,
+                tags: &self.tags,
+                notes: &self.notes,
+                selected: self.selected.as_ref(),
+            },
+            cx,
+        );
         div()
             .track_focus(&self.focus_handle)
             .size_full()
