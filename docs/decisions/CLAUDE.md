@@ -9,3 +9,4 @@
 | [2026-11-06-quality-tooling.md](2026-11-06-quality-tooling.md) | just, clippy pedantic, cargo-deny, comment ban, nextest, mutants |
 | [2026-11-06-minimal-core-milestone.md](2026-11-06-minimal-core-milestone.md) | Milestone 1 scope and core storage rules |
 | [2026-11-06-feature-scope.md](2026-11-06-feature-scope.md) | Every feature in/out until complete; milestone order M1–M8 |
+| [2026-11-06-m2-organization.md](2026-11-06-m2-organization.md) | M2: InkDrop layout, notebooks, tags, status, pin, trash |
