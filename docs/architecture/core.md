@@ -175,3 +175,17 @@ Matching is exact and case-sensitive; every occurrence is replaced; anything els
 | `restore(...)` | Shallow clone, integrity check, atomic replace of `destination_db`; close the store before calling |
 
 The system `git` binary does the transport (`export` and `backup` modules need no network crate). Tests use a local bare repository and a `file://` URL.
+
+## Settings and Omarchy colors
+
+| Item | Behaviour |
+|---|---|
+| `Settings::parse(text)` | Never fails: bad text or bad fields give defaults per field; widths clamped |
+| `Settings::to_toml()` | Serialized form written to disk |
+| `SettingsFile::at(path)` | `load()` (missing file gives defaults) and `save()` (atomic: temp file plus rename, creates directories) |
+| `default_settings_path()` | `$XDG_CONFIG_HOME/bourbon/settings.toml`, else `~/.config/...` |
+| `OmarchyColors::parse(text)` | `None` unless background, foreground, accent, selection, color1, color8 are valid `#rrggbb` |
+| `Rgb` | `from_hex`, `as_hex`, `mix`, `luminance` |
+| `default_omarchy_colors_path()` | `$XDG_STATE_HOME/omarchy/current/theme/colors.toml`, else `~/.local/state/...` |
+
+Details in [the M5 decision](../decisions/2026-11-06-m5-visual.md).

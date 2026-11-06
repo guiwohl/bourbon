@@ -5,8 +5,10 @@ mod identifier;
 mod migrations;
 mod note;
 mod notebook;
+mod omarchy;
 mod parent_directory;
 mod query;
+mod settings;
 mod status;
 mod store;
 mod stored_text;
@@ -22,7 +24,12 @@ pub use export::ExportSummary;
 pub use identifier::{InvalidIdentifier, NoteId, NotebookId, TagId};
 pub use note::{Note, NoteSummary};
 pub use notebook::{Notebook, NotebookNode};
+pub use omarchy::{OmarchyColors, Rgb, default_omarchy_colors_path};
 pub use query::{NoteQuery, NoteScope, NoteSort, NotebookDepth};
+pub use settings::{
+    Appearance, NOTE_LIST_WIDTH_RANGE, SIDEBAR_WIDTH_RANGE, Settings, SettingsFile, ThemeSource,
+    default_settings_path,
+};
 pub use status::NoteStatus;
 pub use store::{NoteSeed, NoteStore, SearchHit, StoreError, TRASH_RETENTION, TagSummary};
 pub use tag::{Tag, TagColor};

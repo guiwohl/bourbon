@@ -9,6 +9,7 @@ use gpui_kit::{
 };
 
 use super::Workspace;
+use crate::locations::Locations;
 use crate::navigation::Navigation;
 
 mod control_pane;
@@ -44,7 +45,23 @@ fn seeded_store() -> (NoteStore, Seeded) {
     )
 }
 
+fn isolated_locations() -> Locations {
+    let directory = tempfile::tempdir().unwrap().keep();
+    Locations {
+        settings: bourbon_core::SettingsFile::at(directory.join("settings.toml")),
+        omarchy_colors: directory.join("colors.toml"),
+    }
+}
+
 fn open_view(cx: &mut TestAppContext, store: NoteStore) -> (AnyWindowHandle, Entity<Workspace>) {
+    open_view_with(cx, store, isolated_locations())
+}
+
+fn open_view_with(
+    cx: &mut TestAppContext,
+    store: NoteStore,
+    locations: Locations,
+) -> (AnyWindowHandle, Entity<Workspace>) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         crate::window::bind_keys(cx);
@@ -60,7 +77,7 @@ fn open_view(cx: &mut TestAppContext, store: NoteStore) -> (AnyWindowHandle, Ent
                 ..WindowOptions::default()
             },
             cx,
-            |window, cx| crate::window::build_workspace(store, window, cx),
+            |window, cx| crate::window::build_workspace(store, locations, window, cx),
         )
         .unwrap()
     })
@@ -606,5 +623,6 @@ fn startup_purges_trash_older_than_the_retention(cx: &mut TestAppContext) {
 }
 
 mod note_list;
+mod settings;
 mod sidebar;
 mod templates;

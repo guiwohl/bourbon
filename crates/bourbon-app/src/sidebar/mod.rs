@@ -22,7 +22,6 @@ use crate::workspace::Workspace;
 
 gpui_kit::actions!(bourbon, [ToggleSidebar]);
 
-const SIDEBAR_WIDTH: f32 = 240.;
 const BASE_INDENT: f32 = 8.;
 const INDENT_STEP: f32 = 12.;
 
@@ -38,6 +37,7 @@ pub(crate) struct SidebarData<'a> {
     pub(crate) notebooks: &'a [NotebookNode],
     pub(crate) tags: &'a [TagSummary],
     pub(crate) state: &'a SidebarState,
+    pub(crate) width: f32,
 }
 
 pub(crate) fn render(
@@ -103,7 +103,7 @@ pub(crate) fn render(
         div()
             .id("sidebar")
             .test_support()
-            .w(px(SIDEBAR_WIDTH))
+            .w(px(data.width))
             .h_full()
             .flex_none()
             .flex()

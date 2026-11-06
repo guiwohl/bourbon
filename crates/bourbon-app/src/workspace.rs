@@ -4,28 +4,38 @@ mod tests;
 mod control_pane_intents;
 mod editor_intents;
 mod note_list_intents;
+mod settings_intents;
 mod sidebar_intents;
+
+use std::time::Duration;
 
 use bourbon_core::{
     Note, NoteId, NoteQuery, NoteScope, NoteSeed, NoteStore, NoteSummary, NotebookId, NotebookNode,
-    StoreError, TagSummary, TemplateTimeZone, Timestamp,
+    Settings, StoreError, TagSummary, TemplateTimeZone, Timestamp,
 };
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    Context, FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _,
-    Render, SharedString, Styled as _, Subscription, Task, Window, div,
+    Context, DragMoveEvent, FocusHandle, Focusable, InteractiveElement as _, IntoElement,
+    MouseButton, ParentElement as _, Render, SharedString, Styled as _, Subscription, Task, Window,
+    div,
 };
 
 use crate::control_pane::{self, ControlPane};
 use crate::editor::{self, EditorPane, History};
+use crate::locations::Locations;
 use crate::navigation::{Listing, Navigation};
 use crate::note_list::NoteListData;
+use crate::panes::{self, Divider};
 use crate::sidebar::SidebarData;
 use crate::sidebar::{SidebarState, ToggleSidebar};
-use crate::{autosave, note_list, sidebar};
+use crate::theme::{self, ModificationWatch};
+use crate::{autosave, note_list, settings_view, sidebar};
 
-gpui_kit::actions!(bourbon, [NewNote, OpenNoteSearch, OpenActionSearch]);
+gpui_kit::actions!(
+    bourbon,
+    [NewNote, OpenNoteSearch, OpenActionSearch, OpenSettings]
+);
 
 pub struct Workspace {
     store: NoteStore,
@@ -40,20 +50,35 @@ pub struct Workspace {
     history: History,
     control_pane: Option<ControlPane>,
     pending_save: Option<Task<()>>,
+    locations: Locations,
+    settings: Settings,
+    settings_open: bool,
+    widths_changed: bool,
+    omarchy_watch: ModificationWatch,
+    _omarchy_polling: Task<()>,
     error_message: Option<SharedString>,
     focus_handle: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
 
 impl Workspace {
-    pub fn new(store: NoteStore, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub(crate) fn new(
+        store: NoteStore,
+        locations: Locations,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let settings = locations.settings.load();
+        theme::apply(&settings, &locations.omarchy_colors, cx);
         let editor = EditorPane::new(window, cx);
         let mut subscriptions = editor.subscribe_to_edits(cx);
         subscriptions.push(cx.on_app_quit(|view, cx| {
             view.flush_before_closing(cx);
             std::future::ready(())
         }));
-        let sidebar = SidebarState::new(store.default_notebook().ok());
+        let mut sidebar = SidebarState::new(store.default_notebook().ok());
+        sidebar.is_visible = settings.sidebar_visible;
+        let omarchy_watch = ModificationWatch::new(locations.omarchy_colors.clone());
         let mut view = Self {
             store,
             listing: Listing::default(),
@@ -67,6 +92,12 @@ impl Workspace {
             history: History::default(),
             control_pane: None,
             pending_save: None,
+            locations,
+            settings,
+            settings_open: false,
+            widths_changed: false,
+            omarchy_watch,
+            _omarchy_polling: poll_omarchy_theme(cx),
             error_message: None,
             focus_handle: cx.focus_handle(),
             _subscriptions: subscriptions,
@@ -276,6 +307,7 @@ impl Workspace {
     }
 
     fn show(&mut self, note: Note, window: &mut Window, cx: &mut Context<Self>) {
+        self.settings_open = false;
         self.editor.load(note.clone(), window, cx);
         self.history.visit(&note.id);
         self.selected = Some(note.id);
@@ -286,6 +318,20 @@ impl Workspace {
         self.error_message = Some(error.to_string().into());
         cx.notify();
     }
+}
+
+const OMARCHY_POLL_INTERVAL: Duration = Duration::from_secs(2);
+
+fn poll_omarchy_theme(cx: &mut Context<Workspace>) -> Task<()> {
+    cx.spawn(async move |view, cx| {
+        loop {
+            cx.background_executor().timer(OMARCHY_POLL_INTERVAL).await;
+            let alive = view.update(cx, Workspace::reload_omarchy_theme_if_changed);
+            if alive.is_err() {
+                break;
+            }
+        }
+    })
 }
 
 pub(super) fn load_note(store: &NoteStore, id: &NoteId) -> Result<Note, StoreError> {
@@ -302,7 +348,9 @@ impl Focusable for Workspace {
 
 impl Render for Workspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let pane = if self.selected.is_some() {
+        let pane = if self.settings_open {
+            settings_view::render(&self.settings, cx).into_any_element()
+        } else if self.selected.is_some() {
             self.editor
                 .render(&self.notebooks, &self.tags, cx)
                 .into_any_element()
@@ -315,6 +363,7 @@ impl Render for Workspace {
                 notebooks: &self.notebooks,
                 tags: &self.tags,
                 state: &self.sidebar,
+                width: f32::from(self.settings.sidebar_width()),
             },
             cx,
         );
@@ -327,6 +376,7 @@ impl Render for Workspace {
                 notes: &self.notes,
                 templates: &self.templates,
                 selected: self.selected.as_ref(),
+                width: f32::from(self.settings.note_list_width()),
             },
             cx,
         );
@@ -338,8 +388,22 @@ impl Render for Workspace {
             .flex_col()
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
+            .on_drag_move::<Divider>(cx.listener(|view, event: &DragMoveEvent<Divider>, _, cx| {
+                let pointer = f32::from(event.event.position.x);
+                match event.drag(cx) {
+                    Divider::AfterSidebar => view.resize_sidebar(pointer, cx),
+                    Divider::AfterNoteList => {
+                        view.resize_note_list(pointer - view.sidebar_edge(), cx);
+                    }
+                }
+            }))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|view, _, _, cx| view.finish_resizing(cx)),
+            )
             .on_action(cx.listener(|view, _: &NewNote, window, cx| view.create_note(window, cx)))
             .on_action(cx.listener(|view, _: &ToggleSidebar, _, cx| view.toggle_sidebar(cx)))
+            .on_action(cx.listener(|view, _: &OpenSettings, _, cx| view.open_settings(cx)))
             .on_action(cx.listener(|view, _: &OpenNoteSearch, window, cx| {
                 view.open_note_search(window, cx);
             }))
@@ -355,8 +419,19 @@ impl Render for Workspace {
                     .flex_1()
                     .min_h_0()
                     .flex()
-                    .children(sidebar)
+                    .children(sidebar.map(|sidebar| {
+                        div().flex().child(sidebar).child(panes::divider(
+                            "sidebar-divider",
+                            Divider::AfterSidebar,
+                            cx,
+                        ))
+                    }))
                     .child(note_list)
+                    .child(panes::divider(
+                        "note-list-divider",
+                        Divider::AfterNoteList,
+                        cx,
+                    ))
                     .child(pane),
             )
             .children(

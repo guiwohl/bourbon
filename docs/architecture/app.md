@@ -184,3 +184,11 @@ Behaviour:
 - Startup now always focuses the workspace root, so `Ctrl+O` and `Ctrl+P` work before any click.
 
 Tests: pure unit tests next to each file; `workspace/tests/control_pane.rs` drives the real keys (`Ctrl+O`, `Ctrl+P`, `Up`, `Down`, `Enter`, `Escape`, typing into `pane-input`) and clicks (`pane-row-<n>`, backdrop, inside the input).
+
+## Settings, themes and panes (M5)
+
+- `locations.rs`: `Locations` (settings file, Omarchy colors path) is injected into `Workspace::new`; tests pass temp paths.
+- `theme/`: `palette.rs` holds the Bourbon palettes as data, the Omarchy mapping and `resolve`; `watch.rs` is the mtime watch; `apply` paints gpui-component's `Theme`. `Workspace` polls the watch every 2 s.
+- `settings_view.rs` replaces the editor column; `workspace/settings_intents.rs` holds the intents (`open_settings`, `set_theme_source`, `set_appearance`, `resize_*`, `finish_resizing`). Each change applies the theme and saves.
+- `panes.rs`: the draggable `Divider` handles; widths come from `Settings` and flow into `SidebarData` and `NoteListData`.
+- Keys: `Ctrl+,` opens settings; control pane action "Open settings".

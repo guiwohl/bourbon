@@ -15,8 +15,6 @@ use crate::navigation::Navigation;
 use crate::workspace::Workspace;
 use header::ListView;
 
-const NOTE_LIST_WIDTH: f32 = 320.;
-
 pub(crate) struct NoteListData<'a> {
     pub(crate) navigation: &'a Navigation,
     pub(crate) sort: NoteSort,
@@ -25,6 +23,7 @@ pub(crate) struct NoteListData<'a> {
     pub(crate) notes: &'a [NoteSummary],
     pub(crate) templates: &'a [NoteSummary],
     pub(crate) selected: Option<&'a NoteId>,
+    pub(crate) width: f32,
 }
 
 pub(crate) fn render(data: &NoteListData, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
@@ -58,7 +57,7 @@ pub(crate) fn render(data: &NoteListData, cx: &mut Context<Workspace>) -> impl I
         })
         .collect();
     div()
-        .w(px(NOTE_LIST_WIDTH))
+        .w(px(data.width))
         .h_full()
         .flex_none()
         .flex()

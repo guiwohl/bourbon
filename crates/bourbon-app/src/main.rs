@@ -2,10 +2,14 @@ mod autosave;
 mod control_pane;
 mod dragged_note;
 mod editor;
+mod locations;
 mod navigation;
 mod note_list;
+mod panes;
 mod presentation;
+mod settings_view;
 mod sidebar;
+mod theme;
 mod window;
 mod workspace;
 
@@ -20,5 +24,5 @@ fn main() {
         );
         std::process::exit(1);
     });
-    window::run(store);
+    window::run(store, locations::Locations::of_the_user());
 }
