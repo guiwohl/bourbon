@@ -44,7 +44,7 @@ DROP TABLE notes;
 ALTER TABLE notes_organized RENAME TO notes;
 CREATE TABLE tags (
     id TEXT PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
     color TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );

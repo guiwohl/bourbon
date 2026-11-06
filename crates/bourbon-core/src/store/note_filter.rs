@@ -5,12 +5,9 @@ use rusqlite::types::Value;
 use crate::identifier::TagId;
 use crate::query::{NoteScope, NoteSort, NotebookDepth};
 use crate::status::NoteStatus;
+use crate::store::notebooks::NOTEBOOK_SUBTREE;
 
 const NOT_TRASHED: &str = "n.deleted_at IS NULL";
-const SUBTREE: &str = "WITH RECURSIVE subtree (id) AS (
-    SELECT ? UNION ALL
-    SELECT notebooks.id FROM notebooks JOIN subtree ON notebooks.parent_id = subtree.id
-)";
 
 pub struct NoteFilter {
     pub common_table: &'static str,
@@ -26,11 +23,15 @@ impl NoteFilter {
                 Self::visible(" AND n.notebook_id = ?", vec![text(notebook.as_str())])
             }
             NoteScope::Notebook(notebook, NotebookDepth::WithDescendants) => {
-                let mut filter =
-                    Self::visible(" AND n.notebook_id IN (SELECT id FROM subtree)", Vec::new());
-                filter.common_table = SUBTREE;
-                filter.parameters.insert(0, text(notebook.as_str()));
-                filter
+                let (shown, mut parameters) = Self::visible_statuses();
+                parameters.insert(0, text(notebook.as_str()));
+                Self {
+                    common_table: NOTEBOOK_SUBTREE,
+                    condition: format!(
+                        "{NOT_TRASHED} AND n.status IN ({shown}) AND n.notebook_id IN (SELECT id FROM subtree)"
+                    ),
+                    parameters,
+                }
             }
             NoteScope::Status(status) => Self {
                 common_table: "",
@@ -39,17 +40,17 @@ impl NoteFilter {
             },
             NoteScope::Tags(tags) => {
                 let wanted: HashSet<&str> = tags.iter().map(TagId::as_str).collect();
-                let mut filter = Self::visible(
-                    &format!(
-                        " AND (SELECT COUNT(*) FROM note_tags nt WHERE nt.note_id = n.id AND nt.tag_id IN ({})) = ?",
+                let (shown, mut parameters) = Self::visible_statuses();
+                parameters.extend(wanted.iter().copied().map(text));
+                parameters.push(Value::Integer(wanted.iter().map(|_| 1_i64).sum()));
+                Self {
+                    common_table: "",
+                    condition: format!(
+                        "{NOT_TRASHED} AND n.status IN ({shown}) AND (SELECT COUNT(*) FROM note_tags nt WHERE nt.note_id = n.id AND nt.tag_id IN ({})) = ?",
                         placeholders(wanted.len())
                     ),
-                    wanted.iter().copied().map(text).collect(),
-                );
-                filter.parameters.push(Value::Integer(
-                    i64::try_from(wanted.len()).unwrap_or(i64::MAX),
-                ));
-                filter
+                    parameters,
+                }
             }
             NoteScope::Trash => Self {
                 common_table: "",
@@ -60,21 +61,22 @@ impl NoteFilter {
     }
 
     fn visible(extra_condition: &str, extra_parameters: Vec<Value>) -> Self {
-        let shown: Vec<&str> = NoteStatus::ALL
-            .into_iter()
-            .filter(|status| !status.is_hidden_by_default())
-            .map(NoteStatus::as_stored)
-            .collect();
-        let mut parameters: Vec<Value> = shown.iter().map(|status| text(status)).collect();
+        let (shown, mut parameters) = Self::visible_statuses();
         parameters.extend(extra_parameters);
         Self {
             common_table: "",
-            condition: format!(
-                "{NOT_TRASHED} AND n.status IN ({}){extra_condition}",
-                placeholders(shown.len())
-            ),
+            condition: format!("{NOT_TRASHED} AND n.status IN ({shown}){extra_condition}"),
             parameters,
         }
+    }
+
+    fn visible_statuses() -> (String, Vec<Value>) {
+        let parameters: Vec<Value> = NoteStatus::ALL
+            .into_iter()
+            .filter(|status| !status.is_hidden_by_default())
+            .map(|status| text(status.as_stored()))
+            .collect();
+        (placeholders(parameters.len()), parameters)
     }
 }
 

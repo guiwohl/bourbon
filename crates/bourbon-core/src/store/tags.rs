@@ -26,10 +26,12 @@ impl NoteStore {
             name: name.to_owned(),
             color,
         };
-        self.connection.execute(
-            "INSERT INTO tags (id, name, color, created_at) VALUES (?1, ?2, ?3, ?4)",
-            params![tag.id, tag.name, tag.color, now],
-        )?;
+        self.connection
+            .execute(
+                "INSERT INTO tags (id, name, color, created_at) VALUES (?1, ?2, ?3, ?4)",
+                params![tag.id, tag.name, tag.color, now],
+            )
+            .map_err(|error| tag_name_conflict(error, &tag.name))?;
         Ok(tag)
     }
 
@@ -38,7 +40,8 @@ impl NoteStore {
         self.ensure_tag_exists(id)?;
         self.ensure_tag_name_available(name, Some(id))?;
         self.connection
-            .execute("UPDATE tags SET name = ?2 WHERE id = ?1", params![id, name])?;
+            .execute("UPDATE tags SET name = ?2 WHERE id = ?1", params![id, name])
+            .map_err(|error| tag_name_conflict(error, name))?;
         Ok(())
     }
 
@@ -155,6 +158,17 @@ impl NoteStore {
         } else {
             Ok(())
         }
+    }
+}
+
+pub(super) fn tag_name_conflict(error: rusqlite::Error, name: &str) -> StoreError {
+    match &error {
+        rusqlite::Error::SqliteFailure(failure, _)
+            if failure.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE =>
+        {
+            StoreError::TagNameTaken(name.to_owned())
+        }
+        _ => StoreError::Database(error),
     }
 }
 

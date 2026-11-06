@@ -27,6 +27,8 @@ pub enum StoreError {
     NoteNotFound(NoteId),
     #[error("notebook not found: {0}")]
     NotebookNotFound(NotebookId),
+    #[error("notebook name must not be empty")]
+    EmptyNotebookName,
     #[error("tag name must not be empty")]
     EmptyTagName,
     #[error("tag name already taken: {0}")]
