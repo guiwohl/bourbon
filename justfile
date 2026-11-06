@@ -27,7 +27,13 @@ comments:
     rg '(^|[^:])(//|/\*)' crates/ --type rust
     [ $? -eq 1 ]
 
+architecture:
+    #!/usr/bin/env bash
+    dependencies=$(cargo tree -p bourbon-core -e normal --prefix none) || exit 1
+    rg '^gpui' <<< "$dependencies"
+    [ $? -eq 1 ]
+
 mutants:
     cargo mutants --workspace
 
-check: fmt-check lint deny comments test
+check: fmt-check lint deny architecture comments test
