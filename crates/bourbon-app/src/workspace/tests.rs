@@ -600,3 +600,5 @@ fn startup_purges_trash_older_than_the_retention(cx: &mut TestAppContext) {
         assert!(store.find_note(&recent).unwrap().is_some());
     });
 }
+
+mod sidebar;

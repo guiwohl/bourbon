@@ -1,6 +1,7 @@
 use bourbon_core::NoteStore;
 use gpui_kit::{App, AppContext as _, Entity, KeyBinding, TitlebarOptions, Window, WindowOptions};
 
+use crate::sidebar::ToggleSidebar;
 use crate::workspace::{NewNote, Workspace};
 
 const APP_ID: &str = "bourbon";
@@ -24,6 +25,7 @@ pub fn run(store: NoteStore) {
 
 pub(crate) fn bind_keys(cx: &mut App) {
     cx.bind_keys([KeyBinding::new("ctrl-n", NewNote, None)]);
+    cx.bind_keys([KeyBinding::new("ctrl-/", ToggleSidebar, None)]);
 }
 
 pub(crate) fn build_workspace(
