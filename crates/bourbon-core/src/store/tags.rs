@@ -69,7 +69,7 @@ impl NoteStore {
         let mut statement = self.connection.prepare(&format!(
             "SELECT t.id, t.name, t.color,
                 (SELECT COUNT(*) FROM note_tags nt JOIN notes n ON n.id = nt.note_id
-                 WHERE nt.tag_id = t.id AND n.deleted_at IS NULL)
+                 WHERE nt.tag_id = t.id AND n.deleted_at IS NULL AND n.is_template = 0)
              FROM tags t
              ORDER BY {TAG_ORDER}"
         ))?;

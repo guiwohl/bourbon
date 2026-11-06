@@ -101,7 +101,7 @@ impl NoteStore {
 
     fn direct_note_counts(&self) -> Result<HashMap<NotebookId, usize>, StoreError> {
         let mut statement = self.connection.prepare(
-            "SELECT notebook_id, COUNT(*) FROM notes WHERE deleted_at IS NULL GROUP BY notebook_id",
+            "SELECT notebook_id, COUNT(*) FROM notes WHERE deleted_at IS NULL AND is_template = 0 GROUP BY notebook_id",
         )?;
         let counts = statement
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?

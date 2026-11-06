@@ -8,6 +8,15 @@ use crate::timestamp::Timestamp;
 
 impl NoteStore {
     pub fn create_note(&self, notebook: &NotebookId, now: Timestamp) -> Result<Note, StoreError> {
+        self.insert_empty_note(notebook, now, false)
+    }
+
+    pub(super) fn insert_empty_note(
+        &self,
+        notebook: &NotebookId,
+        now: Timestamp,
+        is_template: bool,
+    ) -> Result<Note, StoreError> {
         self.ensure_notebook_exists(notebook)?;
         let note = Note {
             id: NoteId::generate(),
@@ -18,19 +27,21 @@ impl NoteStore {
             notebook: notebook.clone(),
             status: NoteStatus::None,
             pinned: false,
+            is_template,
             tags: Vec::new(),
             trashed_at: None,
         };
         self.connection.execute(
-            "INSERT INTO notes (id, title, body, created_at, updated_at, notebook_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO notes (id, title, body, created_at, updated_at, notebook_id, is_template)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 note.id,
                 note.title,
                 note.body,
                 note.created_at,
                 note.updated_at,
-                note.notebook
+                note.notebook,
+                note.is_template
             ],
         )?;
         Ok(note)
@@ -73,7 +84,7 @@ impl NoteStore {
         let stored = self
             .connection
             .query_row(
-                "SELECT title, body, created_at, updated_at, notebook_id, status, pinned, deleted_at
+                "SELECT title, body, created_at, updated_at, notebook_id, status, pinned, deleted_at, is_template
                  FROM notes WHERE id = ?1",
                 params![id],
                 |row| {
@@ -86,6 +97,7 @@ impl NoteStore {
                         notebook: row.get(4)?,
                         status: row.get(5)?,
                         pinned: row.get(6)?,
+                        is_template: row.get(8)?,
                         tags: Vec::new(),
                         trashed_at: row.get(7)?,
                     })

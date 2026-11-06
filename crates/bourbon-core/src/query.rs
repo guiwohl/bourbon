@@ -14,6 +14,7 @@ pub enum NoteScope {
     Notebook(NotebookId, NotebookDepth),
     Status(NoteStatus),
     Tags(Vec<TagId>),
+    Templates,
     Trash,
 }
 

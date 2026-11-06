@@ -13,10 +13,10 @@ Pure domain plus SQLite. Never depends on GPUI. No repository trait: one storage
 | `Tag` | id, name, color |
 | `Notebook` | id, name, parent (`None` = top level), created_at |
 | `NotebookNode` | notebook, note_count, children |
-| `Note` | id, title, body, created_at, updated_at, notebook, status, pinned, tags (`Vec<Tag>`: id, name, colour), trashed_at |
+| `Note` | id, title, body, created_at, updated_at, notebook, status, pinned, is_template, tags (`Vec<Tag>`: id, name, colour), trashed_at |
 | `NoteSummary` | id, title, excerpt, updated_at, created_at, pinned, status, tags (`Vec<Tag>`: id, name, colour). No body |
 | `NoteQuery` | scope + sort; `Default` is `AllNotes` + `UpdatedNewestFirst` |
-| `NoteScope` | `AllNotes`, `Notebook(NotebookId, NotebookDepth)`, `Status(NoteStatus)`, `Tags(Vec<TagId>)`, `Trash` |
+| `NoteScope` | `AllNotes`, `Notebook(NotebookId, NotebookDepth)`, `Status(NoteStatus)`, `Tags(Vec<TagId>)`, `Templates`, `Trash` |
 | `NotebookDepth` | `DirectOnly`, `WithDescendants` |
 | `NoteSort` | `UpdatedNewestFirst` (default), `CreatedNewestFirst`, `TitleAlphabetical` |
 | `NoteStore::open(path)` | Creates parent dirs and file, enables WAL, migrates |
@@ -48,6 +48,8 @@ v2 (milestone 2):
 - `note_tags(note_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (note_id, tag_id))`
 - indexes on `notes(notebook_id)`, `notes(status)`, `notes(deleted_at)`, `note_tags(tag_id)`
 
+v3 (templates): `ALTER TABLE notes ADD COLUMN is_template INTEGER NOT NULL DEFAULT 0`; existing notes stay ordinary.
+
 No foreign keys: a trashed note may point at a deleted notebook, so integrity is the core's job.
 
 ## Listing rules
@@ -61,7 +63,10 @@ No foreign keys: a trashed note may point at a deleted notebook, so integrity is
 | `Notebook(id, WithDescendants)` | Same visibility, notes in the notebook and its whole subtree (recursive CTE) |
 | `Tags(ids)` | Same visibility, notes having all the given tags; repeated ids count once; an empty list adds no restriction |
 | `Status(status)` | Not trashed, exactly that status (so Completed and Dropped are reachable here) |
-| `Trash` | Only trashed notes, any status |
+| `Templates` | Non-trashed templates, any status |
+| `Trash` | Only trashed notes, any status, templates included |
+
+Every scope except `Templates` and `Trash` excludes templates.
 
 Order: pinned notes first in every scope, then the sort. `UpdatedNewestFirst`: updated desc, ties created desc. `CreatedNewestFirst`: created desc, ties updated desc. `TitleAlphabetical`: title ascending, ties updated desc; case folding is SQLite `NOCASE`, so it covers ASCII letters only.
 
@@ -93,7 +98,7 @@ Tag names are trimmed; an empty name is `EmptyTagName`. Uniqueness is case-insen
 
 - `set_status(note, status, now)`: a different status is stored and sets `updated_at = now`; the same status is a no-op.
 - `pin_note` / `unpin_note`: pinning is not an edit, `updated_at` never changes; repeating either is harmless.
-- `duplicate_note(note, now)`: a new note with a new id in the same notebook with the same title, body, status and tags; not pinned, not trashed, `created_at = updated_at = now`. A trashed source is allowed and yields a live copy. The source is untouched. The note and tag rows are inserted in one transaction.
+- `duplicate_note(note, now)`: a new note with a new id in the same notebook with the same title, body, status, tags and template flag; not pinned, not trashed, `created_at = updated_at = now`. A trashed source is allowed and yields a live copy. The source is untouched. The note and tag rows are inserted in one transaction.
 - All four fail with `NoteNotFound` for an unknown note.
 
 ## Trash
@@ -109,3 +114,24 @@ Tag names are trimmed; an empty name is `EmptyTagName`. Uniqueness is case-insen
 | `delete_notebook(id, now)` | One transaction: deletes the notebook and its whole subtree, trashes every non-trashed note inside with `deleted_at = now` (already-trashed notes keep theirs) |
 
 The default notebook cannot be deleted (`DefaultNotebookUndeletable`). The core never purges by itself; the app calls `purge_expired_trash`.
+
+## Templates
+
+A template is a note with `is_template` set. It is listed only by `NoteScope::Templates` (non-trashed, any status, pinned first, then the sort). `AllNotes`, `Notebook`, `Status` and `Tags` never show templates; `Trash` shows trashed templates like any trashed note. `notebook_tree` counts and `list_tags` counts exclude templates. Templates keep a notebook, status, pin and tags like any note; `save_note`, trash and restore work on them unchanged.
+
+| Operation | Behaviour |
+|---|---|
+| `create_template(notebook, now)` | New empty note flagged as template; unknown notebook gives `NotebookNotFound` |
+| `mark_as_template(note)` / `unmark_template(note)` | Sets or clears the flag; not an edit, `updated_at` unchanged; repeating is harmless; unknown note gives `NoteNotFound` |
+| `create_note_from_template(template, notebook, now, zone)` | New non-template note in `notebook` with the template's expanded title and body and the same tags; status `None`, not pinned, `created_at = updated_at = now`. One transaction. The template is untouched and may be trashed. Unknown template gives `NoteNotFound`, unknown notebook `NotebookNotFound`, a note that is not a template `NotATemplate(id)` |
+
+The caller chooses the notebook. Variables are expanded in title and body only, with `now` shown in `zone`:
+
+| Variable | Expands to |
+|---|---|
+| `{{date}}` | `YYYY-MM-DD` |
+| `{{time}}` | `HH:MM`, 24 hour |
+
+Matching is exact and case-sensitive; every occurrence is replaced; anything else (`{{Date}}`, `{{ date }}`, `{{name}}`) is left as written. A timestamp outside the supported calendar range leaves the text unexpanded.
+
+`TemplateTimeZone` wraps a `jiff` time zone: `system()` for the app, `utc()` for deterministic callers. The `jiff` dependency is pure Rust and pulls no GPUI crate; its bundled tz database is enabled for tests only, so tests that name a zone do not depend on the host.

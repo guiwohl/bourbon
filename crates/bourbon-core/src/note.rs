@@ -15,6 +15,7 @@ pub struct Note {
     pub notebook: NotebookId,
     pub status: NoteStatus,
     pub pinned: bool,
+    pub is_template: bool,
     pub tags: Vec<Tag>,
     pub trashed_at: Option<Timestamp>,
 }
