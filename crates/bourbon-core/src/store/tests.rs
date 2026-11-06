@@ -1,5 +1,6 @@
 mod listing;
 mod migration;
+mod note_state;
 mod notebooks;
 mod notes;
 mod support;

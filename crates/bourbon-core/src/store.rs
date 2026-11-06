@@ -1,5 +1,6 @@
 mod listing;
 mod note_filter;
+mod note_state;
 mod notebooks;
 mod notes;
 mod tag_rows;
