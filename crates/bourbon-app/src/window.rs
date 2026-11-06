@@ -51,3 +51,16 @@ fn window_options() -> WindowOptions {
         ..WindowOptions::default()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::window_options;
+
+    #[test]
+    fn window_identifies_itself_as_bourbon() {
+        let options = window_options();
+        assert_eq!(options.app_id.as_deref(), Some("bourbon"));
+        let title = options.titlebar.and_then(|titlebar| titlebar.title);
+        assert_eq!(title.as_deref(), Some("Bourbon"));
+    }
+}

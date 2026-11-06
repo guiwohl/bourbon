@@ -9,7 +9,7 @@ Every build, run and quality task goes through `just`. Run `just` alone to list 
 | `just` | `just --list` | See every recipe |
 | `just build` | `cargo build --workspace` | Compile everything |
 | `just run` | `cargo run -p bourbon-app` | Run the app |
-| `just test` | `cargo nextest run --workspace --no-tests=warn` | Run all tests; warns, not fails, while none exist |
+| `just test` | `cargo nextest run --workspace` | Run all tests; fails if none exist |
 | `just fmt` | `cargo fmt --all` | Format the code |
 | `just fmt-check` | `cargo fmt --all -- --check` | Fail if anything is unformatted |
 | `just lint` | `cargo clippy --workspace --all-targets -- -D warnings` | Fail on any clippy warning (pedantic, `todo!`, `unimplemented!`, `dbg!`) |
@@ -17,7 +17,7 @@ Every build, run and quality task goes through `just`. Run `just` alone to list 
 | `just architecture` | `cargo tree -p bourbon-core -e normal --prefix none` + ripgrep | Fail if `bourbon-core` depends, even transitively, on any `gpui*` crate, or if cargo or ripgrep errors |
 | `just comments` | ripgrep over `crates/**/*.rs` | Fail if any comment exists in code, or if ripgrep errors |
 | `just check` | `fmt-check`, `lint`, `deny`, `architecture`, `comments`, `test` | **Run before every commit.** Must pass |
-| `just mutants` | `cargo mutants --workspace` | Prove tests catch broken code. Slow; run before a PR touching logic |
+| `just mutants` | `cargo mutants --workspace`, with `TMPDIR` in `~/.cache/bourbon-mutants` | Prove tests catch broken code. Slow; run before a PR touching logic. Uses the disk cache because `/tmp` is a small tmpfs. Must report 0 missed; the only excluded mutants are listed in `.cargo/mutants.toml` (`main`, `run` and the selected-row colour, which headless tests cannot observe) |
 
 ## Required tools
 

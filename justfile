@@ -8,7 +8,7 @@ run:
     cargo run -p bourbon-app
 
 test:
-    cargo nextest run --workspace --no-tests=warn
+    cargo nextest run --workspace
 
 fmt:
     cargo fmt --all
@@ -34,6 +34,7 @@ architecture:
     [ $? -eq 1 ]
 
 mutants:
-    cargo mutants --workspace
+    mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/bourbon-mutants"
+    TMPDIR="${XDG_CACHE_HOME:-$HOME/.cache}/bourbon-mutants" cargo mutants --workspace
 
 check: fmt-check lint deny architecture comments test
