@@ -7,6 +7,7 @@ pub(crate) enum PaneAction {
     NewNote,
     NewTemplate,
     ToggleSidebar,
+    OpenSettings,
     GoToAllNotes,
     GoToTemplates,
     GoToTrash,
@@ -23,10 +24,11 @@ pub(crate) enum PaneAction {
     HistoryForward,
 }
 
-const ALL: [PaneAction; 21] = [
+const ALL: [PaneAction; 22] = [
     PaneAction::NewNote,
     PaneAction::NewTemplate,
     PaneAction::ToggleSidebar,
+    PaneAction::OpenSettings,
     PaneAction::GoToAllNotes,
     PaneAction::GoToTemplates,
     PaneAction::GoToTrash,
@@ -53,6 +55,7 @@ impl PaneAction {
             Self::NewNote => "New note".to_owned(),
             Self::NewTemplate => "New template".to_owned(),
             Self::ToggleSidebar => "Toggle sidebar".to_owned(),
+            Self::OpenSettings => "Open settings".to_owned(),
             Self::GoToAllNotes => "Go to All Notes".to_owned(),
             Self::GoToTemplates => "Go to Templates".to_owned(),
             Self::GoToTrash => "Go to Trash".to_owned(),
@@ -74,6 +77,7 @@ impl PaneAction {
         match self {
             Self::NewNote => Some("Ctrl+N"),
             Self::ToggleSidebar => Some("Ctrl+/"),
+            Self::OpenSettings => Some("Ctrl+,"),
             Self::SetStatus(NoteStatus::None) => Some("Shift+Alt+1"),
             Self::SetStatus(NoteStatus::Active) => Some("Shift+Alt+2"),
             Self::SetStatus(NoteStatus::OnHold) => Some("Shift+Alt+3"),

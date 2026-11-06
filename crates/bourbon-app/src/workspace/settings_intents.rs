@@ -1,0 +1,77 @@
+use bourbon_core::{Appearance, ThemeSource};
+use gpui_kit::Context;
+
+use super::Workspace;
+use crate::theme;
+
+impl Workspace {
+    pub(crate) fn open_settings(&mut self, cx: &mut Context<Self>) {
+        self.settings_open = true;
+        cx.notify();
+    }
+
+    pub(crate) fn close_settings(&mut self, cx: &mut Context<Self>) {
+        self.settings_open = false;
+        cx.notify();
+    }
+
+    pub(crate) fn set_theme_source(&mut self, source: ThemeSource, cx: &mut Context<Self>) {
+        self.settings.theme_source = source;
+        self.apply_theme_and_persist(cx);
+    }
+
+    pub(crate) fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
+        self.settings.appearance = appearance;
+        self.apply_theme_and_persist(cx);
+    }
+
+    pub(crate) fn resize_sidebar(&mut self, width: f32, cx: &mut Context<Self>) {
+        self.settings.set_sidebar_width(rounded_width(width));
+        self.widths_changed = true;
+        cx.notify();
+    }
+
+    pub(crate) fn resize_note_list(&mut self, width: f32, cx: &mut Context<Self>) {
+        self.settings.set_note_list_width(rounded_width(width));
+        self.widths_changed = true;
+        cx.notify();
+    }
+
+    pub(crate) fn sidebar_edge(&self) -> f32 {
+        if self.sidebar.is_visible {
+            f32::from(self.settings.sidebar_width())
+        } else {
+            0.
+        }
+    }
+
+    pub(crate) fn finish_resizing(&mut self, cx: &mut Context<Self>) {
+        if std::mem::take(&mut self.widths_changed) {
+            self.persist_settings(cx);
+        }
+    }
+
+    pub(super) fn reload_omarchy_theme_if_changed(&mut self, cx: &mut Context<Self>) {
+        if self.omarchy_watch.has_changed() && self.settings.theme_source == ThemeSource::Omarchy {
+            theme::apply(&self.settings, &self.locations.omarchy_colors, cx);
+        }
+    }
+
+    pub(super) fn persist_settings(&mut self, cx: &mut Context<Self>) {
+        if let Err(error) = self.locations.settings.save(&self.settings) {
+            self.error_message = Some(format!("cannot save the settings: {error}").into());
+            cx.notify();
+        }
+    }
+
+    fn apply_theme_and_persist(&mut self, cx: &mut Context<Self>) {
+        theme::apply(&self.settings, &self.locations.omarchy_colors, cx);
+        self.persist_settings(cx);
+        cx.notify();
+    }
+}
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn rounded_width(width: f32) -> u16 {
+    width.round().clamp(0., f32::from(u16::MAX)) as u16
+}

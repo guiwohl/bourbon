@@ -101,6 +101,7 @@ impl Workspace {
             (PaneAction::NewNote, _) => self.create_note(window, cx),
             (PaneAction::NewTemplate, _) => self.create_template(window, cx),
             (PaneAction::ToggleSidebar, _) => self.toggle_sidebar(cx),
+            (PaneAction::OpenSettings, _) => self.open_settings(cx),
             (PaneAction::GoToAllNotes, _) => self.navigate(Navigation::AllNotes, cx),
             (PaneAction::GoToTemplates, _) => self.navigate(Navigation::Templates, cx),
             (PaneAction::GoToTrash, _) => self.navigate(Navigation::Trash, cx),

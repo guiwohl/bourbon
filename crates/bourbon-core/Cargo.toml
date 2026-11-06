@@ -12,9 +12,11 @@ base64 = "0.23.1"
 jiff = "0.2.38"
 rand = "0.9"
 rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1.0.229", features = ["derive"] }
 sha2 = "0.11.1"
 tempfile = "3"
 thiserror = "2"
+toml = "1.2.1"
 
 [dev-dependencies]
 jiff = { version = "0.2.38", features = ["tzdb-bundle-always"] }

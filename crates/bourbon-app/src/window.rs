@@ -5,8 +5,9 @@ use crate::editor::actions::{
     HistoryBack, HistoryForward, OpenNotebookSelector, SetStatusActive, SetStatusCompleted,
     SetStatusDropped, SetStatusNone, SetStatusOnHold,
 };
+use crate::locations::Locations;
 use crate::sidebar::ToggleSidebar;
-use crate::workspace::{NewNote, OpenActionSearch, OpenNoteSearch, Workspace};
+use crate::workspace::{NewNote, OpenActionSearch, OpenNoteSearch, OpenSettings, Workspace};
 
 struct Identity {
     app_id: &'static str,
@@ -29,14 +30,14 @@ const CURRENT: Identity = if cfg!(feature = "dev") {
     RELEASE
 };
 
-pub fn run(store: NoteStore) {
+pub(crate) fn run(store: NoteStore, locations: Locations) {
     gpui_kit::application()
         .with_assets(gpui_kit::assets::Assets)
         .run(move |cx| {
             gpui_kit::init(cx);
             bind_keys(cx);
             let opened = gpui_kit::open_window(window_options(&CURRENT), cx, |window, cx| {
-                build_workspace(store, window, cx)
+                build_workspace(store, locations, window, cx)
             });
             if let Err(error) = opened {
                 eprintln!("bourbon: cannot open the window: {error}");
@@ -49,6 +50,7 @@ pub(crate) fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("ctrl-n", NewNote, None),
         KeyBinding::new("ctrl-/", ToggleSidebar, None),
+        KeyBinding::new("ctrl-,", OpenSettings, None),
         KeyBinding::new("ctrl-o", OpenNoteSearch, None),
         KeyBinding::new("ctrl-p", OpenActionSearch, None),
         KeyBinding::new("shift-alt-1", SetStatusNone, None),
@@ -64,10 +66,11 @@ pub(crate) fn bind_keys(cx: &mut App) {
 
 pub(crate) fn build_workspace(
     store: NoteStore,
+    locations: Locations,
     window: &mut Window,
     cx: &mut App,
 ) -> Entity<Workspace> {
-    let view = cx.new(|cx| Workspace::new(store, window, cx));
+    let view = cx.new(|cx| Workspace::new(store, locations, window, cx));
     let closing_view = view.downgrade();
     window.on_window_should_close(cx, move |_, cx| {
         closing_view
