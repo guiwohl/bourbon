@@ -1,14 +1,29 @@
 use rusqlite::{OptionalExtension, params};
 
-use crate::identifier::{NoteId, NotebookId};
+use crate::identifier::{NoteId, NotebookId, TagId};
 use crate::note::Note;
 use crate::status::NoteStatus;
 use crate::store::{NoteStore, StoreError};
 use crate::timestamp::Timestamp;
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NoteSeed {
+    pub tags: Vec<TagId>,
+    pub status: NoteStatus,
+}
+
 impl NoteStore {
     pub fn create_note(&self, notebook: &NotebookId, now: Timestamp) -> Result<Note, StoreError> {
-        self.insert_empty_note(notebook, now, false)
+        self.create_note_with(notebook, &NoteSeed::default(), now)
+    }
+
+    pub fn create_note_with(
+        &self,
+        notebook: &NotebookId,
+        seed: &NoteSeed,
+        now: Timestamp,
+    ) -> Result<Note, StoreError> {
+        self.insert_note(notebook, seed, now, false)
     }
 
     pub(super) fn insert_empty_note(
@@ -17,34 +32,35 @@ impl NoteStore {
         now: Timestamp,
         is_template: bool,
     ) -> Result<Note, StoreError> {
+        self.insert_note(notebook, &NoteSeed::default(), now, is_template)
+    }
+
+    fn insert_note(
+        &self,
+        notebook: &NotebookId,
+        seed: &NoteSeed,
+        now: Timestamp,
+        is_template: bool,
+    ) -> Result<Note, StoreError> {
         self.ensure_notebook_exists(notebook)?;
-        let note = Note {
-            id: NoteId::generate(),
-            title: String::new(),
-            body: String::new(),
-            created_at: now,
-            updated_at: now,
-            notebook: notebook.clone(),
-            status: NoteStatus::None,
-            pinned: false,
-            is_template,
-            tags: Vec::new(),
-            trashed_at: None,
-        };
-        self.connection.execute(
-            "INSERT INTO notes (id, title, body, created_at, updated_at, notebook_id, is_template)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![
-                note.id,
-                note.title,
-                note.body,
-                note.created_at,
-                note.updated_at,
-                note.notebook,
-                note.is_template
-            ],
+        for tag in &seed.tags {
+            self.ensure_tag_exists(tag)?;
+        }
+        let id = NoteId::generate();
+        let transaction = self.connection.unchecked_transaction()?;
+        transaction.execute(
+            "INSERT INTO notes (id, title, body, created_at, updated_at, notebook_id, status, is_template)
+             VALUES (?1, '', '', ?2, ?2, ?3, ?4, ?5)",
+            params![id, now, notebook, seed.status, is_template],
         )?;
-        Ok(note)
+        for tag in &seed.tags {
+            transaction.execute(
+                "INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?1, ?2)",
+                params![id, tag],
+            )?;
+        }
+        transaction.commit()?;
+        self.find_note(&id)?.ok_or(StoreError::NoteNotFound(id))
     }
 
     pub fn save_note(

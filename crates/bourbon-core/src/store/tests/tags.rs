@@ -300,3 +300,55 @@ fn a_non_unique_constraint_violation_is_not_mapped_to_tag_name_taken() {
     let error = crate::store::tags::tag_name_conflict(violation, "work");
     assert!(matches!(error, StoreError::Database(_)));
 }
+
+#[test]
+fn new_tag_is_created_and_attached_in_one_step() {
+    let store = store();
+    let note = store.create_note(&inbox(&store), at(1)).unwrap();
+    let tag = store
+        .add_new_tag_to_note(&note.id, " rust ", TagColor::Red, at(5))
+        .unwrap();
+    assert_eq!(tag.name, "rust");
+    assert_eq!(tag.color, TagColor::Red);
+    let found = store.find_note(&note.id).unwrap().unwrap();
+    assert_eq!(found.tags, vec![tag.clone()]);
+    assert_eq!(found.updated_at, at(5));
+    assert_eq!(store.list_tags().unwrap()[0].tag, tag);
+}
+
+#[test]
+fn new_tag_on_an_unknown_note_creates_nothing() {
+    let store = store();
+    let missing = NoteId::generate();
+    let error = store
+        .add_new_tag_to_note(&missing, "rust", TagColor::Default, at(1))
+        .unwrap_err();
+    assert!(matches!(error, StoreError::NoteNotFound(id) if id == missing));
+    assert_eq!(store.list_tags().unwrap().len(), 0);
+}
+
+#[test]
+fn new_tag_with_a_blank_name_attaches_nothing() {
+    let store = store();
+    let note = store.create_note(&inbox(&store), at(1)).unwrap();
+    let error = store
+        .add_new_tag_to_note(&note.id, "  ", TagColor::Default, at(5))
+        .unwrap_err();
+    assert!(matches!(error, StoreError::EmptyTagName));
+    assert_eq!(
+        store.find_note(&note.id).unwrap().unwrap().updated_at,
+        at(1)
+    );
+}
+
+#[test]
+fn new_tag_with_a_taken_name_is_rejected() {
+    let store = store();
+    let note = store.create_note(&inbox(&store), at(1)).unwrap();
+    store.create_tag("Rust", TagColor::Default, at(1)).unwrap();
+    let error = store
+        .add_new_tag_to_note(&note.id, "rust", TagColor::Default, at(5))
+        .unwrap_err();
+    assert!(matches!(error, StoreError::TagNameTaken(_)));
+    assert_eq!(store.find_note(&note.id).unwrap().unwrap().tags.len(), 0);
+}

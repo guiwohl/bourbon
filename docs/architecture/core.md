@@ -25,7 +25,8 @@ Pure domain plus SQLite. Never depends on GPUI. No repository trait: one storage
 | `create_notebook(name, parent, now)` | Names need not be unique; unknown parent gives `StoreError::NotebookNotFound` |
 | `rename_notebook(id, name)` | Unknown id gives `NotebookNotFound` |
 | `notebook_tree()` | Roots and children ordered by name, case-insensitive |
-| `create_note(notebook, now)` | New empty note, created_at = updated_at = now; unknown notebook gives `NotebookNotFound` |
+| `create_note(notebook, now)` | New empty note, created_at = updated_at = now; unknown notebook gives `NotebookNotFound`. Delegates to `create_note_with` with the default seed |
+| `create_note_with(notebook, seed, now)` | Like `create_note`, with `NoteSeed { tags: Vec<TagId>, status }` (default: no tags, `NoteStatus::None`) applied in one transaction. Unknown notebook gives `NotebookNotFound`, unknown tag `TagNotFound`; nothing is written on failure |
 | `save_note(id, title, body, now)` | See save rule; unknown id gives `StoreError::NoteNotFound` |
 | `move_note(note, notebook, now)` | Sets notebook and `updated_at = now`; unknown note or notebook gives the matching error |
 | `find_note(id)` | `Option<Note>`; also finds trashed notes |
@@ -92,12 +93,15 @@ Tag names are trimmed; an empty name is `EmptyTagName`. Uniqueness is case-insen
 
 `list_tags` returns `TagSummary { tag, note_count }` ordered by name ignoring case; `note_count` counts non-trashed notes carrying the tag, any status. `delete_tag` also removes its `note_tags` rows.
 
+`add_new_tag_to_note(note, name, color, now)` creates a tag (same validation as `create_tag`) and attaches it in one transaction, setting the note's `updated_at = now`; any failure writes nothing. Returns the new `Tag`.
+
 `add_tag_to_note` / `remove_tag_from_note` set the note's `updated_at = now` only when they change something; adding a present tag or removing an absent one is a no-op. Unknown note gives `NoteNotFound`.
 
 ## Status, pin and duplicate
 
 - `set_status(note, status, now)`: a different status is stored and sets `updated_at = now`; the same status is a no-op.
 - `pin_note` / `unpin_note`: pinning is not an edit, `updated_at` never changes; repeating either is harmless.
+- `toggle_pin(note) -> bool`: flips the pinned flag in the store and returns the new state; `updated_at` never changes; unknown note gives `NoteNotFound`.
 - `duplicate_note(note, now)`: a new note with a new id in the same notebook with the same title, body, status, tags and template flag; not pinned, not trashed, `created_at = updated_at = now`. A trashed source is allowed and yields a live copy. The source is untouched. The note and tag rows are inserted in one transaction.
 - All four fail with `NoteNotFound` for an unknown note.
 

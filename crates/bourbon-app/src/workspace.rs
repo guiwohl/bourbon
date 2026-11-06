@@ -6,7 +6,7 @@ mod note_list_intents;
 mod sidebar_intents;
 
 use bourbon_core::{
-    Note, NoteId, NoteStore, NoteSummary, NotebookNode, StoreError, TagSummary, Timestamp,
+    Note, NoteId, NoteSeed, NoteStore, NoteSummary, NotebookNode, StoreError, TagSummary, Timestamp,
 };
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::prelude::FluentBuilder as _;
@@ -65,8 +65,7 @@ impl Workspace {
             _subscriptions: subscriptions,
         };
         view.purge_expired_trash(cx);
-        view.reload_sidebar(cx);
-        view.reload_list(cx);
+        view.refresh_listing(cx);
         if let Some(most_recent) = view.notes.first().map(|summary| summary.id.clone()) {
             view.select(&most_recent, window, cx);
         } else {
@@ -106,6 +105,12 @@ impl Workspace {
         }
     }
 
+    pub(super) fn refresh_listing(&mut self, cx: &mut Context<Self>) {
+        self.reload_list(cx);
+        self.reload_sidebar(cx);
+        cx.notify();
+    }
+
     fn reload_list(&mut self, cx: &mut Context<Self>) {
         match self.store.list_notes(&self.listing.query()) {
             Ok(notes) => self.notes = notes,
@@ -131,9 +136,23 @@ impl Workspace {
         Ok(())
     }
 
-    fn flush_pending_save(&mut self, cx: &mut Context<Self>) -> Result<(), StoreError> {
+    pub(super) fn flush_pending_save(&mut self, cx: &mut Context<Self>) -> Result<(), StoreError> {
         self.pending_save = None;
         self.save_and_reload(cx)
+    }
+
+    pub(super) fn flush_then<T>(
+        &mut self,
+        cx: &mut Context<Self>,
+        action: impl FnOnce(&mut Self, &mut Context<Self>) -> T,
+    ) -> Option<T> {
+        match self.flush_pending_save(cx) {
+            Ok(()) => Some(action(self, cx)),
+            Err(error) => {
+                self.report(&error, cx);
+                None
+            }
+        }
     }
 
     pub fn flush_before_closing(&mut self, cx: &mut Context<Self>) -> bool {
@@ -147,58 +166,50 @@ impl Workspace {
     }
 
     pub(crate) fn select(&mut self, id: &NoteId, window: &mut Window, cx: &mut Context<Self>) {
-        if let Err(error) = self.flush_pending_save(cx) {
-            self.report(&error, cx);
-            return;
-        }
-        let loaded = self
-            .store
-            .find_note(id)
-            .and_then(|found| found.ok_or_else(|| StoreError::NoteNotFound(id.clone())));
-        match loaded {
-            Ok(note) => self.show(note, window, cx),
-            Err(error) => self.report(&error, cx),
-        }
+        self.flush_then(cx, |this, cx| match load_note(&this.store, id) {
+            Ok(note) => this.show(note, window, cx),
+            Err(error) => this.report(&error, cx),
+        });
     }
 
     pub(crate) fn create_note(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Err(error) = self.flush_pending_save(cx) {
-            self.report(&error, cx);
-            return;
-        }
-        if self.listing.navigation == Navigation::Trash {
-            self.listing.navigation = Navigation::AllNotes;
-        }
-        let created = self.create_note_for_navigation();
-        self.reload_list(cx);
-        match created {
-            Ok(note) => {
-                self.reload_sidebar(cx);
-                self.show(note, window, cx);
-                self.editor.focus_title(window, cx);
+        self.flush_then(cx, |this, cx| {
+            if this.listing.navigation == Navigation::Trash {
+                this.listing.navigation = Navigation::AllNotes;
             }
-            Err(error) => self.report(&error, cx),
-        }
+            let created = this.create_note_for_navigation();
+            this.refresh_listing(cx);
+            match created {
+                Ok(note) => {
+                    this.show(note, window, cx);
+                    this.editor.focus_title(window, cx);
+                }
+                Err(error) => this.report(&error, cx),
+            }
+        });
     }
 
     fn create_note_for_navigation(&self) -> Result<Note, StoreError> {
-        let now = Timestamp::now();
-        if let Navigation::Notebook(notebook, _) = &self.listing.navigation {
-            return self.store.create_note(notebook, now);
-        }
-        let note = self
-            .store
-            .create_note(&self.store.default_notebook()?, now)?;
-        match &self.listing.navigation {
-            Navigation::Tags(tags) => {
-                for tag in tags {
-                    self.store.add_tag_to_note(&note.id, tag, now)?;
-                }
-            }
-            Navigation::Status(status) => self.store.set_status(&note.id, *status, now)?,
-            _ => {}
-        }
-        Ok(note)
+        let (notebook, seed) = match &self.listing.navigation {
+            Navigation::Notebook(notebook, _) => (notebook.clone(), NoteSeed::default()),
+            Navigation::Tags(tags) => (
+                self.store.default_notebook()?,
+                NoteSeed {
+                    tags: tags.clone(),
+                    ..NoteSeed::default()
+                },
+            ),
+            Navigation::Status(status) => (
+                self.store.default_notebook()?,
+                NoteSeed {
+                    status: *status,
+                    ..NoteSeed::default()
+                },
+            ),
+            _ => (self.store.default_notebook()?, NoteSeed::default()),
+        };
+        self.store
+            .create_note_with(&notebook, &seed, Timestamp::now())
     }
 
     fn show(&mut self, note: Note, window: &mut Window, cx: &mut Context<Self>) {
@@ -212,6 +223,12 @@ impl Workspace {
         self.error_message = Some(error.to_string().into());
         cx.notify();
     }
+}
+
+pub(super) fn load_note(store: &NoteStore, id: &NoteId) -> Result<Note, StoreError> {
+    store
+        .find_note(id)?
+        .ok_or_else(|| StoreError::NoteNotFound(id.clone()))
 }
 
 impl Focusable for Workspace {
