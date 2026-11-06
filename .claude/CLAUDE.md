@@ -33,6 +33,8 @@ Write few words that can make the user understand, be simple, short, ULTRA SUMMA
 
 Work in git worktrees on ".claude/worktrees/*"
 Use Conventional Commits, Conventional Branches Names, Conventional PRs Names.
+New worktrees always should come from the main branch, Only not if you are doing stacked branches for parallel work. 
+ALWAYS rebase to get the latest from the main when working or doing research.
 
 ## Documentation
 
