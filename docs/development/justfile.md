@@ -48,3 +48,8 @@ rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 ```
 
 `.config/nextest.toml` caps local tests at 8 threads; CI uses the `ci` profile (all cores).
+
+## Install
+
+- `just install`: release-builds and installs `bourbon-app` and `bourbon` into `~/.local/bin`, copies `packaging/bourbon.desktop` to `~/.local/share/applications/` and the icons to `~/.local/share/icons/hicolor/`, then refreshes the icon cache and desktop database when those tools exist.
+- `just uninstall`: removes all of the above.

@@ -86,3 +86,23 @@ mutants:
     TMPDIR="${XDG_CACHE_HOME:-$HOME/.cache}/bourbon-mutants" {{cargo}} mutants --workspace --test-tool nextest --in-diff target/mutants.diff
 
 check: fmt-check lint deny architecture comments test
+
+install:
+    #!/usr/bin/env bash
+    set -e
+    {{cargo}} install --locked --path crates/bourbon-app --root ~/.local
+    {{cargo}} install --locked --path crates/bourbon-cli --root ~/.local
+    install -Dm644 packaging/bourbon.desktop ~/.local/share/applications/bourbon.desktop
+    mkdir -p ~/.local/share/icons
+    cp -r assets/icons/hicolor ~/.local/share/icons/
+    command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -f ~/.local/share/icons/hicolor || true
+    command -v update-desktop-database >/dev/null && update-desktop-database ~/.local/share/applications || true
+
+uninstall:
+    #!/usr/bin/env bash
+    cargo uninstall --root ~/.local bourbon-app || true
+    cargo uninstall --root ~/.local bourbon-cli || true
+    rm -f ~/.local/share/applications/bourbon.desktop
+    rm -f ~/.local/share/icons/hicolor/*/apps/bourbon.png
+    command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -f ~/.local/share/icons/hicolor || true
+    command -v update-desktop-database >/dev/null && update-desktop-database ~/.local/share/applications || true

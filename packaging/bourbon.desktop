@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Bourbon
+GenericName=Notes
+Comment=Markdown notes
+Exec=bourbon-app
+Icon=bourbon
+Terminal=false
+Categories=Office;Utility;TextEditor;
+StartupWMClass=bourbon
+Keywords=notes;markdown;

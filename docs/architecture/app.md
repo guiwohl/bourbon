@@ -42,7 +42,8 @@ Each column is a module owned by one concern. Columns render from data the works
 
 | File | Responsibility |
 |---|---|
-| `main.rs` | Opens the store, aborts on error |
+| `main.rs` | Claims the single instance, opens the store, aborts on error |
+| `single_instance.rs` | GPUI-free Unix socket claim and focus listener (see Single instance) |
 | `window.rs` | GPUI application, key binding, window options, the close hook |
 | `autosave.rs` | The 500 ms delayed task |
 | `control_pane/` | The centred search and command overlay (see Control pane) |
@@ -192,3 +193,7 @@ Tests: pure unit tests next to each file; `workspace/tests/control_pane.rs` driv
 - `settings_view.rs` replaces the editor column; `workspace/settings_intents.rs` holds the intents (`open_settings`, `set_theme_source`, `set_appearance`, `resize_*`, `finish_resizing`). Each change applies the theme and saves.
 - `panes.rs`: the draggable `Divider` handles; widths come from `Settings` and flow into `SidebarData` and `NoteListData`.
 - Keys: `Ctrl+,` opens settings; control pane action "Open settings".
+
+## Single instance
+
+At startup `main` calls `claim` on `$XDG_RUNTIME_DIR/<app id>.sock` (fallback `/tmp/<app id>-<uid>.sock`). A live instance gets `focus\n` and the new process exits 0 without opening the store. A refused connection is a stale socket: it is removed and rebound. The listener runs on a std thread and forwards each `focus` line through an mpsc channel; a GPUI task polls it every 100 ms and calls `activate_window()`. Other messages are ignored. Dev builds use the app id `bourbon-dev`, so they never collide with a release build.

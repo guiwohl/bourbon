@@ -1,5 +1,11 @@
+use std::sync::mpsc::{Receiver, TryRecvError};
+use std::time::Duration;
+
 use bourbon_core::NoteStore;
-use gpui_kit::{App, AppContext as _, Entity, KeyBinding, TitlebarOptions, Window, WindowOptions};
+use gpui_kit::{
+    AnyWindowHandle, App, AppContext as _, Entity, KeyBinding, TitlebarOptions, Window,
+    WindowOptions,
+};
 
 use crate::editor::actions::{
     HistoryBack, HistoryForward, OpenNotebookSelector, SetStatusActive, SetStatusCompleted,
@@ -30,7 +36,13 @@ const CURRENT: Identity = if cfg!(feature = "dev") {
     RELEASE
 };
 
-pub(crate) fn run(store: NoteStore, locations: Locations) {
+const FOCUS_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
+pub(crate) fn app_id() -> &'static str {
+    CURRENT.app_id
+}
+
+pub(crate) fn run(store: NoteStore, locations: Locations, focus_requests: Receiver<()>) {
     gpui_kit::application()
         .with_assets(gpui_kit::assets::Assets)
         .run(move |cx| {
@@ -39,11 +51,30 @@ pub(crate) fn run(store: NoteStore, locations: Locations) {
             let opened = gpui_kit::open_window(window_options(&CURRENT), cx, |window, cx| {
                 build_workspace(store, locations, window, cx)
             });
-            if let Err(error) = opened {
-                eprintln!("bourbon: cannot open the window: {error}");
-                cx.quit();
+            match opened {
+                Ok((window, _)) => forward_focus_requests(window, focus_requests, cx),
+                Err(error) => {
+                    eprintln!("bourbon: cannot open the window: {error}");
+                    cx.quit();
+                }
             }
         });
+}
+
+fn forward_focus_requests(window: AnyWindowHandle, focus_requests: Receiver<()>, cx: &mut App) {
+    cx.spawn(async move |cx| {
+        loop {
+            cx.background_executor().timer(FOCUS_POLL_INTERVAL).await;
+            match focus_requests.try_recv() {
+                Ok(()) => {
+                    let _ = window.update(cx, |_, window, _| window.activate_window());
+                }
+                Err(TryRecvError::Empty) => {}
+                Err(TryRecvError::Disconnected) => break,
+            }
+        }
+    })
+    .detach();
 }
 
 pub(crate) fn bind_keys(cx: &mut App) {
