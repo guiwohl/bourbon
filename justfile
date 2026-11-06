@@ -53,9 +53,11 @@ comments:
 
 architecture:
     #!/usr/bin/env bash
-    dependencies=$(cargo tree -p bourbon-core -e normal --prefix none) || exit 1
-    rg '^gpui' <<< "$dependencies"
-    [ $? -eq 1 ]
+    for package in bourbon-core bourbon-cli; do
+        dependencies=$(cargo tree -p "$package" -e normal --prefix none) || exit 1
+        rg '^gpui' <<< "$dependencies"
+        [ $? -eq 1 ] || exit 1
+    done
 
 quick:
     #!/usr/bin/env bash
@@ -65,6 +67,9 @@ quick:
         packages="--workspace"
     elif grep -q '^crates/bourbon-app/' <<< "$changed"; then
         packages="-p bourbon-app"
+        grep -q '^crates/bourbon-cli/' <<< "$changed" && packages="$packages -p bourbon-cli"
+    elif grep -q '^crates/bourbon-cli/' <<< "$changed"; then
+        packages="-p bourbon-cli"
     else
         echo "no crate changed"
         exit 0

@@ -732,6 +732,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bourbon-cli"
+version = "0.1.0"
+dependencies = [
+ "bourbon-core",
+ "tempfile",
+]
+
+[[package]]
 name = "bourbon-core"
 version = "0.1.0"
 dependencies = [

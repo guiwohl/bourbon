@@ -572,3 +572,31 @@ fn only_the_highlighted_action_row_is_marked(cx: &mut TestAppContext) {
     assert!(!row_is_highlighted(cx, handle, 0));
     assert!(row_is_highlighted(cx, handle, 1));
 }
+
+fn clipboard_text(cx: &mut TestAppContext) -> Option<String> {
+    cx.read_from_clipboard().and_then(|item| item.text())
+}
+
+#[gpui_kit::test]
+fn the_copy_cli_command_action_copies_the_open_notes_command(cx: &mut TestAppContext) {
+    let (store, seeded) = seeded_store();
+    let (handle, _) = open_view(cx, store);
+
+    run_action(cx, handle, "copy cli");
+
+    assert_eq!(
+        clipboard_text(cx),
+        Some(format!("bourbon get {}", seeded.newer))
+    );
+}
+
+#[gpui_kit::test]
+fn the_copy_cli_command_action_needs_an_open_note(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let (handle, view) = open_view(cx, store);
+
+    press(cx, handle, "ctrl-p");
+    type_text(cx, handle, "copy cli");
+
+    assert!(!offered_actions(cx, &view).contains(&PaneAction::CopyCliCommand));
+}

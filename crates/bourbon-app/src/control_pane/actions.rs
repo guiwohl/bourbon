@@ -18,13 +18,14 @@ pub(crate) enum PaneAction {
     MoveToNotebook,
     DuplicateNote,
     TogglePin,
+    CopyCliCommand,
     MoveToTrash,
     EmptyTrash,
     HistoryBack,
     HistoryForward,
 }
 
-const ALL: [PaneAction; 22] = [
+const ALL: [PaneAction; 23] = [
     PaneAction::NewNote,
     PaneAction::NewTemplate,
     PaneAction::ToggleSidebar,
@@ -43,6 +44,7 @@ const ALL: [PaneAction; 22] = [
     PaneAction::MoveToNotebook,
     PaneAction::DuplicateNote,
     PaneAction::TogglePin,
+    PaneAction::CopyCliCommand,
     PaneAction::MoveToTrash,
     PaneAction::EmptyTrash,
     PaneAction::HistoryBack,
@@ -66,6 +68,7 @@ impl PaneAction {
             Self::MoveToNotebook => "Move to notebook\u{2026}".to_owned(),
             Self::DuplicateNote => "Duplicate note".to_owned(),
             Self::TogglePin => "Pin/Unpin note".to_owned(),
+            Self::CopyCliCommand => "Copy CLI command".to_owned(),
             Self::MoveToTrash => "Move to Trash".to_owned(),
             Self::EmptyTrash => "Empty Trash".to_owned(),
             Self::HistoryBack => "History back".to_owned(),
@@ -97,6 +100,7 @@ impl PaneAction {
                 | Self::MoveToNotebook
                 | Self::DuplicateNote
                 | Self::TogglePin
+                | Self::CopyCliCommand
                 | Self::MoveToTrash
         )
     }
@@ -258,7 +262,7 @@ mod tests {
         assert!(!without.contains(&PaneAction::SetStatus(NoteStatus::Active)));
         assert!(without.contains(&PaneAction::NewNote));
         assert!(without.contains(&PaneAction::EmptyTrash));
-        assert_eq!(without.len(), ALL.len() - 9);
+        assert_eq!(without.len(), ALL.len() - 10);
     }
 
     #[test]

@@ -1,0 +1,18 @@
+[package]
+name = "bourbon-cli"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "bourbon"
+path = "src/main.rs"
+
+[dependencies]
+bourbon-core = { path = "../bourbon-core" }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

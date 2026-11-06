@@ -2,6 +2,7 @@ use bourbon_core::{NoteId, NoteSort};
 use gpui_kit::{Context, Window};
 
 use super::Workspace;
+use crate::cli_command::copy_cli_command;
 use crate::control_pane::{self, ACTIONS_QUERY, ControlPane, PaneAction, Results};
 use crate::navigation::Navigation;
 
@@ -118,6 +119,7 @@ impl Workspace {
             (PaneAction::MoveToNotebook, Some(_)) => self.open_notebook_selector(cx),
             (PaneAction::DuplicateNote, Some(id)) => self.duplicate(&id, window, cx),
             (PaneAction::TogglePin, Some(id)) => self.toggle_pin(&id, cx),
+            (PaneAction::CopyCliCommand, Some(id)) => copy_cli_command(&id, cx),
             (PaneAction::MoveToTrash, Some(id)) => self.move_to_trash(&id, window, cx),
             (_, None) => {}
         }
