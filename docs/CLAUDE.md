@@ -9,6 +9,6 @@
 
 ## How to use this folder
 
-This is the documentation folder, you should use it by adding your documentations in here and organizing it well on folders, there should be a folder for each category of documentation, Those folders shall be decided with time. BUT, any chat with the user that comes up with decisions of implementations, refactoring or etc, should go straight to docs/decisions 
+This is the documentation folder, you should use it by adding your documentations in here and organizing it well on folders, there should be a folder for each category of documentation, Those folders shall be decided when the need comes. Each folder should have its own CLAUDE.md with INDEXes to explain each file. BUT, any chat with the user that comes up with decisions of implementations, refactoring or etc, should go straight to docs/decisions. The summaries on any INDEX should be REALLY short.
 
-**WHEN ADDING, EDITING, EXCLUDING OR MOVING *ANYTHING*, UPDATE THE INDEX TABLE OF THIS FILE, THIS IS VERY IMPORTANT, AND UNDENIABLE TO DO**
+**WHEN ADDING, EDITING, EXCLUDING OR MOVING *ANY FOLDER*, UPDATE THE INDEX TABLE OF THIS FILE, THIS IS VERY IMPORTANT, AND UNDENIABLE TO DO**

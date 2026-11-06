@@ -2,6 +2,7 @@
 
 ## Coding Principles
 
+0. **WE MUST FOLLOW TDD**, But not doing stupid tests that dont actually test things, they MUST be truthful and honest tests, that actually apply.
 1. Apply the Clean Code and Clean Architecture methods from Uncle Bob, all the way. Always.
 2. DO NOT WRITE COMMENTS, never, If the code is not readable by itself, and needs comments to explain it, it is a bad code. Also do NOT ADD "TODOs" (or similars) in the code. If something needs to be documented, document it on docs/, not on the code. Functions, variable, classes (and etc), should have nice names, so that it DOES NOT HAVE TO BE DISCOVERED what it does, only read.
 3. Write decoupled code, always, think of easy to mantain code first when writing anything.
