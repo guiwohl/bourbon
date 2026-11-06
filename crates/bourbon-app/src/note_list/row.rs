@@ -1,18 +1,18 @@
-use bourbon_core::{NoteId, NoteSummary, Tag, TagColor, TagId, Timestamp};
-use chrono::Local;
+use bourbon_core::{NoteId, NoteSummary, Tag, TagId, Timestamp};
 use gpui_kit::assets::{IconName, icon_assets};
 use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenuItem};
 use gpui_kit::component::tag::Tag as TagChip;
-use gpui_kit::component::{ActiveTheme as _, ColorName, Icon, Sizable as _};
+use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AssetSource as _, Context, Entity, InteractiveElement as _, IntoElement, MouseButton,
     ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _,
     TestSupportExt as _, div,
 };
+use jiff::tz::TimeZone;
 
 use super::date::short_date;
-use crate::UNTITLED;
+use crate::presentation::{UNTITLED, chip_color};
 use crate::workspace::Workspace;
 
 icon_assets!(PinIcon, [Pin]);
@@ -32,7 +32,7 @@ pub(crate) fn render(data: &RowData, cx: &mut Context<Workspace>) -> impl IntoEl
     } else {
         &summary.title
     };
-    let updated_on = short_date(summary.updated_at, Timestamp::now(), &Local);
+    let updated_on = short_date(summary.updated_at, Timestamp::now(), &TimeZone::system());
     let pinned = summary.pinned;
     let in_trash = data.in_trash;
     let menu_id = id.clone();
@@ -116,25 +116,6 @@ fn tag_chip(note: &NoteId, tag: &Tag, cx: &mut Context<Workspace>) -> impl IntoE
                 .small()
                 .child(tag.name.clone()),
         )
-}
-
-fn chip_color(color: TagColor) -> ColorName {
-    match color {
-        TagColor::Default => ColorName::Gray,
-        TagColor::Red => ColorName::Red,
-        TagColor::Orange => ColorName::Orange,
-        TagColor::Yellow => ColorName::Yellow,
-        TagColor::Olive => ColorName::Lime,
-        TagColor::Green => ColorName::Green,
-        TagColor::Teal => ColorName::Teal,
-        TagColor::Blue => ColorName::Blue,
-        TagColor::Violet => ColorName::Violet,
-        TagColor::Purple => ColorName::Purple,
-        TagColor::Pink => ColorName::Pink,
-        TagColor::Brown => ColorName::Amber,
-        TagColor::Grey => ColorName::Neutral,
-        TagColor::Black => ColorName::Black,
-    }
 }
 
 fn pin_item(id: &NoteId, pinned: bool, view: &Entity<Workspace>) -> PopupMenuItem {

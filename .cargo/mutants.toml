@@ -2,4 +2,5 @@ exclude_re = [
     "replace main with \\(\\)",
     "replace run with \\(\\)",
     "\\bindent\\b",
+    "replace pin_icon -> Icon with Default::default\\(\\)",
 ]

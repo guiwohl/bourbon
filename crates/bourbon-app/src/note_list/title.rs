@@ -1,16 +1,7 @@
-use bourbon_core::{NoteStatus, NotebookId, NotebookNode, TagId, TagSummary};
+use bourbon_core::{NotebookId, NotebookNode, TagId, TagSummary};
 
 use crate::navigation::Navigation;
-
-pub(crate) fn status_label(status: NoteStatus) -> &'static str {
-    match status {
-        NoteStatus::None => "None",
-        NoteStatus::Active => "Active",
-        NoteStatus::OnHold => "On Hold",
-        NoteStatus::Completed => "Completed",
-        NoteStatus::Dropped => "Dropped",
-    }
-}
+use crate::presentation::status_label;
 
 pub(crate) fn view_title(
     navigation: &Navigation,
@@ -46,7 +37,7 @@ fn tag_names(ids: &[TagId], tags: &[TagSummary]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use bourbon_core::{Notebook, NotebookDepth, Tag, TagColor, Timestamp};
+    use bourbon_core::{NoteStatus, Notebook, NotebookDepth, Tag, TagColor, Timestamp};
 
     use super::*;
 
@@ -118,15 +109,6 @@ mod tests {
         assert_eq!(
             view_title(&Navigation::Tags(selection), &[], &tags),
             "later, work"
-        );
-    }
-
-    #[test]
-    fn every_status_has_a_distinct_label() {
-        let labels: Vec<_> = NoteStatus::ALL.into_iter().map(status_label).collect();
-        assert_eq!(
-            labels,
-            ["None", "Active", "On Hold", "Completed", "Dropped"]
         );
     }
 }

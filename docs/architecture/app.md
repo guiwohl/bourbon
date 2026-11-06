@@ -13,7 +13,7 @@ GPUI window over `bourbon-core`. Holds no business rule: it presents state and f
 | Note list | Header with a "New note" button (top right); rows show the title (or "Untitled") and the excerpt; the selected row is highlighted; clicking selects |
 | Editor | Title input and Markdown editor (soft wrap, no line numbers). Empty state: "No notes yet" with a "New note" button |
 | Navigation | `Navigation { AllNotes, Notebook, Status, Tags, Trash }` plus the current sort form a `Listing`; `Listing::query()` maps it to a core `NoteQuery` (table below) |
-| New note | Button or `Ctrl+N`: flush, then create so the note is visible in the current list: `Notebook(id)` creates in that notebook; `AllNotes` in `default_notebook()`; `Tags(ids)` in `default_notebook()` with every tag added; `Status(s)` in `default_notebook()` with status `s`; `Trash` switches to `AllNotes` first, then as `AllNotes`. Then reload the list and the sidebar, select, focus the title. The root view tracks its own focus handle, focused at startup when no note is selected, so `Ctrl+N` works with nothing else focused |
+| New note | Button or `Ctrl+N`: flush, then create so the note is visible in the current list: `Notebook(id, _)` creates in that notebook; `AllNotes` in `default_notebook()`; `Tags(ids)` in `default_notebook()` with every tag added; `Status(s)` in `default_notebook()` with status `s`; `Trash` switches to `AllNotes` first, then as `AllNotes`. Then reload the list and the sidebar, select, focus the title. The root view tracks its own focus handle, focused at startup when no note is selected, so `Ctrl+N` works with nothing else focused |
 | Autosave | Any title or body change restarts one pending 500 ms task; when it fires: `save_note`, then reload the list only. No manual save |
 | Flush | Selecting or creating a note first saves the current one immediately; if that save fails the switch is cancelled. Changing the navigation does not flush: the open note stays open |
 | Close | `on_window_should_close` flushes the pending save while the view is alive. Success closes the window; failure keeps it open with the banner shown |
@@ -28,7 +28,7 @@ GPUI window over `bourbon-core`. Holds no business rule: it presents state and f
 | Navigation | `NoteScope` |
 |---|---|
 | `AllNotes` | `AllNotes` |
-| `Notebook(id)` | `Notebook(id, WithDescendants)` (expand/collapse depth comes with the sidebar slice) |
+| `Notebook(id, depth)` | `Notebook(id, depth)`, `depth` is `DirectOnly` or `WithDescendants` |
 | `Status(status)` | `Status(status)` |
 | `Tags(ids)` | `Tags(ids)` |
 | `Trash` | `Trash` |
@@ -46,6 +46,7 @@ Each column is a module owned by one concern. Columns render from data the works
 | `autosave.rs` | The 500 ms delayed task |
 | `navigation.rs` | `Navigation`, `Listing`, the pure mapping to `NoteQuery` |
 | `workspace.rs` | Root view: owns `NoteStore`, listing, selection, autosave and flush, trash purge, error banner state; lays out the three columns |
+| `presentation.rs` | Labels and colours shared by the columns: `UNTITLED`, `status_label`, `chip_color` (`TagColor` to `ColorName`, note list and editor header chips), `dot_color`, `color_label`, `is_current_color` (sidebar) |
 | `sidebar/mod.rs` | `render(SidebarData, cx)`: navigation rows, notebook tree flattening, selection rule |
 | `note_list/mod.rs` | `render(notes, selected, cx)`: header with the New note button, note rows |
 | `editor/mod.rs` | `EditorPane` (title input, Markdown editor, load/read/focus, change subscriptions), empty state, error banner element |
@@ -69,7 +70,7 @@ Implements decision rows 2, 4, 7, 11, 12 and 23 of [M2 organization](../decision
 | Expansion | `SidebarState::expanded` (set of `NotebookId`), all collapsed at startup, lives in the workspace |
 | Depth | `Navigation::Notebook(id, depth)`. Selecting an expanded notebook uses `DirectOnly`; a collapsed one `WithDescendants`. Toggling the disclosure of the selected notebook re-applies the depth and reloads the list |
 | Notebook menu | Right click: New sub-notebook (also expands the parent), Rename, Delete. The Inbox (`default_notebook()`, read once at startup) has no Delete |
-| Tag rows | Colour dot (fixed palette in `sidebar/palette.rs`, independent of the theme), name, `TagSummary::note_count`. Click selects the tag alone; `Ctrl+click` toggles it in the `Navigation::Tags` selection (notes having all of them); removing the last tag goes to All Notes |
+| Tag rows | Colour dot (fixed palette in `presentation.rs`, independent of the theme), name, `TagSummary::note_count`. Click selects the tag alone; `Ctrl+click` toggles it in the `Navigation::Tags` selection (notes having all of them); removing the last tag goes to All Notes |
 | Tag menu | Rename, Change colour (submenu of the 14 `TagColor` values, current one checked), Delete |
 | Prompt | One inline panel at the top of the sidebar (`SidebarState::prompt`): a name field with Save/Cancel (Enter also saves) for create and rename, a question with Delete/Cancel for deletions ("Delete notebook X? Its notes move to Trash."). No dialog: the dialog layer needs `Root` as the window root view, which the app does not use. A core error (empty name, duplicate tag) goes to the banner and the prompt stays open; success clears the banner and the prompt |
 | After a mutation | Reload the sidebar data and the list. Deleting a notebook whose subtree contains the current notebook, or deleting a selected tag, adjusts the navigation first (All Notes, or the remaining tags) |
@@ -87,8 +88,8 @@ Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure cli
 | `note_list/mod.rs` | Column layout, the "No notes" empty state, selection rule |
 | `note_list/header.rs` | View title, sort selector (Updated, Created, Title), "New note" or, in Trash, "Empty trash" |
 | `note_list/row.rs` | Row: title (or `UNTITLED`), excerpt, short date, pin icon, tag chips, context menu |
-| `note_list/title.rs` | Pure view title: "All Notes", notebook name, status label, tag names, "Trash" |
-| `note_list/date.rs` | Pure `short_date(updated, now, zone)`: `14:30` today, `Nov 6` this year, `Nov 6, 2025` otherwise; the app passes `chrono::Local` |
+| `note_list/title.rs` | Pure view title: "All Notes", notebook name, status label (from `presentation.rs`), tag names, "Trash" |
+| `note_list/date.rs` | Pure `short_date(updated, now, zone)`: `14:30` today, `Nov 6` this year, `Nov 6, 2025` otherwise; the app passes `jiff::tz::TimeZone::system()` |
 | `workspace/note_list_intents.rs` | `sort_by`, `show_tag`, `toggle_pin`, `duplicate`, `move_to_trash`, `restore`, `confirm_empty_trash`, `empty_trash` |
 
 ### Behaviour
@@ -99,7 +100,7 @@ Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure cli
 - Duplicate selects the copy. Move to Trash on the selected note selects the next row, else the previous, else nothing (editor empty state); on another row the selection is untouched.
 - "Empty trash" opens an alert dialog ("Permanently delete N notes?"); only OK calls `empty_trash`. A selected note that was purged is deselected.
 - A tag chip navigates to that single tag. Its mouse-down stops propagation so the row is not selected.
-- Tag colours map from `TagColor` to the component palette (`ColorName`) in `row.rs`.
+- Tag colours map from `TagColor` to the component palette (`ColorName`) in `presentation.rs`, shared with the editor header chips.
 
 ### Tests
 
@@ -111,10 +112,10 @@ Rows 3, 8, 10, 13, 15 and 19 of the [M2 decisions](../decisions/2026-11-06-m2-or
 
 | Part | Behaviour |
 |---|---|
-| Notebook selector | Button (id `notebook-selector`) labelled with the note's notebook; opens a popover listing every notebook, depth-first, indented by depth (rows `notebook-option-<id>`). Choosing one calls `move_note` and closes the popover. The open state is the editor's own (`Popover::open` controlled), so `Ctrl+Alt+M` can open it |
+| Notebook selector | Button (id `notebook-selector`) labelled with the note's notebook; opens a popover listing every notebook, depth-first, indented by depth (rows `notebook-option-<id>`, the note's notebook has `aria_selected`). Choosing one calls `move_note` and closes the popover. The open state is the editor's own (`Popover::open` controlled), so `Ctrl+Alt+M` can open it |
 | Status button | Button (id `status-button`) labelled with the current status; dropdown menu None, Active, On Hold, Completed, Dropped, current one checked. Each item dispatches its `SetStatus*` action, the same actions the shortcuts use, so button and keys share one path to `set_status` |
-| Tags field | One removable chip per tag (`tag-chip-<id>`, × is `remove-tag-<id>` → `remove_tag_from_note`), then an "Add tags" input (`tag-input`) |
-| Autocomplete | While typing, rows `tag-suggestion-<id>` list existing tags, not already on the note, whose name contains the typed text (case-insensitive). `Down`/`Up` move the highlight (captured before the single-line input swallows them); clicking a row adds it |
+| Tags field | One removable chip per tag, coloured like the note list chips (`tag-chip-<id>`, × is `remove-tag-<id>` → `remove_tag_from_note`), then an "Add tags" input (`tag-input`) |
+| Autocomplete | While typing, rows `tag-suggestion-<id>` (the highlighted one has `aria_selected`) list existing tags, not already on the note, whose name contains the typed text (case-insensitive). `Down`/`Up` move the highlight (captured before the single-line input swallows them); clicking a row adds it |
 | `Enter` | Highlighted suggestion if any; else the existing tag named exactly as typed (case-insensitive, trimmed); else `create_tag(name, TagColor::Default)` then add. Blank input does nothing. The input is cleared on success |
 | Every header action | Flush the pending save, call core, reload the note into the header, then reload the sidebar data and the list. The note may leave the current list; it stays open. A failure goes to the banner and the input keeps its text |
 

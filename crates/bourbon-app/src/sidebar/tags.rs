@@ -9,8 +9,8 @@ use gpui_kit::{
 
 use super::nav_row;
 use super::notebooks::item;
-use super::palette::{color_label, dot_color, is_current_color};
 use crate::navigation::Navigation;
+use crate::presentation::{color_label, dot_color, is_current_color};
 use crate::workspace::Workspace;
 
 pub(super) fn row(

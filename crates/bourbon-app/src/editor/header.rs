@@ -15,6 +15,7 @@ use gpui_kit::{
 use super::actions::{
     SetStatusActive, SetStatusCompleted, SetStatusDropped, SetStatusNone, SetStatusOnHold,
 };
+use crate::presentation::{chip_color, status_label};
 use crate::workspace::Workspace;
 
 const INDENT_STEP: f32 = 12.;
@@ -22,34 +23,28 @@ const TAG_INPUT_WIDTH: f32 = 160.;
 
 struct StatusOption {
     status: NoteStatus,
-    label: &'static str,
     action: fn() -> Box<dyn Action>,
 }
 
 const STATUS_OPTIONS: [StatusOption; 5] = [
     StatusOption {
         status: NoteStatus::None,
-        label: "None",
         action: || Box::new(SetStatusNone),
     },
     StatusOption {
         status: NoteStatus::Active,
-        label: "Active",
         action: || Box::new(SetStatusActive),
     },
     StatusOption {
         status: NoteStatus::OnHold,
-        label: "On Hold",
         action: || Box::new(SetStatusOnHold),
     },
     StatusOption {
         status: NoteStatus::Completed,
-        label: "Completed",
         action: || Box::new(SetStatusCompleted),
     },
     StatusOption {
         status: NoteStatus::Dropped,
-        label: "Dropped",
         action: || Box::new(SetStatusDropped),
     },
 ];
@@ -208,6 +203,7 @@ fn notebook_option(
     let (background, foreground) = (cx.theme().accent, cx.theme().accent_foreground);
     div()
         .id(format!("notebook-option-{}", row.id))
+        .aria_selected(is_current)
         .test_support()
         .ml(px(INDENT_STEP * f32::from(row.depth)))
         .pr_2()
@@ -226,17 +222,17 @@ fn notebook_option(
 }
 
 fn status_button(current: NoteStatus) -> impl IntoElement + use<> {
-    let label = STATUS_OPTIONS
-        .iter()
-        .find(|option| option.status == current)
-        .map_or("", |option| option.label);
     Button::new("status-button")
         .ghost()
         .small()
-        .label(label)
+        .label(status_label(current))
         .dropdown_menu(move |menu, _, _| {
             STATUS_OPTIONS.iter().fold(menu, |menu, option| {
-                menu.menu_with_check(option.label, option.status == current, (option.action)())
+                menu.menu_with_check(
+                    status_label(option.status),
+                    option.status == current,
+                    (option.action)(),
+                )
             })
         })
 }
@@ -247,15 +243,18 @@ fn tag_chip(tag: &Tag, cx: &mut Context<Workspace>) -> impl IntoElement + use<> 
         .id(format!("tag-chip-{}", tag.id))
         .test_support()
         .child(
-            TagChip::secondary().child(tag.name.clone()).child(
-                Button::new(format!("remove-tag-{}", tag.id))
-                    .ghost()
-                    .xsmall()
-                    .label("×")
-                    .on_click(cx.listener(move |workspace, _, _, cx| {
-                        workspace.remove_tag_from_selected(&id, cx);
-                    })),
-            ),
+            TagChip::color(chip_color(tag.color))
+                .small()
+                .child(tag.name.clone())
+                .child(
+                    Button::new(format!("remove-tag-{}", tag.id))
+                        .ghost()
+                        .xsmall()
+                        .label("×")
+                        .on_click(cx.listener(move |workspace, _, _, cx| {
+                            workspace.remove_tag_from_selected(&id, cx);
+                        })),
+                ),
         )
 }
 
@@ -268,6 +267,7 @@ fn suggestion_row(
     let highlight = cx.theme().accent;
     div()
         .id(format!("tag-suggestion-{}", tag.id))
+        .aria_selected(is_highlighted)
         .test_support()
         .px_2()
         .py_1()
