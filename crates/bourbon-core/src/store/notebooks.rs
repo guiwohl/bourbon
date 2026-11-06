@@ -82,7 +82,7 @@ impl NoteStore {
         }
     }
 
-    fn all_notebooks(&self) -> Result<Vec<Notebook>, StoreError> {
+    pub(crate) fn all_notebooks(&self) -> Result<Vec<Notebook>, StoreError> {
         let mut statement = self
             .connection
             .prepare("SELECT id, name, parent_id, created_at FROM notebooks")?;

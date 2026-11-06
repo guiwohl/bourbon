@@ -734,9 +734,11 @@ dependencies = [
 name = "bourbon-core"
 version = "0.1.0"
 dependencies = [
+ "base64 0.23.1",
  "jiff",
  "rand 0.9.5",
  "rusqlite",
+ "sha2 0.11.1",
  "tempfile",
  "thiserror 2.0.21",
 ]
