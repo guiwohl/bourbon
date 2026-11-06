@@ -30,19 +30,33 @@ jobs:
         env:
           NEXTEST_PROFILE: ci
 
-  mutants:
-    name: mutants
+  mutants-shard:
+    name: mutants shard ${{ matrix.shard }}
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          shared-key: mutants
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest,cargo-mutants
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential clang cmake libfontconfig-dev libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev
       - run: git diff origin/${{ github.base_ref }}...HEAD > pr.diff
-      - run: cargo mutants --workspace --test-tool nextest --in-diff pr.diff
+      - run: cargo mutants --workspace --test-tool nextest --in-diff pr.diff --shard ${{ matrix.shard }}/4 --baseline skip --timeout 120
+
+  mutants:
+    name: mutants
+    if: always() && github.event_name == 'pull_request'
+    needs: mutants-shard
+    runs-on: ubuntu-24.04
+    steps:
+      - run: test "${{ needs.mutants-shard.result }}" = success
