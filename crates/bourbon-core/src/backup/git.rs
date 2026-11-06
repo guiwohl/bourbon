@@ -26,13 +26,7 @@ pub fn run(
     if let Some(remote) = remote {
         command.args(remote.authentication_arguments());
     }
-    let output = command.args(arguments).output().map_err(|error| {
-        if error.kind() == io::ErrorKind::NotFound {
-            BackupError::GitNotInstalled
-        } else {
-            BackupError::Io(error)
-        }
-    })?;
+    let output = command.args(arguments).output().map_err(spawn_failure)?;
     if output.status.success() {
         return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
     }
@@ -44,9 +38,29 @@ pub fn run(
     })
 }
 
+fn spawn_failure(error: io::Error) -> BackupError {
+    if error.kind() == io::ErrorKind::NotFound {
+        BackupError::GitNotInstalled
+    } else {
+        BackupError::Io(error)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_missing_git_binary_is_reported_clearly() {
+        let error = spawn_failure(io::Error::from(io::ErrorKind::NotFound));
+        assert!(matches!(error, BackupError::GitNotInstalled));
+    }
+
+    #[test]
+    fn other_spawn_failures_stay_io_errors() {
+        let error = spawn_failure(io::Error::from(io::ErrorKind::PermissionDenied));
+        assert!(matches!(error, BackupError::Io(_)));
+    }
 
     #[test]
     fn successful_commands_return_their_output() {

@@ -107,6 +107,28 @@ mod tests {
     }
 
     #[test]
+    fn every_transliterated_letter_maps_to_its_plain_form() {
+        let table = [
+            ("àáâãäå", "a"),
+            ("ç", "c"),
+            ("èéêë", "e"),
+            ("ìíîï", "i"),
+            ("ñ", "n"),
+            ("òóôõöø", "o"),
+            ("ùúûü", "u"),
+            ("ýÿ", "y"),
+            ("ß", "ss"),
+            ("æ", "ae"),
+            ("œ", "oe"),
+        ];
+        for (letters, plain) in table {
+            for letter in letters.chars() {
+                assert_eq!(slug_of(&format!("x{letter}x")), format!("x{plain}x"));
+            }
+        }
+    }
+
+    #[test]
     fn slug_drops_letters_it_cannot_transliterate() {
         assert_eq!(slug_of("日本語 note"), "note");
         assert_eq!(slug_of("a日b"), "ab");

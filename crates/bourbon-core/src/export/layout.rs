@@ -115,14 +115,15 @@ struct UniqueNames {
 
 impl UniqueNames {
     fn claim(&mut self, base: &str, extension: &str) -> String {
-        let mut candidate = format!("{base}{extension}");
-        let mut number = 0;
-        while self.taken.contains(&candidate) {
-            number += 1;
-            candidate = format!("{base}-{number}{extension}");
-        }
-        self.taken.insert(candidate.clone());
-        candidate
+        let name = (0..=self.taken.len())
+            .map(|number| match number {
+                0 => format!("{base}{extension}"),
+                _ => format!("{base}-{number}{extension}"),
+            })
+            .find(|candidate| !self.taken.contains(candidate))
+            .unwrap_or_default();
+        self.taken.insert(name.clone());
+        name
     }
 }
 
