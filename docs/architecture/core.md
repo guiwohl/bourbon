@@ -84,3 +84,11 @@ Tag names are trimmed; an empty name is `EmptyTagName`. Uniqueness is case-insen
 `list_tags` returns `TagSummary { tag, note_count }` ordered by name ignoring case; `note_count` counts non-trashed notes carrying the tag, any status. `delete_tag` also removes its `note_tags` rows.
 
 `add_tag_to_note` / `remove_tag_from_note` set the note's `updated_at = now` only when they change something; adding a present tag or removing an absent one is a no-op. Unknown note gives `NoteNotFound`.
+||||||| parent of e336d89 (feat(core): add note status, pin and duplicate)
+
+## Status, pin and duplicate
+
+- `set_status(note, status, now)`: a different status is stored and sets `updated_at = now`; the same status is a no-op.
+- `pin_note` / `unpin_note`: pinning is not an edit, `updated_at` never changes; repeating either is harmless.
+- `duplicate_note(note, now)`: a new note with a new id in the same notebook with the same title, body, status and tags; not pinned, not trashed, `created_at = updated_at = now`. A trashed source is allowed and yields a live copy. The source is untouched. The note and tag rows are inserted in one transaction.
+- All four fail with `NoteNotFound` for an unknown note.
