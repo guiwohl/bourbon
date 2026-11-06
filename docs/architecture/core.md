@@ -85,6 +85,13 @@ Tag names are trimmed; an empty name is `EmptyTagName`. Uniqueness is case-insen
 
 `add_tag_to_note` / `remove_tag_from_note` set the note's `updated_at = now` only when they change something; adding a present tag or removing an absent one is a no-op. Unknown note gives `NoteNotFound`.
 
+## Status, pin and duplicate
+
+- `set_status(note, status, now)`: a different status is stored and sets `updated_at = now`; the same status is a no-op.
+- `pin_note` / `unpin_note`: pinning is not an edit, `updated_at` never changes; repeating either is harmless.
+- `duplicate_note(note, now)`: a new note with a new id in the same notebook with the same title, body, status and tags; not pinned, not trashed, `created_at = updated_at = now`. A trashed source is allowed and yields a live copy. The source is untouched. The note and tag rows are inserted in one transaction.
+- All four fail with `NoteNotFound` for an unknown note.
+
 ## Trash
 
 `TRASH_RETENTION` is 7 days. Trashing sets `deleted_at` and leaves `updated_at` alone; trashing a trashed note keeps the first `deleted_at`.
