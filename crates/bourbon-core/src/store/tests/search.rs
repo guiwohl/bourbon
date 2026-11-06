@@ -185,6 +185,7 @@ fn the_snippet_shows_the_matching_text_without_markup() {
     let hit = store.search_notes("needle", 50).unwrap().remove(0);
     assert!(hit.snippet.contains("needle"), "{}", hit.snippet);
     assert!(!hit.snippet.contains('<'), "{}", hit.snippet);
+    assert!(!hit.snippet.contains(['\u{1}', '\u{2}']), "{}", hit.snippet);
     assert!(!hit.snippet.contains('\n'), "{}", hit.snippet);
 }
 

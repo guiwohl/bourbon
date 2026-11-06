@@ -536,3 +536,39 @@ fn the_pane_works_while_the_editor_has_focus(cx: &mut TestAppContext) {
 
     assert!(is_open(cx, &view));
 }
+
+fn row_is_highlighted(cx: &mut TestAppContext, handle: AnyWindowHandle, index: usize) -> bool {
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.find(format!("pane-row-{index}")).selected() == Some(true)
+    })
+    .unwrap()
+}
+
+#[gpui_kit::test]
+fn only_the_highlighted_note_row_is_marked(cx: &mut TestAppContext) {
+    let (store, _) = seeded_store();
+    let (handle, _) = open_view(cx, store);
+    press(cx, handle, "ctrl-o");
+    assert!(row_is_highlighted(cx, handle, 0));
+    assert!(!row_is_highlighted(cx, handle, 1));
+
+    press(cx, handle, "down");
+
+    assert!(!row_is_highlighted(cx, handle, 0));
+    assert!(row_is_highlighted(cx, handle, 1));
+}
+
+#[gpui_kit::test]
+fn only_the_highlighted_action_row_is_marked(cx: &mut TestAppContext) {
+    let (store, _) = seeded_store();
+    let (handle, _) = open_view(cx, store);
+    press(cx, handle, "ctrl-p");
+    assert!(row_is_highlighted(cx, handle, 0));
+    assert!(!row_is_highlighted(cx, handle, 1));
+
+    press(cx, handle, "down");
+
+    assert!(!row_is_highlighted(cx, handle, 0));
+    assert!(row_is_highlighted(cx, handle, 1));
+}
