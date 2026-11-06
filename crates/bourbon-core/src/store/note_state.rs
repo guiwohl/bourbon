@@ -6,6 +6,12 @@ use crate::status::NoteStatus;
 use crate::store::{NoteStore, StoreError};
 use crate::timestamp::Timestamp;
 
+#[derive(Clone, Copy)]
+enum PinState {
+    Unpinned = 0,
+    Pinned = 1,
+}
+
 impl NoteStore {
     pub fn set_status(
         &self,
@@ -18,17 +24,17 @@ impl NoteStore {
             params![note, status, now],
         )?;
         if changed == 0 {
-            self.require_note(note)?;
+            self.ensure_note_exists(note)?;
         }
         Ok(())
     }
 
     pub fn pin_note(&self, note: &NoteId) -> Result<(), StoreError> {
-        self.write_pinned(note, true)
+        self.write_pinned(note, PinState::Pinned)
     }
 
     pub fn unpin_note(&self, note: &NoteId) -> Result<(), StoreError> {
-        self.write_pinned(note, false)
+        self.write_pinned(note, PinState::Unpinned)
     }
 
     pub fn duplicate_note(&self, note: &NoteId, now: Timestamp) -> Result<Note, StoreError> {
@@ -52,27 +58,14 @@ impl NoteStore {
             .ok_or(StoreError::NoteNotFound(copy_id))
     }
 
-    fn write_pinned(&self, note: &NoteId, pinned: bool) -> Result<(), StoreError> {
+    fn write_pinned(&self, note: &NoteId, pin_state: PinState) -> Result<(), StoreError> {
         let matched = self.connection.execute(
             "UPDATE notes SET pinned = ?2 WHERE id = ?1",
-            params![note, pinned],
+            params![note, pin_state as i64],
         )?;
         if matched == 0 {
             return Err(StoreError::NoteNotFound(note.clone()));
         }
         Ok(())
-    }
-
-    fn require_note(&self, note: &NoteId) -> Result<(), StoreError> {
-        let exists: bool = self.connection.query_row(
-            "SELECT EXISTS (SELECT 1 FROM notes WHERE id = ?1)",
-            params![note],
-            |row| row.get(0),
-        )?;
-        if exists {
-            Ok(())
-        } else {
-            Err(StoreError::NoteNotFound(note.clone()))
-        }
     }
 }

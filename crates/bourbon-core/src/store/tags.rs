@@ -120,8 +120,7 @@ impl NoteStore {
     }
 
     fn ensure_taggable(&self, note: &NoteId, tag: &TagId) -> Result<(), StoreError> {
-        self.find_note(note)?
-            .ok_or_else(|| StoreError::NoteNotFound(note.clone()))?;
+        self.ensure_note_exists(note)?;
         self.ensure_tag_exists(tag)
     }
 
