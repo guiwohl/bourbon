@@ -26,6 +26,15 @@ For multi-step tasks, state a brief plan:
     4. ...
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## Commands
+
+Everything runs through `just`. Full reference: `docs/development/justfile.md`.
+
+- `just check` — fmt-check, lint, deny, comments, test. **Must pass before every commit.**
+- `just build` / `just run` / `just test`
+- `just fmt` — format before `check`.
+- `just mutants` — slow; run before a PR that touches logic.
+
 ## Writing style
 
 Write few words that can make the user understand, be simple, short, ULTRA SUMMARIZED, but do not miss details, never.

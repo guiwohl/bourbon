@@ -1,0 +1,6 @@
+[bans]
+deny = [
+    { crate = "gpui", wrappers = ["bourbon-app"] },
+    { crate = "gpui-pre", wrappers = ["bourbon-app"] },
+    { crate = "gpui-component", wrappers = ["bourbon-app"] },
+]

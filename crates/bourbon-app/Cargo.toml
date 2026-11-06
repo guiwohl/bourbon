@@ -1,0 +1,10 @@
+[package]
+name = "bourbon-app"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+bourbon-core = { path = "../bourbon-core" }
+
+[lints]
+workspace = true

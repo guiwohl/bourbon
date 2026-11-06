@@ -2,10 +2,10 @@
 
 ## INDEX
 
-| Path | Category | Summary |
-|---|---|---|
-| [decisions/2026-11-05-project-foundation.md](decisions/2026-11-05-project-foundation.md) | Decision | Foundation: name, Linux-only, Rust + GPUI, SQLite storage, autosave, trash, GitHub backup, agent CLI, note ID, notebooks + tags, Markdown export |
-| [decisions/2026-11-06-workspace-crate-layout.md](decisions/2026-11-06-workspace-crate-layout.md) | Decision | Build order (app first, CLI last) and Cargo workspace: bourbon-core, bourbon-app, bourbon-cli |
+| Folder | Summary |
+|---|---|
+| [decisions/](decisions/CLAUDE.md) | Decisions taken with the user |
+| [development/](development/CLAUDE.md) | How to build, test and lint |
 
 ## How to use this folder
 

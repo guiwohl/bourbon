@@ -1,0 +1,13 @@
+[workspace]
+resolver = "3"
+members = ["crates/bourbon-core", "crates/bourbon-app"]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+todo = "warn"
+unimplemented = "warn"
+dbg_macro = "warn"

@@ -1,0 +1,33 @@
+default:
+    just --list
+
+build:
+    cargo build --workspace
+
+run:
+    cargo run -p bourbon-app
+
+test:
+    cargo nextest run --workspace --no-tests=warn
+
+fmt:
+    cargo fmt --all
+
+fmt-check:
+    cargo fmt --all -- --check
+
+lint:
+    cargo clippy --workspace --all-targets -- -D warnings
+
+deny:
+    cargo deny check bans
+
+comments:
+    #!/usr/bin/env bash
+    rg '(^|[^:])(//|/\*)' crates/ --type rust
+    [ $? -eq 1 ]
+
+mutants:
+    cargo mutants --workspace
+
+check: fmt-check lint deny comments test
