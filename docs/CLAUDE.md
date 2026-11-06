@@ -6,6 +6,7 @@
 |---|---|
 | [decisions/](decisions/CLAUDE.md) | Decisions taken with the user |
 | [development/](development/CLAUDE.md) | How to build, test and lint |
+| [architecture/](architecture/CLAUDE.md) | How the crates are built: core API and schema |
 
 ## How to use this folder
 
