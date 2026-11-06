@@ -26,7 +26,7 @@ impl Rgb {
 
     #[must_use]
     pub fn as_hex(self) -> u32 {
-        (u32::from(self.red) << 16) | (u32::from(self.green) << 8) | u32::from(self.blue)
+        u32::from_be_bytes([0, self.red, self.green, self.blue])
     }
 
     #[must_use]
