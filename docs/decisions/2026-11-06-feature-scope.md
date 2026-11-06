@@ -40,3 +40,16 @@
 ## To discuss soon
 
 - Release process (versioning, tags, binaries, how AUR consumes them).
+
+## Milestone order
+
+| Milestone | Content |
+|---|---|
+| M1 Minimal core | Done: create, edit, list, autosave |
+| M2 Organization | Notebooks, tags, trash, pin, status, move/duplicate, sorting |
+| M3 Navigation | Control pane (`Ctrl+O` notes, `Ctrl+P` actions), full-text search |
+| M4 Editor | Preview in three modes, checklists/tables, `[[links]]`, find/replace, focus mode, word count |
+| M5 Visual | Themes (own + follow Omarchy), resizable panes, collapsible sidebar, settings, animations |
+| M6 Data | GitHub backup, restore, Markdown export |
+| M7 Distribution | Release process, AUR, `.desktop` and icon, single instance |
+| M8 CLI | `bourbon get <id>` and the copy-command button |
