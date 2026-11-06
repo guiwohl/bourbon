@@ -1,72 +1,9 @@
-use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
+use crate::identifier::{NoteId, NotebookId};
+use crate::status::NoteStatus;
+use crate::tag::Tag;
+use crate::timestamp::Timestamp;
 
-use rand::Rng;
-
-const ID_LENGTH: usize = 12;
-const ID_ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct NoteId(String);
-
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("invalid note id: {0:?}")]
-pub struct InvalidNoteId(String);
-
-impl NoteId {
-    #[must_use]
-    pub fn generate() -> Self {
-        let mut rng = rand::rng();
-        let id = (0..ID_LENGTH)
-            .map(|_| char::from(ID_ALPHABET[rng.random_range(0..ID_ALPHABET.len())]))
-            .collect();
-        Self(id)
-    }
-
-    pub fn parse(text: &str) -> Result<Self, InvalidNoteId> {
-        let well_formed =
-            text.len() == ID_LENGTH && text.bytes().all(|byte| ID_ALPHABET.contains(&byte));
-        if well_formed {
-            Ok(Self(text.to_owned()))
-        } else {
-            Err(InvalidNoteId(text.to_owned()))
-        }
-    }
-
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Display for NoteId {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.0)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Timestamp(i64);
-
-impl Timestamp {
-    #[must_use]
-    pub fn now() -> Self {
-        let since_epoch = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default();
-        Self(i64::try_from(since_epoch.as_millis()).unwrap_or(i64::MAX))
-    }
-
-    #[must_use]
-    pub fn from_millis(millis: i64) -> Self {
-        Self(millis)
-    }
-
-    #[must_use]
-    pub fn as_millis(self) -> i64 {
-        self.0
-    }
-}
+const EXCERPT_LENGTH: usize = 100;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Note {
@@ -75,13 +12,31 @@ pub struct Note {
     pub body: String,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+    pub notebook: NotebookId,
+    pub status: NoteStatus,
+    pub pinned: bool,
+    pub tags: Vec<Tag>,
+    pub trashed_at: Option<Timestamp>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NoteSummary {
     pub id: NoteId,
     pub title: String,
+    pub excerpt: String,
     pub updated_at: Timestamp,
+    pub created_at: Timestamp,
+    pub pinned: bool,
+    pub status: NoteStatus,
+    pub tags: Vec<Tag>,
+}
+
+pub(crate) fn excerpt_of(body: &str) -> String {
+    body.lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(|line| line.chars().take(EXCERPT_LENGTH).collect())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -89,50 +44,43 @@ mod tests {
     use super::*;
 
     #[test]
-    fn generated_id_has_twelve_lowercase_alphanumerics() {
-        let id = NoteId::generate();
-        assert_eq!(id.as_str().len(), 12);
-        assert!(
-            id.as_str()
-                .chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
-        );
+    fn excerpt_is_the_first_line() {
+        assert_eq!(excerpt_of("first\nsecond"), "first");
     }
 
     #[test]
-    fn generated_ids_differ() {
-        assert_ne!(NoteId::generate(), NoteId::generate());
+    fn excerpt_skips_blank_lines_and_trims() {
+        assert_eq!(excerpt_of("\n  \n\t  hello world \t\nnext"), "hello world");
     }
 
     #[test]
-    fn parse_accepts_valid_id() {
-        let id = NoteId::parse("k7f3q2m9x4ta").unwrap();
-        assert_eq!(id.as_str(), "k7f3q2m9x4ta");
-        assert_eq!(id.to_string(), "k7f3q2m9x4ta");
+    fn excerpt_of_blank_body_is_empty() {
+        assert_eq!(excerpt_of(""), "");
+        assert_eq!(excerpt_of("  \n\r\n \t"), "");
     }
 
     #[test]
-    fn parse_rejects_wrong_length_and_characters() {
-        for bad in [
-            "",
-            "k7f3q2m9x4t",
-            "k7f3q2m9x4tab",
-            "K7f3q2m9x4ta",
-            "k7f3q2m9x4t-",
-            "k7f3q2m9x4tá",
-        ] {
-            assert!(NoteId::parse(bad).is_err(), "{bad}");
-        }
+    fn excerpt_handles_windows_line_endings() {
+        assert_eq!(excerpt_of("one\r\ntwo"), "one");
     }
 
     #[test]
-    fn timestamp_round_trips_and_orders() {
-        assert_eq!(Timestamp::from_millis(42).as_millis(), 42);
-        assert!(Timestamp::from_millis(1) < Timestamp::from_millis(2));
+    fn excerpt_is_cut_at_one_hundred_characters() {
+        let body = "a".repeat(250);
+        assert_eq!(excerpt_of(&body), "a".repeat(100));
     }
 
     #[test]
-    fn now_is_after_2020() {
-        assert!(Timestamp::now().as_millis() > 1_577_836_800_000);
+    fn excerpt_of_exactly_one_hundred_characters_is_kept_whole() {
+        let body = "b".repeat(100);
+        assert_eq!(excerpt_of(&body), body);
+    }
+
+    #[test]
+    fn excerpt_cuts_on_character_boundaries() {
+        let body = "ç".repeat(150);
+        let excerpt = excerpt_of(&body);
+        assert_eq!(excerpt.chars().count(), 100);
+        assert!(excerpt.chars().all(|character| character == 'ç'));
     }
 }

@@ -3,7 +3,7 @@ mod sidebar;
 #[cfg(test)]
 mod tests;
 
-use bourbon_core::{Note, NoteId, NoteStore, NoteSummary, StoreError, Timestamp};
+use bourbon_core::{Note, NoteId, NoteQuery, NoteStore, NoteSummary, StoreError, Timestamp};
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::input::{EditorState, InputEvent, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -87,7 +87,7 @@ impl NotesView {
     }
 
     fn reload_list(&mut self, cx: &mut Context<Self>) {
-        match self.store.list_notes() {
+        match self.store.list_notes(&NoteQuery::default()) {
             Ok(notes) => self.notes = notes,
             Err(error) => self.report(&error, cx),
         }
@@ -146,7 +146,7 @@ impl NotesView {
             self.report(&error, cx);
             return;
         }
-        match self.store.create_note(Timestamp::now()) {
+        match self.create_note_in_default_notebook() {
             Ok(note) => {
                 self.reload_list(cx);
                 self.show(note, window, cx);
@@ -155,6 +155,11 @@ impl NotesView {
             }
             Err(error) => self.report(&error, cx),
         }
+    }
+
+    fn create_note_in_default_notebook(&self) -> Result<Note, StoreError> {
+        let notebook = self.store.default_notebook()?;
+        self.store.create_note(&notebook, Timestamp::now())
     }
 
     fn show(&mut self, note: Note, window: &mut Window, cx: &mut Context<Self>) {

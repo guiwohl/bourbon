@@ -1,8 +1,21 @@
 mod database_path;
+mod identifier;
 mod migrations;
 mod note;
+mod notebook;
+mod query;
+mod status;
 mod store;
+mod stored_text;
+mod tag;
+mod timestamp;
 
 pub use database_path::default_database_path;
-pub use note::{InvalidNoteId, Note, NoteId, NoteSummary, Timestamp};
+pub use identifier::{InvalidIdentifier, NoteId, NotebookId, TagId};
+pub use note::{Note, NoteSummary};
+pub use notebook::{Notebook, NotebookNode};
+pub use query::{NoteQuery, NoteScope, NoteSort, NotebookDepth};
+pub use status::NoteStatus;
 pub use store::{NoteStore, StoreError};
+pub use tag::{Tag, TagColor};
+pub use timestamp::Timestamp;
