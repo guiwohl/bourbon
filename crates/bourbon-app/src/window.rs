@@ -1,6 +1,10 @@
 use bourbon_core::NoteStore;
 use gpui_kit::{App, AppContext as _, Entity, KeyBinding, TitlebarOptions, Window, WindowOptions};
 
+use crate::editor::actions::{
+    HistoryBack, HistoryForward, OpenNotebookSelector, SetStatusActive, SetStatusCompleted,
+    SetStatusDropped, SetStatusNone, SetStatusOnHold,
+};
 use crate::sidebar::ToggleSidebar;
 use crate::workspace::{NewNote, Workspace};
 
@@ -24,8 +28,18 @@ pub fn run(store: NoteStore) {
 }
 
 pub(crate) fn bind_keys(cx: &mut App) {
-    cx.bind_keys([KeyBinding::new("ctrl-n", NewNote, None)]);
-    cx.bind_keys([KeyBinding::new("ctrl-/", ToggleSidebar, None)]);
+    cx.bind_keys([
+        KeyBinding::new("ctrl-n", NewNote, None),
+        KeyBinding::new("ctrl-/", ToggleSidebar, None),
+        KeyBinding::new("shift-alt-1", SetStatusNone, None),
+        KeyBinding::new("shift-alt-2", SetStatusActive, None),
+        KeyBinding::new("shift-alt-3", SetStatusOnHold, None),
+        KeyBinding::new("shift-alt-4", SetStatusCompleted, None),
+        KeyBinding::new("shift-alt-5", SetStatusDropped, None),
+        KeyBinding::new("ctrl-alt-m", OpenNotebookSelector, None),
+        KeyBinding::new("alt-left", HistoryBack, None),
+        KeyBinding::new("alt-right", HistoryForward, None),
+    ]);
 }
 
 pub(crate) fn build_workspace(

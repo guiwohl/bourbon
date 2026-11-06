@@ -1,4 +1,4 @@
-use bourbon_core::Note;
+use bourbon_core::{Note, NotebookNode, Tag, TagSummary};
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Editor, EditorState, Input, InputEvent, InputState};
@@ -10,9 +10,22 @@ use gpui_kit::{
 use crate::UNTITLED;
 use crate::workspace::Workspace;
 
+pub(crate) mod actions;
+mod header;
+mod history;
+
+pub(crate) use history::History;
+
+use header::{HeaderView, NoteHeader};
+
 pub(crate) struct EditorPane {
     title_input: Entity<InputState>,
     body_editor: Entity<EditorState>,
+    tag_input: Entity<InputState>,
+    note_header: Option<NoteHeader>,
+    tag_highlight: Option<usize>,
+    notebook_selector_open: bool,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl EditorPane {
@@ -24,9 +37,24 @@ impl EditorPane {
                 .soft_wrap(true)
                 .line_number(false)
         });
+        let tag_input = cx.new(|cx| InputState::new(window, cx).placeholder("Add tags"));
+        let tag_events = cx.subscribe_in(
+            &tag_input,
+            window,
+            |workspace, _, event: &InputEvent, window, cx| match event {
+                InputEvent::Change => workspace.tag_input_changed(cx),
+                InputEvent::PressEnter { .. } => workspace.commit_tag_input(window, cx),
+                _ => {}
+            },
+        );
         Self {
             title_input,
             body_editor,
+            tag_input,
+            note_header: None,
+            tag_highlight: None,
+            notebook_selector_open: false,
+            _subscriptions: vec![tag_events],
         }
     }
 
@@ -56,11 +84,66 @@ impl EditorPane {
         self.body_editor.read(cx).value().to_string()
     }
 
-    pub(crate) fn load(&self, note: Note, window: &mut Window, cx: &mut Context<Workspace>) {
+    pub(crate) fn load(&mut self, note: Note, window: &mut Window, cx: &mut Context<Workspace>) {
+        self.show_header(&note);
         self.title_input
             .update(cx, |title, cx| title.set_value(note.title, window, cx));
         self.body_editor
             .update(cx, |body, cx| body.set_value(note.body, window, cx));
+    }
+
+    pub(crate) fn show_header(&mut self, note: &Note) {
+        self.note_header = Some(NoteHeader::of(note));
+    }
+
+    pub(crate) fn tag_input_text(&self, cx: &App) -> String {
+        self.tag_input.read(cx).value().to_string()
+    }
+
+    pub(crate) fn clear_tag_input(&mut self, window: &mut Window, cx: &mut Context<Workspace>) {
+        self.tag_input
+            .update(cx, |input, cx| input.set_value("", window, cx));
+        self.tag_highlight = None;
+    }
+
+    pub(crate) fn forget_tag_highlight(&mut self) {
+        self.tag_highlight = None;
+    }
+
+    pub(crate) fn highlight_next_tag(&mut self, typed: &str, tags: &[TagSummary]) {
+        let Some(header) = &self.note_header else {
+            return;
+        };
+        let count = header::suggestions(typed, tags, header).len();
+        if count > 0 {
+            self.tag_highlight = Some(
+                self.tag_highlight
+                    .map_or(0, |index| (index + 1).min(count - 1)),
+            );
+        }
+    }
+
+    pub(crate) fn highlight_previous_tag(&mut self) {
+        self.tag_highlight = self.tag_highlight.and_then(|index| index.checked_sub(1));
+    }
+
+    pub(crate) fn chosen_tag(&self, typed: &str, tags: &[TagSummary]) -> Option<Tag> {
+        let header = self.note_header.as_ref()?;
+        match self.tag_highlight {
+            Some(index) => header::suggestions(typed, tags, header)
+                .get(index)
+                .map(|tag| (*tag).clone()),
+            None => header::tag_named(typed, tags).cloned(),
+        }
+    }
+
+    pub(crate) fn set_notebook_selector_open(&mut self, open: bool) {
+        self.notebook_selector_open = open;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn notebook_selector_is_open(&self) -> bool {
+        self.notebook_selector_open
     }
 
     pub(crate) fn focus_title(&self, window: &mut Window, cx: &mut Context<Workspace>) {
@@ -68,7 +151,27 @@ impl EditorPane {
             .update(cx, |title, cx| title.focus(window, cx));
     }
 
-    pub(crate) fn render(&self) -> impl IntoElement + use<> {
+    pub(crate) fn render(
+        &self,
+        notebooks: &[NotebookNode],
+        tags: &[TagSummary],
+        cx: &mut Context<Workspace>,
+    ) -> impl IntoElement + use<> {
+        let typed_tag = self.tag_input_text(cx);
+        let header = self.note_header.as_ref().map(|header| {
+            header::render(
+                &HeaderView {
+                    header,
+                    notebooks,
+                    tags,
+                    tag_input: &self.tag_input,
+                    typed_tag: &typed_tag,
+                    highlight: self.tag_highlight,
+                    notebook_selector_open: self.notebook_selector_open,
+                },
+                cx,
+            )
+        });
         div()
             .flex_1()
             .h_full()
@@ -81,6 +184,7 @@ impl EditorPane {
                     .id("title")
                     .aria_label("Title"),
             )
+            .children(header)
             .child(
                 Editor::new(&self.body_editor)
                     .aria_label("Body")

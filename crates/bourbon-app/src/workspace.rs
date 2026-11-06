@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests;
 
+mod editor_intents;
 mod note_list_intents;
 mod sidebar_intents;
 
@@ -14,7 +15,7 @@ use gpui_kit::{
     Render, SharedString, Styled as _, Subscription, Task, Window, div,
 };
 
-use crate::editor::{self, EditorPane};
+use crate::editor::{self, EditorPane, History};
 use crate::navigation::{Listing, Navigation};
 use crate::note_list::NoteListData;
 use crate::sidebar::SidebarData;
@@ -32,6 +33,7 @@ pub struct Workspace {
     selected: Option<NoteId>,
     sidebar: SidebarState,
     editor: EditorPane,
+    history: History,
     pending_save: Option<Task<()>>,
     error_message: Option<SharedString>,
     focus_handle: FocusHandle,
@@ -56,6 +58,7 @@ impl Workspace {
             selected: None,
             sidebar,
             editor,
+            history: History::default(),
             pending_save: None,
             error_message: None,
             focus_handle: cx.focus_handle(),
@@ -200,6 +203,7 @@ impl Workspace {
 
     fn show(&mut self, note: Note, window: &mut Window, cx: &mut Context<Self>) {
         self.editor.load(note.clone(), window, cx);
+        self.history.visit(&note.id);
         self.selected = Some(note.id);
         cx.notify();
     }
@@ -219,7 +223,9 @@ impl Focusable for Workspace {
 impl Render for Workspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pane = if self.selected.is_some() {
-            self.editor.render().into_any_element()
+            self.editor
+                .render(&self.notebooks, &self.tags, cx)
+                .into_any_element()
         } else {
             editor::render_empty(cx).into_any_element()
         };
@@ -252,6 +258,7 @@ impl Render for Workspace {
             .text_color(cx.theme().foreground)
             .on_action(cx.listener(|view, _: &NewNote, window, cx| view.create_note(window, cx)))
             .on_action(cx.listener(|view, _: &ToggleSidebar, _, cx| view.toggle_sidebar(cx)))
+            .map(|root| editor::actions::register(root, cx))
             .when_some(self.error_message.clone(), |root, message| {
                 root.child(editor::error_banner(message, cx))
             })
