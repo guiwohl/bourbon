@@ -11,6 +11,7 @@ use gpui_kit::{
 use super::Workspace;
 use crate::navigation::Navigation;
 
+mod control_pane;
 mod drag;
 mod editor;
 

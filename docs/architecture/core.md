@@ -31,6 +31,7 @@ Pure domain plus SQLite. Never depends on GPUI. No repository trait: one storage
 | `move_note(note, notebook, now)` | Sets notebook and `updated_at = now`; unknown note or notebook gives the matching error |
 | `find_note(id)` | `Option<Note>`; also finds trashed notes |
 | `list_notes(query)` | See listing rules |
+| `search_notes(text, limit)` | See search; returns `Vec<SearchHit>` (`summary: NoteSummary`, `snippet`) |
 | `default_database_path()` | See database path |
 | `export_markdown(destination)` | See export |
 | `snapshot(target)` | See backup |
@@ -53,6 +54,8 @@ v2 (milestone 2):
 - indexes on `notes(notebook_id)`, `notes(status)`, `notes(deleted_at)`, `note_tags(tag_id)`
 
 v3 (templates): `ALTER TABLE notes ADD COLUMN is_template INTEGER NOT NULL DEFAULT 0`; existing notes stay ordinary.
+
+v4 (milestone 3, search): `notes_fts` FTS5 virtual table `(title, body)` with `content='notes'` (external content, joined on `notes.rowid`); triggers `notes_fts_insert`, `notes_fts_update` (fires on `UPDATE OF title, body` only, so pin, status and trash do not touch the index) and `notes_fts_delete`; existing notes are back-filled with the FTS `rebuild` command. The index depends on `notes.rowid` staying stable, so `notes` must keep rowids and never be rebuilt without rebuilding the index.
 
 No foreign keys: a trashed note may point at a deleted notebook, so integrity is the core's job.
 
@@ -77,6 +80,18 @@ Order: pinned notes first in every scope, then the sort. `UpdatedNewestFirst`: u
 `excerpt` is the first non-blank line of the body, trimmed, cut to 100 characters.
 
 `NotebookNode.note_count` counts non-trashed notes in the notebook and all descendants, every status included.
+
+## Search
+
+`search_notes(text, limit)` uses `notes_fts`. Parameterised SQL; the match expression is built from the text: split on whitespace, each token becomes `"token"*` (embedded `"` doubled), joined with `AND`. Punctuation and words such as `AND`, `NOT`, `(` are therefore plain text and never an error. The `*` makes every token a prefix match.
+
+| Rule | Behaviour |
+|---|---|
+| Visible notes | Not trashed, not templates, any status |
+| Order | `bm25(notes_fts, 10.0, 1.0)` (title column weighs 10, body 1), ties by newest `updated_at` |
+| Blank text | The `limit` most recently updated visible notes (`updated_at` desc, `created_at` desc), snippet is the excerpt |
+| Snippet | FTS `snippet()` over the body (12 words), plain text with whitespace collapsed; the excerpt when the body itself has no match |
+| Tags | Loaded per hit (at most `limit` small queries) |
 
 ## Save rule
 

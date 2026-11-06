@@ -12,3 +12,4 @@
 | [2026-11-06-m2-organization.md](2026-11-06-m2-organization.md) | M2: InkDrop layout, notebooks, tags, status, pin, trash, templates |
 | [2026-11-06-dev-loop-and-cpu.md](2026-11-06-dev-loop-and-cpu.md) | `just dev` UI loop, dev identity, mutants in CI, CPU limits |
 | [2026-11-06-m6-data-core.md](2026-11-06-m6-data-core.md) | M6 core: Markdown export layout, snapshot, GitHub backup and restore engine |
+| [2026-11-06-m3-navigation.md](2026-11-06-m3-navigation.md) | M3: FTS5 search, control pane (notes and actions) |

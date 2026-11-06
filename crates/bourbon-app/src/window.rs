@@ -6,7 +6,7 @@ use crate::editor::actions::{
     SetStatusDropped, SetStatusNone, SetStatusOnHold,
 };
 use crate::sidebar::ToggleSidebar;
-use crate::workspace::{NewNote, Workspace};
+use crate::workspace::{NewNote, OpenActionSearch, OpenNoteSearch, Workspace};
 
 struct Identity {
     app_id: &'static str,
@@ -49,6 +49,8 @@ pub(crate) fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("ctrl-n", NewNote, None),
         KeyBinding::new("ctrl-/", ToggleSidebar, None),
+        KeyBinding::new("ctrl-o", OpenNoteSearch, None),
+        KeyBinding::new("ctrl-p", OpenActionSearch, None),
         KeyBinding::new("shift-alt-1", SetStatusNone, None),
         KeyBinding::new("shift-alt-2", SetStatusActive, None),
         KeyBinding::new("shift-alt-3", SetStatusOnHold, None),

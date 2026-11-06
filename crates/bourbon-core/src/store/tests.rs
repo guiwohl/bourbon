@@ -5,6 +5,7 @@ mod note_state;
 mod notebooks;
 mod notes;
 mod snapshot;
+mod search;
 mod support;
 mod tags;
 mod templates;
