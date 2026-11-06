@@ -16,3 +16,7 @@ Open the GPUI window; create, edit and list notes; autosave to SQLite. Nothing e
 | 6 | Time | **The caller passes `now` into every write** | Deterministic tests without a fake clock |
 | 7 | SQLite build | **`rusqlite` with the `bundled` feature** | Same SQLite version everywhere, CI included |
 | 8 | Doc-comment lints | **Clippy `missing_errors_doc` and `missing_panics_doc` allowed** | They demand doc comments, which the project forbids |
+
+## Deferred
+
+- SQLite `busy_timeout` for concurrent writers: needed only once the CLI shares the database file. Set it in the CLI milestone.

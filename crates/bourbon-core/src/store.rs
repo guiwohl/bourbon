@@ -13,6 +13,8 @@ pub enum StoreError {
     NoteNotFound(NoteId),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("database schema version {found} is newer than supported version {supported}")]
+    SchemaTooNew { found: usize, supported: usize },
 }
 
 pub struct NoteStore {
@@ -306,5 +308,24 @@ mod tests {
         std::fs::write(&blocker, "x").unwrap();
         let error = NoteStore::open(&blocker.join("bourbon.db")).err().unwrap();
         assert!(matches!(error, StoreError::Io(_)));
+    }
+
+    #[test]
+    fn open_rejects_schema_newer_than_supported() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("bourbon.db");
+        drop(NoteStore::open(&path).unwrap());
+        rusqlite::Connection::open(&path)
+            .unwrap()
+            .pragma_update(None, "user_version", 99)
+            .unwrap();
+        let error = NoteStore::open(&path).err().unwrap();
+        assert!(matches!(
+            error,
+            StoreError::SchemaTooNew {
+                found: 99,
+                supported: 1
+            }
+        ));
     }
 }

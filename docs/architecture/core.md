@@ -21,7 +21,7 @@ Pure domain plus SQLite. Never depends on GPUI. No repository trait: one storage
 
 ## Schema
 
-Versioned by `PRAGMA user_version`; an ordered list of migrations is applied past the stored version.
+Versioned by `PRAGMA user_version`; an ordered list of migrations is applied past the stored version. A stored version above the known migrations fails the open with `StoreError::SchemaTooNew`.
 
 v1: `notes(id TEXT PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`
 

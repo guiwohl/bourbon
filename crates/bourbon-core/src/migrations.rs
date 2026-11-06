@@ -1,5 +1,7 @@
 use rusqlite::Connection;
 
+use crate::store::StoreError;
+
 const MIGRATIONS: &[&str] = &["CREATE TABLE notes (
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
@@ -8,8 +10,14 @@ const MIGRATIONS: &[&str] = &["CREATE TABLE notes (
         updated_at INTEGER NOT NULL
     )"];
 
-pub fn migrate(connection: &mut Connection) -> rusqlite::Result<()> {
+pub fn migrate(connection: &mut Connection) -> Result<(), StoreError> {
     let applied: usize = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    if applied > MIGRATIONS.len() {
+        return Err(StoreError::SchemaTooNew {
+            found: applied,
+            supported: MIGRATIONS.len(),
+        });
+    }
     for (index, migration) in MIGRATIONS.iter().enumerate().skip(applied) {
         let transaction = connection.transaction()?;
         transaction.execute_batch(migration)?;
