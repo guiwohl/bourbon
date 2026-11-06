@@ -7,6 +7,11 @@ use crate::notebook::{Notebook, NotebookNode, build_tree};
 use crate::store::{NoteStore, StoreError};
 use crate::timestamp::Timestamp;
 
+pub(super) const NOTEBOOK_SUBTREE: &str = "WITH RECURSIVE subtree (id) AS (
+    SELECT ?1 UNION ALL
+    SELECT notebooks.id FROM notebooks JOIN subtree ON notebooks.parent_id = subtree.id
+)";
+
 impl NoteStore {
     pub fn default_notebook(&self) -> Result<NotebookId, StoreError> {
         let id = self.connection.query_row(
@@ -23,6 +28,7 @@ impl NoteStore {
         parent: Option<&NotebookId>,
         now: Timestamp,
     ) -> Result<Notebook, StoreError> {
+        let name = non_empty_notebook_name(name)?;
         if let Some(parent) = parent {
             self.ensure_notebook_exists(parent)?;
         }
@@ -45,6 +51,7 @@ impl NoteStore {
     }
 
     pub fn rename_notebook(&self, id: &NotebookId, name: &str) -> Result<(), StoreError> {
+        let name = non_empty_notebook_name(name)?;
         let changed = self.connection.execute(
             "UPDATE notebooks SET name = ?2 WHERE id = ?1",
             params![id, name],
@@ -100,5 +107,14 @@ impl NoteStore {
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
             .collect::<Result<HashMap<_, _>, _>>()?;
         Ok(counts)
+    }
+}
+
+fn non_empty_notebook_name(name: &str) -> Result<&str, StoreError> {
+    let name = name.trim();
+    if name.is_empty() {
+        Err(StoreError::EmptyNotebookName)
+    } else {
+        Ok(name)
     }
 }

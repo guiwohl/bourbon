@@ -1,18 +1,13 @@
 use std::time::Duration;
 
-use rusqlite::params;
+use rusqlite::{params, params_from_iter};
 
 use crate::identifier::{NoteId, NotebookId};
+use crate::store::notebooks::NOTEBOOK_SUBTREE;
 use crate::store::{NoteStore, StoreError};
 use crate::timestamp::Timestamp;
 
 pub const TRASH_RETENTION: Duration = Duration::from_hours(168);
-
-const SUBTREE_OF_NOTEBOOK: &str = "WITH RECURSIVE subtree(id) AS (
-    SELECT ?1
-    UNION ALL
-    SELECT notebooks.id FROM notebooks JOIN subtree ON notebooks.parent_id = subtree.id
-)";
 
 impl NoteStore {
     pub fn trash_note(&self, note: &NoteId, now: Timestamp) -> Result<(), StoreError> {
@@ -44,12 +39,12 @@ impl NoteStore {
     }
 
     pub fn empty_trash(&self) -> Result<usize, StoreError> {
-        self.delete_trashed_notes_where("deleted_at IS NOT NULL", [])
+        self.purge_trash(&TrashPurge::Everything)
     }
 
     pub fn purge_expired_trash(&self, now: Timestamp) -> Result<usize, StoreError> {
-        let expiry_limit = now.as_millis() - retention_millis();
-        self.delete_trashed_notes_where("deleted_at <= ?1", [expiry_limit])
+        let expiry_limit = Timestamp::from_millis(now.as_millis() - retention_millis());
+        self.purge_trash(&TrashPurge::ExpiredBefore(expiry_limit))
     }
 
     pub fn delete_notebook(&self, notebook: &NotebookId, now: Timestamp) -> Result<(), StoreError> {
@@ -60,7 +55,7 @@ impl NoteStore {
         let transaction = self.connection.unchecked_transaction()?;
         transaction.execute(
             &format!(
-                "{SUBTREE_OF_NOTEBOOK}
+                "{NOTEBOOK_SUBTREE}
                  UPDATE notes SET deleted_at = ?2
                  WHERE deleted_at IS NULL AND notebook_id IN (SELECT id FROM subtree)"
             ),
@@ -68,7 +63,7 @@ impl NoteStore {
         )?;
         transaction.execute(
             &format!(
-                "{SUBTREE_OF_NOTEBOOK}
+                "{NOTEBOOK_SUBTREE}
                  DELETE FROM notebooks WHERE id IN (SELECT id FROM subtree)"
             ),
             params![notebook],
@@ -77,22 +72,42 @@ impl NoteStore {
         Ok(())
     }
 
-    fn delete_trashed_notes_where<P: rusqlite::Params + Copy>(
-        &self,
-        condition: &str,
-        parameters: P,
-    ) -> Result<usize, StoreError> {
+    fn purge_trash(&self, purge: &TrashPurge) -> Result<usize, StoreError> {
+        let condition = purge.condition();
         let transaction = self.connection.unchecked_transaction()?;
         transaction.execute(
             &format!(
                 "DELETE FROM note_tags WHERE note_id IN (SELECT id FROM notes WHERE {condition})"
             ),
-            parameters,
+            params_from_iter(purge.parameters()),
         )?;
-        let deleted =
-            transaction.execute(&format!("DELETE FROM notes WHERE {condition}"), parameters)?;
+        let deleted = transaction.execute(
+            &format!("DELETE FROM notes WHERE {condition}"),
+            params_from_iter(purge.parameters()),
+        )?;
         transaction.commit()?;
         Ok(deleted)
+    }
+}
+
+enum TrashPurge {
+    Everything,
+    ExpiredBefore(Timestamp),
+}
+
+impl TrashPurge {
+    fn condition(&self) -> &'static str {
+        match self {
+            Self::Everything => "deleted_at IS NOT NULL",
+            Self::ExpiredBefore(_) => "deleted_at <= ?1",
+        }
+    }
+
+    fn parameters(&self) -> Vec<Timestamp> {
+        match self {
+            Self::Everything => Vec::new(),
+            Self::ExpiredBefore(limit) => vec![*limit],
+        }
     }
 }
 

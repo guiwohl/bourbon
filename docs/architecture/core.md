@@ -13,8 +13,8 @@ Pure domain plus SQLite. Never depends on GPUI. No repository trait: one storage
 | `Tag` | id, name, color |
 | `Notebook` | id, name, parent (`None` = top level), created_at |
 | `NotebookNode` | notebook, note_count, children |
-| `Note` | id, title, body, created_at, updated_at, notebook, status, pinned, tags (by name), trashed_at |
-| `NoteSummary` | id, title, excerpt, updated_at, created_at, pinned, status, tags (by name). No body |
+| `Note` | id, title, body, created_at, updated_at, notebook, status, pinned, tags (`Vec<Tag>`: id, name, colour), trashed_at |
+| `NoteSummary` | id, title, excerpt, updated_at, created_at, pinned, status, tags (`Vec<Tag>`: id, name, colour). No body |
 | `NoteQuery` | scope + sort; `Default` is `AllNotes` + `UpdatedNewestFirst` |
 | `NoteScope` | `AllNotes`, `Notebook(NotebookId, NotebookDepth)`, `Status(NoteStatus)`, `Tags(Vec<TagId>)`, `Trash` |
 | `NotebookDepth` | `DirectOnly`, `WithDescendants` |
@@ -44,7 +44,7 @@ v2 (milestone 2):
 - `settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)`; key `default_notebook_id` holds the Inbox id
 - the Inbox notebook is inserted with a random id (`lower(hex(randomblob(6)))`) and the migration time
 - `notes` rebuilt (create, copy, drop, rename) with `notebook_id TEXT NOT NULL` (existing rows go to Inbox), `status TEXT NOT NULL DEFAULT 'none'`, `pinned INTEGER NOT NULL DEFAULT 0`, `deleted_at INTEGER` (NULL = not in trash)
-- `tags(id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, color TEXT NOT NULL, created_at INTEGER NOT NULL)`
+- `tags(id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE, color TEXT NOT NULL, created_at INTEGER NOT NULL)`
 - `note_tags(note_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (note_id, tag_id))`
 - indexes on `notes(notebook_id)`, `notes(status)`, `notes(deleted_at)`, `note_tags(tag_id)`
 
@@ -77,9 +77,13 @@ If title and body both equal what is stored, `save_note` is a no-op and `updated
 
 `$XDG_DATA_HOME/bourbon/bourbon.db`; if unset or empty, `$HOME/.local/share/bourbon/bourbon.db`.
 
+## Notebooks
+
+Notebook names are trimmed on create and rename; an empty name is `EmptyNotebookName`. Names need not be unique.
+
 ## Tags
 
-Tag names are trimmed; an empty name is `EmptyTagName`. Uniqueness is case-insensitive (`TagNameTaken`); a tag may be renamed to its own name in another case. Unknown ids give `TagNotFound`.
+Tag names are trimmed; an empty name is `EmptyTagName`. Uniqueness is case-insensitive and enforced by the schema (`UNIQUE COLLATE NOCASE`); the store pre-checks for a friendly error and also maps a unique-constraint violation to `TagNameTaken`. NOCASE folds ASCII letters only, for tag uniqueness and for title sort alike; a tag may be renamed to its own name in another case. Unknown ids give `TagNotFound`.
 
 `list_tags` returns `TagSummary { tag, note_count }` ordered by name ignoring case; `note_count` counts non-trashed notes carrying the tag, any status. `delete_tag` also removes its `note_tags` rows.
 

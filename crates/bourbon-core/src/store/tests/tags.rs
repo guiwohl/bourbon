@@ -254,3 +254,49 @@ fn removing_with_unknown_note_or_tag_fails() {
         .unwrap_err();
     assert!(matches!(error, StoreError::TagNotFound(id) if id == missing_tag));
 }
+
+#[test]
+fn the_schema_rejects_tag_names_differing_only_in_case() {
+    let store = store();
+    add_tag(&store, "Work", TagColor::Red);
+    let second = store.connection.execute(
+        "INSERT INTO tags (id, name, color, created_at) VALUES ('other', 'work', 'red', 0)",
+        [],
+    );
+    assert!(second.is_err());
+}
+
+#[test]
+fn a_unique_violation_maps_to_tag_name_taken() {
+    let store = store();
+    add_tag(&store, "Work", TagColor::Red);
+    let violation = store
+        .connection
+        .execute(
+            "INSERT INTO tags (id, name, color, created_at) VALUES ('other', 'work', 'red', 0)",
+            [],
+        )
+        .unwrap_err();
+    let error = crate::store::tags::tag_name_conflict(violation, "work");
+    assert!(matches!(error, StoreError::TagNameTaken(name) if name == "work"));
+}
+
+#[test]
+fn other_database_errors_are_not_mapped_to_tag_name_taken() {
+    let error = crate::store::tags::tag_name_conflict(rusqlite::Error::QueryReturnedNoRows, "work");
+    assert!(matches!(error, StoreError::Database(_)));
+}
+
+#[test]
+fn a_non_unique_constraint_violation_is_not_mapped_to_tag_name_taken() {
+    let store = store();
+    let violation = store
+        .connection
+        .execute(
+            "INSERT INTO tags (id, name, color, created_at) VALUES ('x', NULL, 'red', 0)",
+            [],
+        )
+        .unwrap_err();
+    let error = crate::store::tags::tag_name_conflict(violation, "work");
+    assert!(matches!(error, StoreError::Database(_)));
+}

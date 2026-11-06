@@ -159,3 +159,35 @@ fn notebooks_persist_across_reopen() {
     let tree = NoteStore::open(&path).unwrap().notebook_tree().unwrap();
     assert!(tree.iter().any(|node| node.notebook.id == id));
 }
+
+#[test]
+fn created_notebook_name_is_trimmed() {
+    let store = store();
+    let notebook = store.create_notebook("  Work  ", None, at(1)).unwrap();
+    assert_eq!(notebook.name, "Work");
+}
+
+#[test]
+fn blank_notebook_name_is_rejected_on_create() {
+    let store = store();
+    let result = store.create_notebook("   ", None, at(1));
+    assert!(matches!(result, Err(StoreError::EmptyNotebookName)));
+    assert_eq!(store.notebook_tree().unwrap().len(), 1);
+}
+
+#[test]
+fn renamed_notebook_name_is_trimmed() {
+    let store = store();
+    let id = inbox(&store);
+    store.rename_notebook(&id, "  Home ").unwrap();
+    assert_eq!(store.notebook_tree().unwrap()[0].notebook.name, "Home");
+}
+
+#[test]
+fn blank_notebook_name_is_rejected_on_rename() {
+    let store = store();
+    let id = inbox(&store);
+    let result = store.rename_notebook(&id, " ");
+    assert!(matches!(result, Err(StoreError::EmptyNotebookName)));
+    assert_eq!(store.notebook_tree().unwrap()[0].notebook.name, "Inbox");
+}
