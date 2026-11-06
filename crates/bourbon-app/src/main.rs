@@ -1,6 +1,10 @@
 mod autosave;
-mod notes_view;
+mod editor;
+mod navigation;
+mod note_list;
+mod sidebar;
 mod window;
+mod workspace;
 
 use bourbon_core::{NoteStore, default_database_path};
 

@@ -7,32 +7,51 @@ GPUI window over `bourbon-core`. Holds no business rule: it presents state and f
 | Topic | Behaviour |
 |---|---|
 | Window | Title "Bourbon", Wayland `app_id` "bourbon" |
-| Startup | Opens `default_database_path()`; failure prints a message and exits 1. Loads the list, selects the most recent note |
-| Layout | Sidebar ("New note" button, note list; empty title shows "Untitled"; selected row highlighted) and right pane (title input, Markdown editor with soft wrap, no line numbers) |
-| Empty state | No notes: the right pane shows a "New note" button |
-| New note | Button or `Ctrl+N`: flush, create in the store, select, focus the title; the root view tracks its own focus handle, focused at startup when no note is selected, so `Ctrl+N` works with nothing else focused |
-| Autosave | Any title or body change restarts one pending 500 ms task; when it fires: `save_note`, then reload the list. No manual save |
-| Flush | Selecting or creating a note first saves the current one immediately; if that save fails the switch is cancelled |
+| Startup | Opens `default_database_path()`; failure prints a message and exits 1. Purges expired trash once (errors go to the banner), loads the sidebar data and the list, selects the most recent note |
+| Layout | Three columns: sidebar (240 px) \| note list (320 px) \| editor (flex). Fixed widths; resizing is M5 |
+| Sidebar | Rows: All Notes, the notebook tree flattened with indentation, a Status header (Active, On Hold, Completed, Dropped), a Tags header (one row per tag), Trash. The row of the current navigation is highlighted. Clicking sets the navigation and reloads the list |
+| Note list | Header with a "New note" button (top right); rows show the title (or "Untitled") and the excerpt; the selected row is highlighted; clicking selects |
+| Editor | Title input and Markdown editor (soft wrap, no line numbers). Empty state: "No notes yet" with a "New note" button |
+| Navigation | `Navigation { AllNotes, Notebook, Status, Tags, Trash }` plus the current sort form a `Listing`; `Listing::query()` maps it to a core `NoteQuery` (table below) |
+| New note | Button or `Ctrl+N`: flush, create in the selected notebook when the navigation is a notebook, else in `default_notebook()`; reload list and sidebar, select, focus the title. The root view tracks its own focus handle, focused at startup when no note is selected, so `Ctrl+N` works with nothing else focused |
+| Autosave | Any title or body change restarts one pending 500 ms task; when it fires: `save_note`, then reload list and sidebar counts. No manual save |
+| Flush | Selecting or creating a note first saves the current one immediately; if that save fails the switch is cancelled. Changing the navigation does not flush: the open note stays open |
 | Close | `on_window_should_close` flushes the pending save while the view is alive. Success closes the window; failure keeps it open with the banner shown |
 | Quit | `on_app_quit` flushes synchronously for quits that happen while the window is open. On Linux, closing the last window quits after the window and view are dropped, so the close hook is the one that matters there |
-| Errors | `save_selected` and `flush_pending_save` return `Result<(), StoreError>`; the error is reported once at the boundary (autosave timer, select, create, close, quit). The banner is rendered once by the root view, above both panes, until the next successful save |
-| Save vs reload | Only a save failure blocks switching, creating or closing. A failed list reload is reported but blocks nothing |
+| Errors | `save_selected` and `flush_pending_save` return `Result<(), StoreError>`; the error is reported once at the boundary (autosave timer, select, create, close, quit). The banner is rendered once by the root view, above the columns, until the next successful save |
+| Save vs reload | Only a save failure blocks switching, creating or closing. A failed list or sidebar reload is reported but blocks nothing |
 | Loading a note | `set_value` emits no `Change` event, so loading never schedules a save |
 
+### Navigation to query
+
+| Navigation | `NoteScope` |
+|---|---|
+| `AllNotes` | `AllNotes` |
+| `Notebook(id)` | `Notebook(id, WithDescendants)` (expand/collapse depth comes with the sidebar slice) |
+| `Status(status)` | `Status(status)` |
+| `Tags(ids)` | `Tags(ids)` |
+| `Trash` | `Trash` |
+
+The sort is the listing's own field, default `UpdatedNewestFirst`.
+
 ## Modules
+
+Each column is a module owned by one concern. Columns render from data the workspace passes in and report intent through `cx.listener` callbacks on `Workspace`; no column touches `NoteStore`.
 
 | File | Responsibility |
 |---|---|
 | `main.rs` | Opens the store, aborts on error |
 | `window.rs` | GPUI application, key binding, window options, the close hook |
-| `notes_view.rs` | The root view: state, selection, save, create |
-| `notes_view/sidebar.rs` | Sidebar rendering |
-| `notes_view/editor_pane.rs` | Title, editor, empty state, the error banner element |
 | `autosave.rs` | The 500 ms delayed task |
+| `navigation.rs` | `Navigation`, `Listing`, the pure mapping to `NoteQuery` |
+| `workspace.rs` | Root view: owns `NoteStore`, listing, selection, autosave and flush, trash purge, error banner state; lays out the three columns |
+| `sidebar/mod.rs` | `render(SidebarData, cx)`: navigation rows, notebook tree flattening, selection rule |
+| `note_list/mod.rs` | `render(notes, selected, cx)`: header with the New note button, note rows |
+| `editor/mod.rs` | `EditorPane` (title input, Markdown editor, load/read/focus, change subscriptions), empty state, error banner element |
 
 ## Tests
 
-Headless, through `gpui-kit` `test-support` (`#[gpui_kit::test]`, `TestAppContext`): the view takes a `NoteStore` (in memory in tests), clicks and typing go through real element ids, and the clock is advanced with `advance_clock`. They cover startup selection, autosave timing (499 ms vs 500 ms, restart on keystroke), flush on switch, creation, and the empty state. Also: close flush (through `simulate_close`, which runs the real `on_window_should_close` handler registered by `window::build_notes_view`), refused close on a failed save, quit flush (`App::shutdown`, which runs the `on_app_quit` handlers), pending autosave cancelled on switch, banner shown and cleared, failed save blocking a switch, and `Ctrl+N` through the real key binding. A save is made to fail honestly by selecting a note id the store does not hold.
+Headless, through `gpui-kit` `test-support` (`#[gpui_kit::test]`, `TestAppContext`): the workspace takes a `NoteStore` (in memory in tests), clicks and typing go through real element ids, and the clock is advanced with `advance_clock`. They cover startup selection, autosave timing (499 ms vs 500 ms, restart on keystroke), flush on switch, creation, and the empty state. Also: close flush (through `simulate_close`, which runs the real `on_window_should_close` handler registered by `window::build_workspace`), refused close on a failed save, quit flush (`App::shutdown`, which runs the `on_app_quit` handlers), pending autosave cancelled on switch, banner shown and cleared, failed save blocking a switch, and `Ctrl+N` through the real key binding. Navigation tests click real sidebar row ids (`nav-notebook-<id>`, `nav-trash`, ...) and check the listed titles, the notebook a created note lands in, and the startup trash purge. A save is made to fail honestly by selecting a note id the store does not hold.
 
 ## Dependency guard
 

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bourbon_core::{NoteId, NoteStore, Timestamp};
+use bourbon_core::{NoteId, NoteStatus, NoteStore, NotebookId, TagColor, Timestamp};
 use gpui_kit::VisualTestContext;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
@@ -8,7 +8,7 @@ use gpui_kit::{
     WindowOptions, px, size,
 };
 
-use super::NotesView;
+use super::Workspace;
 
 struct Seeded {
     older: NoteId,
@@ -39,7 +39,7 @@ fn seeded_store() -> (NoteStore, Seeded) {
     )
 }
 
-fn open_view(cx: &mut TestAppContext, store: NoteStore) -> (AnyWindowHandle, Entity<NotesView>) {
+fn open_view(cx: &mut TestAppContext, store: NoteStore) -> (AnyWindowHandle, Entity<Workspace>) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         crate::window::bind_keys(cx);
@@ -55,13 +55,13 @@ fn open_view(cx: &mut TestAppContext, store: NoteStore) -> (AnyWindowHandle, Ent
                 ..WindowOptions::default()
             },
             cx,
-            |window, cx| crate::window::build_notes_view(store, window, cx),
+            |window, cx| crate::window::build_workspace(store, window, cx),
         )
         .unwrap()
     })
 }
 
-fn stored_title(cx: &mut TestAppContext, view: &Entity<NotesView>, id: &NoteId) -> String {
+fn stored_title(cx: &mut TestAppContext, view: &Entity<Workspace>, id: &NoteId) -> String {
     cx.read(|cx| view.read(cx).store.find_note(id).unwrap().unwrap().title)
 }
 
@@ -90,8 +90,8 @@ fn startup_selects_the_most_recent_note_and_loads_it(cx: &mut TestAppContext) {
     cx.read(|cx| {
         let view = view.read(cx);
         assert_eq!(view.selected, Some(seeded.newer.clone()));
-        assert_eq!(view.title_input.read(cx).value(), "Newer");
-        assert_eq!(view.body_editor.read(cx).value(), "newer body");
+        assert_eq!(view.editor.title(cx), "Newer");
+        assert_eq!(view.editor.body(cx), "newer body");
     });
 }
 
@@ -141,8 +141,8 @@ fn switching_notes_saves_the_pending_edit_immediately(cx: &mut TestAppContext) {
     cx.read(|cx| {
         let view = view.read(cx);
         assert_eq!(view.selected, Some(seeded.older.clone()));
-        assert_eq!(view.title_input.read(cx).value(), "Older");
-        assert_eq!(view.body_editor.read(cx).value(), "older body");
+        assert_eq!(view.editor.title(cx), "Older");
+        assert_eq!(view.editor.body(cx), "older body");
     });
 }
 
@@ -160,7 +160,7 @@ fn creating_a_note_selects_it_on_top_of_the_list_and_focuses_the_title(cx: &mut 
         assert_ne!(created, seeded.older);
         assert_eq!(view.notes.len(), 3);
         assert_eq!(view.notes[0].id, created);
-        assert_eq!(view.title_input.read(cx).value(), "");
+        assert_eq!(view.editor.title(cx), "");
     });
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
@@ -195,7 +195,7 @@ fn advance_past_autosave_delay(cx: &mut TestAppContext) {
     cx.run_until_parked();
 }
 
-fn select_missing_note(cx: &mut TestAppContext, view: &Entity<NotesView>) {
+fn select_missing_note(cx: &mut TestAppContext, view: &Entity<Workspace>) {
     view.update(cx, |view, _| view.selected = Some(NoteId::generate()));
 }
 
@@ -283,7 +283,7 @@ fn a_failed_save_blocks_switching_to_another_note(cx: &mut TestAppContext) {
     cx.read(|cx| {
         let view = view.read(cx);
         assert_eq!(view.selected, missing);
-        assert_eq!(view.title_input.read(cx).value(), "Newer!");
+        assert_eq!(view.editor.title(cx), "Newer!");
     });
     assert!(banner_is_shown(cx, handle));
 }
@@ -328,4 +328,184 @@ fn quitting_the_app_saves_an_edit_typed_before_the_autosave_delay(cx: &mut TestA
     cx.run_until_parked();
 
     assert_eq!(stored_title(cx, &view, &seeded.newer), "Newer!");
+}
+
+fn listed_titles(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Vec<String> {
+    cx.read(|cx| {
+        view.read(cx)
+            .notes
+            .iter()
+            .map(|summary| summary.title.clone())
+            .collect()
+    })
+}
+
+fn note_in(store: &NoteStore, notebook: &NotebookId, title: &str, at_millis: i64) -> NoteId {
+    let note = store.create_note(notebook, at(at_millis)).unwrap();
+    store.save_note(&note.id, title, "", at(at_millis)).unwrap();
+    note.id
+}
+
+#[gpui_kit::test]
+fn clicking_a_notebook_lists_only_its_notes(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    let work = store.create_notebook("Work", None, at(1)).unwrap();
+    note_in(&store, &inbox, "In inbox", 2);
+    note_in(&store, &work.id, "In work", 3);
+    let (handle, view) = open_view(cx, store);
+    assert_eq!(listed_titles(cx, &view).len(), 2);
+
+    click(cx, handle, &format!("nav-notebook-{}", work.id));
+
+    assert_eq!(listed_titles(cx, &view), ["In work"]);
+}
+
+#[gpui_kit::test]
+fn clicking_all_notes_after_a_notebook_lists_everything_again(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    let work = store.create_notebook("Work", None, at(1)).unwrap();
+    note_in(&store, &inbox, "In inbox", 2);
+    note_in(&store, &work.id, "In work", 3);
+    let (handle, view) = open_view(cx, store);
+
+    click(cx, handle, &format!("nav-notebook-{}", work.id));
+    click(cx, handle, "nav-all-notes");
+
+    assert_eq!(listed_titles(cx, &view), ["In work", "In inbox"]);
+}
+
+#[gpui_kit::test]
+fn clicking_a_notebook_lists_the_notes_of_its_sub_notebooks(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let work = store.create_notebook("Work", None, at(1)).unwrap();
+    let nested = store
+        .create_notebook("Nested", Some(&work.id), at(1))
+        .unwrap();
+    note_in(&store, &nested.id, "Deep", 2);
+    let (handle, view) = open_view(cx, store);
+
+    click(cx, handle, &format!("nav-notebook-{}", work.id));
+
+    assert_eq!(listed_titles(cx, &view), ["Deep"]);
+}
+
+#[gpui_kit::test]
+fn clicking_a_status_lists_notes_with_that_status(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    note_in(&store, &inbox, "Plain", 1);
+    let done = note_in(&store, &inbox, "Done", 2);
+    store
+        .set_status(&done, NoteStatus::Completed, at(3))
+        .unwrap();
+    let (handle, view) = open_view(cx, store);
+
+    click(cx, handle, "nav-status-completed");
+
+    assert_eq!(listed_titles(cx, &view), ["Done"]);
+}
+
+#[gpui_kit::test]
+fn clicking_a_tag_lists_notes_carrying_it(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    note_in(&store, &inbox, "Untagged", 1);
+    let tagged = note_in(&store, &inbox, "Tagged", 2);
+    let tag = store.create_tag("idea", TagColor::Red, at(3)).unwrap();
+    store.add_tag_to_note(&tagged, &tag.id, at(4)).unwrap();
+    let (handle, view) = open_view(cx, store);
+
+    click(cx, handle, &format!("nav-tag-{}", tag.id));
+
+    assert_eq!(listed_titles(cx, &view), ["Tagged"]);
+}
+
+#[gpui_kit::test]
+fn clicking_trash_lists_only_trashed_notes(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    note_in(&store, &inbox, "Alive", 1);
+    let trashed = note_in(&store, &inbox, "Trashed", 2);
+    store.trash_note(&trashed, Timestamp::now()).unwrap();
+    let (handle, view) = open_view(cx, store);
+    assert_eq!(listed_titles(cx, &view), ["Alive"]);
+
+    click(cx, handle, "nav-trash");
+
+    assert_eq!(listed_titles(cx, &view), ["Trashed"]);
+}
+
+#[gpui_kit::test]
+fn creating_a_note_while_a_notebook_is_selected_puts_it_there(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let work = store.create_notebook("Work", None, at(1)).unwrap();
+    let (handle, view) = open_view(cx, store);
+
+    click(cx, handle, &format!("nav-notebook-{}", work.id));
+    click(cx, handle, "new-note");
+
+    cx.read(|cx| {
+        let workspace = view.read(cx);
+        let created = workspace.selected.clone().unwrap();
+        let note = workspace.store.find_note(&created).unwrap().unwrap();
+        assert_eq!(note.notebook, work.id);
+        assert_eq!(workspace.notes.len(), 1);
+    });
+}
+
+#[gpui_kit::test]
+fn creating_a_note_outside_a_notebook_puts_it_in_the_inbox(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    store.create_notebook("Work", None, at(1)).unwrap();
+    let (handle, view) = open_view(cx, store);
+
+    click(cx, handle, "nav-trash");
+    click(cx, handle, "new-note");
+
+    cx.read(|cx| {
+        let workspace = view.read(cx);
+        let created = workspace.selected.clone().unwrap();
+        let note = workspace.store.find_note(&created).unwrap().unwrap();
+        assert_eq!(note.notebook, inbox);
+    });
+}
+
+#[gpui_kit::test]
+fn creating_a_note_refreshes_the_sidebar_counts(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let (handle, view) = open_view(cx, store);
+    let count = |cx: &mut TestAppContext| {
+        cx.read(|cx| {
+            view.read(cx)
+                .notebooks
+                .iter()
+                .map(|node| node.note_count)
+                .sum::<usize>()
+        })
+    };
+    assert_eq!(count(cx), 0);
+
+    click(cx, handle, "new-note");
+
+    assert_eq!(count(cx), 1);
+}
+
+#[gpui_kit::test]
+fn startup_purges_trash_older_than_the_retention(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    let expired = note_in(&store, &inbox, "Expired", 1);
+    store.trash_note(&expired, at(1)).unwrap();
+    let recent = note_in(&store, &inbox, "Recent", 2);
+    store.trash_note(&recent, Timestamp::now()).unwrap();
+    let (_, view) = open_view(cx, store);
+
+    cx.read(|cx| {
+        let store = &view.read(cx).store;
+        assert!(store.find_note(&expired).unwrap().is_none());
+        assert!(store.find_note(&recent).unwrap().is_some());
+    });
 }

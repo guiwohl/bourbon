@@ -1,7 +1,7 @@
 use bourbon_core::NoteStore;
 use gpui_kit::{App, AppContext as _, Entity, KeyBinding, TitlebarOptions, Window, WindowOptions};
 
-use crate::notes_view::{NewNote, NotesView};
+use crate::workspace::{NewNote, Workspace};
 
 const APP_ID: &str = "bourbon";
 const WINDOW_TITLE: &str = "Bourbon";
@@ -13,7 +13,7 @@ pub fn run(store: NoteStore) {
             gpui_kit::init(cx);
             bind_keys(cx);
             let opened = gpui_kit::open_window(window_options(), cx, |window, cx| {
-                build_notes_view(store, window, cx)
+                build_workspace(store, window, cx)
             });
             if let Err(error) = opened {
                 eprintln!("bourbon: cannot open the window: {error}");
@@ -26,16 +26,16 @@ pub(crate) fn bind_keys(cx: &mut App) {
     cx.bind_keys([KeyBinding::new("ctrl-n", NewNote, None)]);
 }
 
-pub(crate) fn build_notes_view(
+pub(crate) fn build_workspace(
     store: NoteStore,
     window: &mut Window,
     cx: &mut App,
-) -> Entity<NotesView> {
-    let view = cx.new(|cx| NotesView::new(store, window, cx));
+) -> Entity<Workspace> {
+    let view = cx.new(|cx| Workspace::new(store, window, cx));
     let closing_view = view.downgrade();
     window.on_window_should_close(cx, move |_, cx| {
         closing_view
-            .update(cx, NotesView::flush_before_closing)
+            .update(cx, Workspace::flush_before_closing)
             .unwrap_or(true)
     });
     view
