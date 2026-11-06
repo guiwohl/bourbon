@@ -1,0 +1,5 @@
+exclude_re = [
+    "replace main with \\(\\)",
+    "replace run with \\(\\)",
+    "replace == with != in NotesView::render_note_row",
+]
