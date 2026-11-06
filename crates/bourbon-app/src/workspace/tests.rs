@@ -9,6 +9,7 @@ use gpui_kit::{
 };
 
 use super::Workspace;
+use crate::navigation::Navigation;
 
 struct Seeded {
     older: NoteId,
@@ -455,21 +456,111 @@ fn creating_a_note_while_a_notebook_is_selected_puts_it_there(cx: &mut TestAppCo
     });
 }
 
+fn created_note(cx: &mut TestAppContext, view: &Entity<Workspace>) -> bourbon_core::Note {
+    cx.read(|cx| {
+        let workspace = view.read(cx);
+        let created = workspace.selected.clone().unwrap();
+        assert!(workspace.notes.iter().any(|summary| summary.id == created));
+        workspace.store.find_note(&created).unwrap().unwrap()
+    })
+}
+
 #[gpui_kit::test]
-fn creating_a_note_outside_a_notebook_puts_it_in_the_inbox(cx: &mut TestAppContext) {
+fn creating_a_note_on_all_notes_puts_it_in_the_inbox_and_lists_it(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
     store.create_notebook("Work", None, at(1)).unwrap();
     let (handle, view) = open_view(cx, store);
 
+    click(cx, handle, "new-note");
+
+    assert_eq!(created_note(cx, &view).notebook, inbox);
+}
+
+#[gpui_kit::test]
+fn creating_a_note_on_trash_switches_to_all_notes_and_lists_it(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    let (handle, view) = open_view(cx, store);
+
     click(cx, handle, "nav-trash");
     click(cx, handle, "new-note");
 
+    assert_eq!(created_note(cx, &view).notebook, inbox);
+    cx.read(|cx| assert_eq!(view.read(cx).listing.navigation, Navigation::AllNotes));
+}
+
+#[gpui_kit::test]
+fn creating_a_note_on_a_status_gives_it_that_status_and_lists_it(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    let (handle, view) = open_view(cx, store);
+
+    click(cx, handle, "nav-status-completed");
+    click(cx, handle, "new-note");
+
+    let note = created_note(cx, &view);
+    assert_eq!(note.notebook, inbox);
+    assert_eq!(note.status, NoteStatus::Completed);
+}
+
+#[gpui_kit::test]
+fn creating_a_note_on_a_tag_adds_the_tag_and_lists_it(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    let tag = store.create_tag("idea", TagColor::Red, at(1)).unwrap();
+    let (handle, view) = open_view(cx, store);
+
+    click(cx, handle, &format!("nav-tag-{}", tag.id));
+    click(cx, handle, "new-note");
+
+    let note = created_note(cx, &view);
+    assert_eq!(note.notebook, inbox);
+    assert_eq!(note.tags, [tag]);
+}
+
+#[gpui_kit::test]
+fn creating_a_note_with_several_tags_adds_every_tag(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let first = store.create_tag("one", TagColor::Red, at(1)).unwrap();
+    let second = store.create_tag("two", TagColor::Blue, at(1)).unwrap();
+    let (handle, view) = open_view(cx, store);
+    view.update(cx, |view, cx| {
+        view.navigate(
+            Navigation::Tags(vec![first.id.clone(), second.id.clone()]),
+            cx,
+        );
+    });
+
+    click(cx, handle, "new-note");
+
+    let tag_ids: Vec<_> = created_note(cx, &view)
+        .tags
+        .into_iter()
+        .map(|tag| tag.id)
+        .collect();
+    assert_eq!(tag_ids.len(), 2);
+    assert!(tag_ids.contains(&first.id));
+    assert!(tag_ids.contains(&second.id));
+}
+
+#[gpui_kit::test]
+fn saving_reloads_the_list_and_leaves_the_sidebar_data_unchanged(cx: &mut TestAppContext) {
+    let (store, seeded) = seeded_store();
+    let (handle, view) = open_view(cx, store);
+    let sidebar_before = cx.read(|cx| {
+        let view = view.read(cx);
+        (view.notebooks.clone(), view.tags.clone())
+    });
+
+    type_into_title(cx, handle, "!");
+    advance_past_autosave_delay(cx);
+
+    assert_eq!(listed_titles(cx, &view)[0], "Newer!");
     cx.read(|cx| {
-        let workspace = view.read(cx);
-        let created = workspace.selected.clone().unwrap();
-        let note = workspace.store.find_note(&created).unwrap().unwrap();
-        assert_eq!(note.notebook, inbox);
+        let view = view.read(cx);
+        assert_eq!((view.notebooks.clone(), view.tags.clone()), sidebar_before);
+        assert_eq!(view.selected, Some(seeded.newer.clone()));
     });
 }
 

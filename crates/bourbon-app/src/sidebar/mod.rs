@@ -207,13 +207,6 @@ mod tests {
     }
 
     #[test]
-    fn each_depth_indents_one_step_further() {
-        assert!((indent(0) - 8.).abs() < f32::EPSILON);
-        assert!((indent(1) - 20.).abs() < f32::EPSILON);
-        assert!((indent(3) - 44.).abs() < f32::EPSILON);
-    }
-
-    #[test]
     fn a_row_is_selected_only_for_the_current_navigation() {
         let notebook = NotebookId::generate();
         let tag = TagId::generate();

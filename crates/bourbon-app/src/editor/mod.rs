@@ -7,9 +7,8 @@ use gpui_kit::{
     ParentElement as _, SharedString, Styled as _, Subscription, TestSupportExt as _, Window, div,
 };
 
+use crate::UNTITLED;
 use crate::workspace::Workspace;
-
-const UNTITLED: &str = "Untitled";
 
 pub(crate) struct EditorPane {
     title_input: Entity<InputState>,

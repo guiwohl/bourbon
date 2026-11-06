@@ -7,10 +7,10 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
 
+use crate::UNTITLED;
 use crate::workspace::Workspace;
 
 const NOTE_LIST_WIDTH: f32 = 320.;
-const UNTITLED: &str = "Untitled";
 
 pub(crate) fn render(
     notes: &[NoteSummary],

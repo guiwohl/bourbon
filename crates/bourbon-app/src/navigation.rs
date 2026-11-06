@@ -32,13 +32,6 @@ impl Listing {
             sort: self.sort,
         }
     }
-
-    pub(crate) fn selected_notebook(&self) -> Option<&NotebookId> {
-        match &self.navigation {
-            Navigation::Notebook(id) => Some(id),
-            _ => None,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -86,22 +79,5 @@ mod tests {
             sort: NoteSort::TitleAlphabetical,
         };
         assert_eq!(listing.query().sort, NoteSort::TitleAlphabetical);
-    }
-
-    #[test]
-    fn only_a_notebook_navigation_selects_a_notebook() {
-        let notebook = NotebookId::generate();
-        assert_eq!(
-            listing(Navigation::Notebook(notebook.clone())).selected_notebook(),
-            Some(&notebook)
-        );
-        for navigation in [
-            Navigation::AllNotes,
-            Navigation::Status(NoteStatus::Active),
-            Navigation::Tags(Vec::new()),
-            Navigation::Trash,
-        ] {
-            assert_eq!(listing(navigation).selected_notebook(), None);
-        }
     }
 }
