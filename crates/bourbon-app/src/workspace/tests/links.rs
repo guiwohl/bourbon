@@ -346,3 +346,33 @@ fn clicking_a_note_link_in_the_preview_opens_that_note(cx: &mut TestAppContext) 
 
     assert_eq!(selected(cx, &view), Some(older));
 }
+
+fn highlighted_suggestions(
+    cx: &mut TestAppContext,
+    handle: AnyWindowHandle,
+    ids: [&NoteId; 2],
+) -> [Option<bool>; 2] {
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        ids.map(|id| window.find(suggestion(id)).selected())
+    })
+    .unwrap()
+}
+
+#[gpui_kit::test]
+fn only_the_highlighted_suggestion_is_marked_selected(cx: &mut TestAppContext) {
+    let (store, seeded) = seeded_store();
+    let (handle, view) = open_view(cx, store);
+    type_into_body(cx, handle, &view, "[[");
+    let ids = [&seeded.newer, &seeded.older];
+
+    assert_eq!(
+        highlighted_suggestions(cx, handle, ids),
+        [Some(true), Some(false)]
+    );
+    press(cx, handle, "down");
+    assert_eq!(
+        highlighted_suggestions(cx, handle, ids),
+        [Some(false), Some(true)]
+    );
+}

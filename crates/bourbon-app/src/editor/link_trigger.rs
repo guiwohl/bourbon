@@ -7,10 +7,8 @@ pub(crate) struct LinkQuery<'a> {
 const OPENER: &str = "[[";
 
 pub(crate) fn link_query_before_cursor(text_before_cursor: &str) -> Option<LinkQuery<'_>> {
-    let line_start = text_before_cursor
-        .rfind('\n')
-        .map_or(0, |newline| newline + 1);
-    let line = &text_before_cursor[line_start..];
+    let line = text_before_cursor.rsplit('\n').next()?;
+    let line_start = text_before_cursor.len() - line.len();
     let opener = line.rfind(OPENER)?;
     let text = &line[opener + OPENER.len()..];
     if text.contains(['[', ']']) {
