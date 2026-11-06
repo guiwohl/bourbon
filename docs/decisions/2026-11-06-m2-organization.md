@@ -53,11 +53,9 @@ Rule: follow InkDrop exactly, unless a row says otherwise. Sources: [How to orga
 |---|---|---|
 | 21 | Deleting | **Soft delete into Trash; purged after 7 days** (foundation decision #9) |
 | 22 | Trash view | **Restore a note, or empty the trash** |
+| 23 | Deleting a notebook | **The notebook and all its sub-notebooks are removed; every note inside goes to Trash.** A note restored after its notebook is gone lands in Inbox |
 
 ## Out of scope
 
 - Templates (InkDrop has them; not in our scope).
 
-## Open
-
-- What happens to a notebook's notes and sub-notebooks when it is deleted.
