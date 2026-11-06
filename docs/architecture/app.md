@@ -54,6 +54,9 @@ Each column is a module owned by one concern. Columns render from data the works
 | `sidebar/mod.rs` | `render(SidebarData, cx)`: navigation rows, notebook tree flattening, selection rule |
 | `note_list/mod.rs` | `render(notes, selected, cx)`: header with the New note button, note rows |
 | `editor/mod.rs` | `EditorPane` (title input, Markdown editor, load/read/focus, change subscriptions), empty state, error banner element |
+| `editor/{tasks,preview_blocks,link_trigger,link_picker,word_count,view_mode}.rs` | Pure, unit-tested editor logic: task toggling, preview block splitting, `[[` detection, suggestion matching, counts, mode cycle |
+| `editor/{preview,toolbar}.rs` | Preview pane and the mode switch |
+| `workspace/writing_intents.rs` | View mode, tasks, link picker and link opening, find, focus mode intents |
 
 ## Tests
 
@@ -197,3 +200,18 @@ Tests: pure unit tests next to each file; `workspace/tests/control_pane.rs` driv
 ## Single instance
 
 At startup `main` calls `claim` on `$XDG_RUNTIME_DIR/<app id>.sock` (fallback `/tmp/<app id>-<uid>.sock`). A live instance gets `focus\n` and the new process exits 0 without opening the store. A refused connection is a stale socket: it is removed and rebound. The listener runs on a std thread and forwards each `focus` line through an mpsc channel; a GPUI task polls it every 100 ms and calls `activate_window()`. Other messages are ignored. Dev builds use the app id `bourbon-dev`, so they never collide with a release build.
+## Writing features (M4)
+
+Decisions in [M4 editor](../decisions/2026-11-06-m4-editor.md). Pure logic is in `editor/`, intents in `workspace/writing_intents.rs`, the link format in `bourbon-core` (`format_note_link`, `parse_note_link`).
+
+| Feature | Keys / ids | Notes |
+|---|---|---|
+| View modes | `Ctrl+E`, `view-mode-edit`, `view-mode-side-by-side`, `view-mode-preview`, panes `body-editor` and `preview` | One mode on `Workspace`, not per note |
+| Preview tasks | `preview-task-<line>` | Own checkbox rows split out of the Markdown by `preview_blocks`; a click runs `toggle_task_on_line` and the normal autosave |
+| Task shortcut | `Ctrl+Enter` in the body | `toggle_task_at_cursor` |
+| Note links | `[[`, `link-suggestions`, `link-suggestion-<id>`; `Up`/`Down`/`Enter`/`Esc` while open | `LinkPicker` lives on `EditorPane`; keys are scoped by the `LinkPicker` key context on the editor wrapper |
+| Find and replace | `Ctrl+F`, `Ctrl+H` | The editor's built-in search panel; app actions cover other focus |
+| Focus mode | `Ctrl+Shift+F`, `Esc` | `Workspace::focus_mode` hides the two columns at render time |
+| Word count | `word-count` | Computed from the body on every render |
+
+Tests: `workspace/tests/{view_modes,tasks,links,find,focus}.rs` (real key bindings, real clicks, painted text) plus unit tests next to each pure module and in `bourbon-core/src/note_link.rs`. The preview link test clicks inside the `preview` pane at the first character of the link.

@@ -29,6 +29,7 @@ Pure domain plus SQLite. Never depends on GPUI. No repository trait: one storage
 | `create_note_with(notebook, seed, now)` | Like `create_note`, with `NoteSeed { tags: Vec<TagId>, status }` (default: no tags, `NoteStatus::None`) applied in one transaction. Unknown notebook gives `NotebookNotFound`, unknown tag `TagNotFound`; nothing is written on failure |
 | `save_note(id, title, body, now)` | See save rule; unknown id gives `StoreError::NoteNotFound` |
 | `move_note(note, notebook, now)` | Sets notebook and `updated_at = now`; unknown note or notebook gives the matching error |
+| `format_note_link(title, id)`, `parse_note_link(url)` | Pure, no store: `[Title](bourbon://note/<id>)` with `\`, `[`, `]` escaped and line breaks as spaces; `parse_note_link` gives the `NoteId` of a well-formed `bourbon://note/<id>`, else `None` |
 | `find_note(id)` | `Option<Note>`; also finds trashed notes |
 | `list_notes(query)` | See listing rules |
 | `search_notes(text, limit)` | See search; returns `Vec<SearchHit>` (`summary: NoteSummary`, `snippet`) |
