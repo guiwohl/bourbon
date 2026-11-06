@@ -6,6 +6,7 @@ mod repository;
 mod secret;
 #[cfg(test)]
 mod tests;
+mod token_file;
 
 use std::fs;
 use std::path::Path;
@@ -17,6 +18,7 @@ pub use error::BackupError;
 pub use remote::{BackupRemote, RemoteUrl};
 pub use repository::GitHubRepository;
 pub use secret::Secret;
+pub use token_file::TokenFile;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackupOutcome {

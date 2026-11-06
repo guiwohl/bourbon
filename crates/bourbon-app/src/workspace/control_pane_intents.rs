@@ -96,13 +96,21 @@ impl Workspace {
         });
     }
 
-    fn run_pane_action(&mut self, action: PaneAction, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn run_pane_action(
+        &mut self,
+        action: PaneAction,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let selected = self.selected.clone();
         match (action, selected) {
             (PaneAction::NewNote, _) => self.create_note(window, cx),
             (PaneAction::NewTemplate, _) => self.create_template(window, cx),
             (PaneAction::ToggleSidebar, _) => self.toggle_sidebar(cx),
             (PaneAction::OpenSettings, _) => self.open_settings(cx),
+            (PaneAction::BackUpNow, _) => self.back_up_now(cx),
+            (PaneAction::RestoreFromBackup, _) => self.begin_restore(cx),
+            (PaneAction::ExportToMarkdown, _) => self.export_to_markdown(cx),
             (PaneAction::GoToAllNotes, _) => self.navigate(Navigation::AllNotes, cx),
             (PaneAction::GoToTemplates, _) => self.navigate(Navigation::Templates, cx),
             (PaneAction::GoToTrash, _) => self.navigate(Navigation::Trash, cx),

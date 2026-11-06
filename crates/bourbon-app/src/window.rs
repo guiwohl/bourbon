@@ -121,9 +121,9 @@ pub(crate) fn build_workspace(
 ) -> Entity<Workspace> {
     let view = cx.new(|cx| Workspace::new(store, locations, window, cx));
     let closing_view = view.downgrade();
-    window.on_window_should_close(cx, move |_, cx| {
+    window.on_window_should_close(cx, move |window, cx| {
         closing_view
-            .update(cx, Workspace::flush_before_closing)
+            .update(cx, |view, cx| view.request_close(window, cx))
             .unwrap_or(true)
     });
     view

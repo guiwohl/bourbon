@@ -17,3 +17,4 @@
 | [2026-11-06-m8-cli.md](2026-11-06-m8-cli.md) | M8: `bourbon` CLI (`get`, launch), exit codes, Copy CLI command action |
 | [2026-11-06-m7-distribution.md](2026-11-06-m7-distribution.md) | M7: desktop entry, single instance, install, release and AUR proposal |
 | [2026-11-06-m4-editor.md](2026-11-06-m4-editor.md) | M4: view modes, task checkboxes, `[[` note links, find/replace, focus mode, word count |
+| [2026-11-06-m6-data-app.md](2026-11-06-m6-data-app.md) | M6 app: backup settings, token file, menu, scheduler, restore, export |

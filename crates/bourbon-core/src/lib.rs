@@ -18,7 +18,8 @@ mod template_variables;
 mod timestamp;
 
 pub use backup::{
-    BackupError, BackupOutcome, BackupRemote, GitHubRepository, RemoteUrl, Secret, backup, restore,
+    BackupError, BackupOutcome, BackupRemote, GitHubRepository, RemoteUrl, Secret, TokenFile,
+    backup, restore,
 };
 pub use database_path::default_database_path;
 pub use export::ExportSummary;
@@ -29,8 +30,8 @@ pub use notebook::{Notebook, NotebookNode};
 pub use omarchy::{OmarchyColors, Rgb, default_omarchy_colors_path};
 pub use query::{NoteQuery, NoteScope, NoteSort, NotebookDepth};
 pub use settings::{
-    Appearance, NOTE_LIST_WIDTH_RANGE, SIDEBAR_WIDTH_RANGE, Settings, SettingsFile, ThemeSource,
-    default_settings_path,
+    Appearance, BackupAuth, NOTE_LIST_WIDTH_RANGE, SIDEBAR_WIDTH_RANGE, Settings, SettingsFile,
+    ThemeSource, default_settings_path,
 };
 pub use status::NoteStatus;
 pub use store::{NoteSeed, NoteStore, SearchHit, StoreError, TRASH_RETENTION, TagSummary};

@@ -1,4 +1,4 @@
-use bourbon_core::{Appearance, ThemeSource};
+use bourbon_core::{Appearance, BackupAuth, GitHubRepository, ThemeSource};
 use gpui_kit::Context;
 
 use super::Workspace;
@@ -23,6 +23,43 @@ impl Workspace {
     pub(crate) fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
         self.settings.appearance = appearance;
         self.apply_theme_and_persist(cx);
+    }
+
+    pub(crate) fn set_backup_auth(&mut self, auth: BackupAuth, cx: &mut Context<Self>) {
+        self.settings.backup_auth = auth;
+        self.persist_settings(cx);
+        cx.notify();
+    }
+
+    pub(crate) fn toggle_backup_enabled(&mut self, cx: &mut Context<Self>) {
+        self.settings.backup_enabled = !self.settings.backup_enabled;
+        self.persist_settings(cx);
+        cx.notify();
+    }
+
+    pub(super) fn repository_changed(&mut self, cx: &mut Context<Self>) {
+        let text = self.repository_input.read(cx).value().trim().to_owned();
+        if text.is_empty() {
+            self.settings.backup_repository = None;
+            self.data.repository_error = None;
+        } else if let Err(error) = GitHubRepository::parse(&text) {
+            self.data.repository_error = Some(error.to_string().into());
+            cx.notify();
+            return;
+        } else {
+            self.settings.backup_repository = Some(text);
+            self.data.repository_error = None;
+        }
+        self.persist_settings(cx);
+        cx.notify();
+    }
+
+    pub(super) fn token_changed(&mut self, cx: &mut Context<Self>) {
+        let token = self.token_input.read(cx).unmask_value();
+        if let Err(error) = self.locations.backup_token.save(&token) {
+            self.error_message = Some(format!("cannot save the token: {error}").into());
+            cx.notify();
+        }
     }
 
     pub(crate) fn resize_sidebar(&mut self, width: f32, cx: &mut Context<Self>) {

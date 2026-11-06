@@ -1,8 +1,11 @@
-use bourbon_core::{Appearance, Settings, ThemeSource};
+use bourbon_core::{Appearance, BackupAuth, Settings, ThemeSource};
 use gpui_kit::component::ActiveTheme as _;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, Context, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div,
+    AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
+    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div,
 };
 
 use crate::workspace::Workspace;
@@ -62,7 +65,160 @@ fn opacity_of(enabled: bool) -> f32 {
     if enabled { 1. } else { 0.5 }
 }
 
-pub(crate) fn render(settings: &Settings, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
+pub(crate) struct SettingsData<'a> {
+    pub(crate) settings: &'a Settings,
+    pub(crate) repository_input: &'a Entity<InputState>,
+    pub(crate) token_input: &'a Entity<InputState>,
+    pub(crate) repository_error: Option<SharedString>,
+    pub(crate) status: Option<SharedString>,
+}
+
+fn backup_auth_choices(settings: &Settings) -> [Choice; 2] {
+    [
+        Choice {
+            id: "settings-backup-auth-gh",
+            label: "GitHub CLI",
+            selected: settings.backup_auth == BackupAuth::GhCli,
+            enabled: true,
+            apply: |view, cx| view.set_backup_auth(BackupAuth::GhCli, cx),
+        },
+        Choice {
+            id: "settings-backup-auth-token",
+            label: "Personal access token",
+            selected: settings.backup_auth == BackupAuth::Token,
+            enabled: true,
+            apply: |view, cx| view.set_backup_auth(BackupAuth::Token, cx),
+        },
+    ]
+}
+
+fn backup_enabled_choice(settings: &Settings) -> Choice {
+    Choice {
+        id: "settings-backup-enabled",
+        label: if settings.backup_enabled {
+            "Automatic backup: on"
+        } else {
+            "Automatic backup: off"
+        },
+        selected: settings.backup_enabled,
+        enabled: true,
+        apply: Workspace::toggle_backup_enabled,
+    }
+}
+
+fn backup_section(data: &SettingsData, cx: &mut Context<Workspace>) -> AnyElement {
+    let settings = data.settings;
+    let auth_options = div()
+        .flex()
+        .gap_2()
+        .children(backup_auth_choices(settings).map(|choice| button(choice, cx)));
+    let actions = div()
+        .flex()
+        .gap_2()
+        .child(
+            Button::new("settings-backup-now")
+                .label("Back up now")
+                .on_click(cx.listener(|view, _, _, cx| view.back_up_now(cx))),
+        )
+        .child(
+            Button::new("settings-restore")
+                .label("Restore from backup\u{2026}")
+                .on_click(cx.listener(|view, _, _, cx| view.begin_restore(cx))),
+        );
+    let repository = div()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .child(Input::new(data.repository_input).id("settings-backup-repository"))
+        .children(data.repository_error.clone().map(|message| {
+            div()
+                .id("settings-backup-repository-error")
+                .test_support()
+                .text_sm()
+                .text_color(cx.theme().danger)
+                .child(message)
+        }));
+    div()
+        .flex()
+        .flex_col()
+        .gap_4()
+        .child(
+            div()
+                .text_sm()
+                .text_color(cx.theme().muted_foreground)
+                .child("Backup"),
+        )
+        .child(labelled("Repository", repository))
+        .child(labelled("Sign in with", auth_options))
+        .when(settings.backup_auth == BackupAuth::Token, |section| {
+            section.child(labelled(
+                "Token",
+                Input::new(data.token_input).id("settings-backup-token"),
+            ))
+        })
+        .child(button(backup_enabled_choice(settings), cx))
+        .child(actions)
+        .children(data.status.clone().map(|status| {
+            div()
+                .id("settings-backup-status")
+                .test_support()
+                .text_sm()
+                .child(status)
+        }))
+        .into_any_element()
+}
+
+pub(crate) fn restore_confirmation(
+    question: String,
+    cx: &mut Context<Workspace>,
+) -> impl IntoElement + use<> {
+    div()
+        .id("restore-confirmation")
+        .test_support()
+        .flex()
+        .flex_col()
+        .gap_2()
+        .p_3()
+        .rounded_md()
+        .border_1()
+        .border_color(cx.theme().border)
+        .bg(cx.theme().muted)
+        .child(question)
+        .child(
+            div()
+                .flex()
+                .gap_2()
+                .child(
+                    Button::new("restore-confirm")
+                        .label("Restore")
+                        .danger()
+                        .on_click(cx.listener(|view, _, _, cx| view.confirm_restore(cx))),
+                )
+                .child(
+                    Button::new("restore-cancel")
+                        .label("Cancel")
+                        .on_click(cx.listener(|view, _, _, cx| view.cancel_restore(cx))),
+                ),
+        )
+}
+
+pub(crate) fn notice_banner(
+    message: SharedString,
+    cx: &mut Context<Workspace>,
+) -> impl IntoElement + use<> {
+    div()
+        .id("notice-banner")
+        .test_support()
+        .px_3()
+        .py_1()
+        .rounded_md()
+        .bg(cx.theme().muted)
+        .text_color(cx.theme().foreground)
+        .child(message)
+}
+
+pub(crate) fn render(data: &SettingsData, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
+    let settings = data.settings;
     let theme_options = div()
         .flex()
         .gap_2()
@@ -103,6 +259,7 @@ pub(crate) fn render(settings: &Settings, cx: &mut Context<Workspace>) -> impl I
         )
         .child(labelled("Theme", theme_options))
         .child(labelled("Appearance", appearance_options))
+        .child(backup_section(data, cx))
 }
 
 fn labelled(label: &'static str, options: impl IntoElement) -> impl IntoElement {

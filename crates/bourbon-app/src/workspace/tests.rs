@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use bourbon_core::{NoteId, NoteStatus, NoteStore, NotebookId, TagColor, Timestamp};
@@ -9,10 +10,12 @@ use gpui_kit::{
 };
 
 use super::Workspace;
+use crate::backup_runner::BackupRunner;
 use crate::locations::Locations;
 use crate::navigation::Navigation;
 
 mod control_pane;
+mod data;
 mod drag;
 mod editor;
 mod find;
@@ -51,10 +54,18 @@ fn seeded_store() -> (NoteStore, Seeded) {
 }
 
 fn isolated_locations() -> Locations {
+    locations_with_runner(Arc::new(data::FakeRunner::default()))
+}
+
+fn locations_with_runner(runner: Arc<dyn BackupRunner>) -> Locations {
     let directory = tempfile::tempdir().unwrap().keep();
     Locations {
         settings: bourbon_core::SettingsFile::at(directory.join("settings.toml")),
         omarchy_colors: directory.join("colors.toml"),
+        database: directory.join("bourbon.db"),
+        backup_token: bourbon_core::TokenFile::at(directory.join("backup-token")),
+        backup_work_dir: directory.join("backup"),
+        backup_runner: runner,
     }
 }
 
