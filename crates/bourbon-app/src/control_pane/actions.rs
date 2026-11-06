@@ -82,8 +82,8 @@ impl PaneAction {
             Self::HistoryBack => "History back".to_owned(),
             Self::HistoryForward => "History forward".to_owned(),
             Self::CycleViewMode => "Cycle view mode".to_owned(),
-            Self::Find => "Find in note".to_owned(),
-            Self::Replace => "Replace in note".to_owned(),
+            Self::Find => "Find".to_owned(),
+            Self::Replace => "Replace".to_owned(),
             Self::ToggleFocusMode => "Toggle focus mode".to_owned(),
         }
     }
