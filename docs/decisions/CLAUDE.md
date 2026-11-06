@@ -15,3 +15,4 @@
 | [2026-11-06-m3-navigation.md](2026-11-06-m3-navigation.md) | M3: FTS5 search, control pane (notes and actions) |
 | [2026-11-06-m5-visual.md](2026-11-06-m5-visual.md) | M5: settings file, Bourbon and Omarchy themes, resizable panes, settings screen |
 | [2026-11-06-m8-cli.md](2026-11-06-m8-cli.md) | M8: `bourbon` CLI (`get`, launch), exit codes, Copy CLI command action |
+| [2026-11-06-m7-distribution.md](2026-11-06-m7-distribution.md) | M7: desktop entry, single instance, install, release and AUR proposal |

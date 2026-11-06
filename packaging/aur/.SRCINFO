@@ -1,0 +1,21 @@
+pkgbase = bourbon
+	pkgdesc = Markdown notes app
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/guiwohl/bourbon
+	arch = x86_64
+	license = GPL-3.0-only
+	makedepends = rust
+	makedepends = cargo
+	makedepends = clang
+	makedepends = cmake
+	depends = fontconfig
+	depends = freetype2
+	depends = wayland
+	depends = libxkbcommon
+	depends = libxcb
+	depends = git
+	source = bourbon-0.1.0.tar.gz::https://github.com/guiwohl/bourbon/archive/refs/tags/v0.1.0.tar.gz
+	sha256sums = REPLACE_AT_RELEASE
+
+pkgname = bourbon
