@@ -21,11 +21,12 @@ fn at(millis: i64) -> Timestamp {
 
 fn seeded_store() -> (NoteStore, Seeded) {
     let store = NoteStore::open_in_memory().unwrap();
-    let older = store.create_note(at(1)).unwrap();
+    let inbox = store.default_notebook().unwrap();
+    let older = store.create_note(&inbox, at(1)).unwrap();
     store
         .save_note(&older.id, "Older", "older body", at(2))
         .unwrap();
-    let newer = store.create_note(at(3)).unwrap();
+    let newer = store.create_note(&inbox, at(3)).unwrap();
     store
         .save_note(&newer.id, "Newer", "newer body", at(4))
         .unwrap();
