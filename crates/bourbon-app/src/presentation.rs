@@ -44,6 +44,7 @@ pub(crate) fn dot_color(color: TagColor) -> Hsla {
 const MINIMUM_CONTRAST: f32 = 4.5;
 const PILL_TINT: f32 = 0.15;
 const DARKENING_STEPS: u16 = 20;
+const DARKENING_STEP: f32 = 0.05;
 
 pub(crate) fn pill_text_color(tag: Hsla, backdrop: Hsla, is_dark_theme: bool) -> Hsla {
     let tag = tag.to_rgb();
@@ -68,11 +69,7 @@ fn readable_shade(tag: [f32; 3], backdrop: [f32; 3], toward: f32) -> [f32; 3] {
     let tinted = blend(backdrop, tag, PILL_TINT);
     (0..=DARKENING_STEPS)
         .map(|step| {
-            blend(
-                tag,
-                [toward; 3],
-                f32::from(step) / f32::from(DARKENING_STEPS),
-            )
+            blend(tag, [toward; 3], f32::from(step) * DARKENING_STEP)
         })
         .find(|shade| contrast(*shade, tinted) >= MINIMUM_CONTRAST)
         .unwrap_or([toward; 3])
@@ -204,6 +201,17 @@ mod tests {
         assert!((contrast([1.; 3], [0.; 3]) - 21.).abs() < 1e-3);
         assert!((contrast([0.; 3], [1.; 3]) - 21.).abs() < 1e-3);
         assert!((contrast([0.5; 3], [0.5; 3]) - 1.).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_pale_colour_is_darkened_part_of_the_way() {
+        let tag = [0.8, 0.8, 0.2];
+        let shade = readable_shade(tag, [0.97; 3], 0.);
+        for (channel, original) in shade.into_iter().zip(tag) {
+            assert!(channel > 0. && channel < original);
+            let steps = channel / original;
+            assert!(((1. - steps) * 20.).fract().min(1. - ((1. - steps) * 20.).fract()) < 1e-3);
+        }
     }
 
     #[test]
