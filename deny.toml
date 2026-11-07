@@ -4,6 +4,7 @@ deny = [
     { crate = "gpui-component", wrappers = ["gpui-kit"] },
     { crate = "gpui-base", wrappers = ["gpui-component", "gpui-kit"] },
     { crate = "gpui-pre", wrappers = [
+        "bourbon-ui",
         "gpui-base",
         "gpui-component",
         "gpui-kit",

@@ -1,0 +1,15 @@
+[package]
+name = "bourbon-ui"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+gpui = { package = "gpui-pre", version = "0.3.11" }
+
+[dev-dependencies]
+gpui = { package = "gpui-pre", version = "0.3.11", features = ["test-support"] }
+gpui_platform = { package = "gpui-pre-platform", version = "0.3.11" }
+
+[lints]
+workspace = true

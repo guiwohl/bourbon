@@ -50,7 +50,7 @@ Each column is a module owned by one concern. Columns render from data the works
 | `navigation.rs` | `Navigation`, `Listing`, the pure mapping to `NoteQuery` |
 | `workspace.rs` | Root view: owns `NoteStore`, listing, selection, autosave and flush, trash purge, error banner state; lays out the three columns |
 | `dragged_note.rs` | `DraggedNote` drag payload and preview, built from a `NoteSummary` |
-| `presentation.rs` | Labels and colours shared by the columns: `UNTITLED`, `display_title`, `status_label`, `chip_color` (`TagColor` to `ColorName`, note list and editor header chips), `dot_color`, `color_label`, `is_current_color` (sidebar) |
+| `presentation.rs` | Labels and colours shared by the columns (pill text shade now comes from `bourbon_ui::pill_text_color`): `UNTITLED`, `display_title`, `status_label`, `chip_color` (`TagColor` to `ColorName`, note list and editor header chips), `dot_color`, `color_label`, `is_current_color` (sidebar) |
 | `sidebar/mod.rs` | `render(SidebarData, cx)`: navigation rows, notebook tree flattening, selection rule |
 | `note_list/mod.rs` | `render(notes, selected, cx)`: header with the New note button, note rows |
 | `editor/mod.rs` | `EditorPane` (title input, Markdown editor, load/read/focus, change subscriptions), empty state, error banner element |
