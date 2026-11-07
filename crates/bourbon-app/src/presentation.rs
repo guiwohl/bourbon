@@ -200,6 +200,13 @@ mod tests {
     }
 
     #[test]
+    fn contrast_between_white_and_black_is_twenty_one() {
+        assert!((contrast([1.; 3], [0.; 3]) - 21.).abs() < 1e-3);
+        assert!((contrast([0.; 3], [1.; 3]) - 21.).abs() < 1e-3);
+        assert!((contrast([0.5; 3], [0.5; 3]) - 1.).abs() < 1e-6);
+    }
+
+    #[test]
     fn a_colour_that_already_reads_well_is_kept() {
         let navy = [0.05, 0.1, 0.4];
         assert_eq!(readable_shade(navy, [0.97; 3], 0.), navy);
