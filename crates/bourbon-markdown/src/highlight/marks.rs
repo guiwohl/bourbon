@@ -15,11 +15,12 @@ pub fn trimmed(source: &str, range: &Range<usize>) -> Range<usize> {
     range.start..end
 }
 
-fn skip_blanks(source: &str, mut position: usize) -> usize {
-    while matches!(source.as_bytes().get(position), Some(b' ' | b'\t')) {
-        position += 1;
-    }
-    position
+fn skip_blanks(source: &str, position: usize) -> usize {
+    let blanks = source.as_bytes()[position..]
+        .iter()
+        .take_while(|byte| matches!(byte, b' ' | b'\t'))
+        .count();
+    position + blanks
 }
 
 fn run_length(source: &str, position: usize, byte: u8) -> usize {
@@ -46,16 +47,17 @@ pub fn list_marker(source: &str, range: &Range<usize>) -> Range<usize> {
 pub fn quote_marks(source: &str, range: &Range<usize>) -> Vec<Range<usize>> {
     let mut marks = Vec::new();
     let mut line_start = range.start;
-    while line_start < range.end {
-        let mut position = skip_blanks(source, line_start);
-        while source.as_bytes().get(position) == Some(&b'>') {
-            marks.push(position..position + 1);
-            position = skip_blanks(source, position + 1);
-        }
-        match source[line_start..range.end].find('\n') {
-            Some(newline) => line_start += newline + 1,
-            None => break,
-        }
+    for line in source[range.clone()].split_inclusive('\n') {
+        let prefix = line
+            .bytes()
+            .enumerate()
+            .take_while(|(_, byte)| matches!(byte, b'>' | b' ' | b'\t'));
+        marks.extend(
+            prefix
+                .filter(|(_, byte)| *byte == b'>')
+                .map(|(index, _)| line_start + index..line_start + index + 1),
+        );
+        line_start += line.len();
     }
     marks
 }
