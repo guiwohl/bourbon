@@ -14,6 +14,7 @@ use crate::editor::actions::{
     ToggleFocusMode, ToggleTaskAtCursor,
 };
 use crate::locations::Locations;
+use crate::note_list::ClearFilter;
 use crate::sidebar::ToggleSidebar;
 use crate::workspace::{NewNote, OpenActionSearch, OpenNoteSearch, OpenSettings, Workspace};
 
@@ -110,6 +111,7 @@ pub(crate) fn bind_keys(cx: &mut App) {
         KeyBinding::new("down", LinkPickNext, Some("LinkPicker > Input")),
         KeyBinding::new("enter", LinkPickConfirm, Some("LinkPicker > Input")),
         KeyBinding::new("escape", LinkPickCancel, Some("LinkPicker > Input")),
+        KeyBinding::new("escape", ClearFilter, Some("NoteFilter > Input")),
     ]);
 }
 

@@ -13,6 +13,7 @@ pub(crate) struct Palette {
     pub(crate) accent: Rgb,
     pub(crate) accent_foreground: Rgb,
     pub(crate) selection: Rgb,
+    pub(crate) sidebar_selection: Rgb,
     pub(crate) danger: Rgb,
 }
 
@@ -22,29 +23,31 @@ const fn rgb(hex: u32) -> Rgb {
 }
 
 pub(crate) const BOURBON_DARK: Palette = Palette {
-    background: rgb(0x001c_1613),
-    sidebar: rgb(0x0017_110e),
-    foreground: rgb(0x00e8_dccf),
-    border: rgb(0x003a_2d25),
-    muted: rgb(0x002a_211b),
-    muted_foreground: rgb(0x009c_8b7c),
-    accent: rgb(0x00b0_6a3b),
-    accent_foreground: rgb(0x001c_1613),
-    selection: rgb(0x003d_2c20),
-    danger: rgb(0x00d9_534f),
+    background: rgb(0x0026_2a31),
+    sidebar: rgb(0x001f_2228),
+    foreground: rgb(0x00d7_dae0),
+    border: rgb(0x0034_3944),
+    muted: rgb(0x002d_323b),
+    muted_foreground: rgb(0x008a_909c),
+    accent: rgb(0x005b_9bf0),
+    accent_foreground: rgb(0x0010_131a),
+    selection: rgb(0x002f_3d52),
+    sidebar_selection: rgb(0x002c_313b),
+    danger: rgb(0x00e5_534b),
 };
 
 pub(crate) const BOURBON_LIGHT: Palette = Palette {
-    background: rgb(0x00fa_f5ee),
-    sidebar: rgb(0x00f1_e8dc),
-    foreground: rgb(0x003b_2a20),
-    border: rgb(0x00dc_cfc0),
-    muted: rgb(0x00ec_e2d4),
-    muted_foreground: rgb(0x0085_715f),
-    accent: rgb(0x00b0_6a3b),
-    accent_foreground: rgb(0x00ff_faf3),
-    selection: rgb(0x00ea_d6c0),
-    danger: rgb(0x00c0_392b),
+    background: rgb(0x00f7_f7f8),
+    sidebar: rgb(0x00eb_ebee),
+    foreground: rgb(0x001f_2024),
+    border: rgb(0x00de_dee2),
+    muted: rgb(0x00ee_eef1),
+    muted_foreground: rgb(0x006f_7078),
+    accent: rgb(0x003d_7be0),
+    accent_foreground: rgb(0x00ff_ffff),
+    selection: rgb(0x00d6_dfeb),
+    sidebar_selection: rgb(0x00d8_d8de),
+    danger: rgb(0x00d1_4b4b),
 };
 
 const WHITE: Rgb = rgb(0x00ff_ffff);
@@ -75,6 +78,7 @@ impl Palette {
                 BLACK
             },
             selection: background.mix(colors.selection, 0.4),
+            sidebar_selection: background.mix(colors.selection, 0.4),
             danger: colors.danger,
         }
     }
@@ -89,7 +93,7 @@ impl Palette {
         colors.sidebar = hsla(self.sidebar);
         colors.sidebar_foreground = hsla(self.foreground);
         colors.sidebar_border = hsla(self.border);
-        colors.sidebar_accent = hsla(self.selection);
+        colors.sidebar_accent = hsla(self.sidebar_selection);
         colors.sidebar_accent_foreground = hsla(self.foreground);
         colors.border = hsla(self.border);
         colors.input = hsla(self.border);
@@ -225,9 +229,18 @@ mod tests {
     }
 
     #[test]
-    fn the_bourbon_accent_is_copper_in_both_appearances() {
-        let copper = Rgb::from_hex("#b06a3b").unwrap();
-        assert_eq!(BOURBON_DARK.accent, copper);
-        assert_eq!(BOURBON_LIGHT.accent, copper);
+    fn the_bourbon_palettes_follow_the_inkdrop_reference() {
+        assert_eq!(BOURBON_LIGHT.sidebar, Rgb::from_hex("#ebebee").unwrap());
+        assert_eq!(BOURBON_LIGHT.background, Rgb::from_hex("#f7f7f8").unwrap());
+        assert_eq!(BOURBON_LIGHT.accent, Rgb::from_hex("#3d7be0").unwrap());
+        assert_eq!(BOURBON_DARK.sidebar, Rgb::from_hex("#1f2228").unwrap());
+        assert_eq!(BOURBON_DARK.background, Rgb::from_hex("#262a31").unwrap());
+        assert_eq!(BOURBON_DARK.accent, Rgb::from_hex("#5b9bf0").unwrap());
+    }
+
+    #[test]
+    fn the_sidebar_selection_differs_from_the_note_list_selection() {
+        assert_ne!(BOURBON_LIGHT.sidebar_selection, BOURBON_LIGHT.selection);
+        assert_ne!(BOURBON_DARK.sidebar_selection, BOURBON_DARK.selection);
     }
 }

@@ -1,22 +1,26 @@
+mod header;
 mod menu;
 mod notebooks;
 mod prompt;
 mod state;
 mod tags;
-mod templates;
 mod tree;
 
 use bourbon_core::{NoteStatus, NotebookNode, TagSummary};
+use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme as _;
+use gpui_kit::component::label::Label;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    Context, Div, InteractiveElement as _, IntoElement, ParentElement as _, SharedString, Stateful,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
+    AnyElement, Context, Div, InteractiveElement as _, IntoElement, ParentElement as _,
+    SharedString, Stateful, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div,
+    px,
 };
 
-pub(crate) use state::{DeletionTarget, NameTarget, Prompt, SidebarState};
+pub(crate) use state::{DeletionTarget, NameTarget, Prompt, Section, SidebarState};
 pub(crate) use tree::subtree_ids;
 
+use crate::icons::{glyph, status_glyph};
 use crate::navigation::Navigation;
 use crate::presentation::status_label;
 use crate::workspace::Workspace;
@@ -24,6 +28,7 @@ use crate::workspace::Workspace;
 gpui_kit::actions!(bourbon, [ToggleSidebar]);
 
 const BASE_INDENT: f32 = 8.;
+const ROW_HEIGHT: f32 = 30.;
 const INDENT_STEP: f32 = 12.;
 
 const STATUS_ROWS: [NoteStatus; 4] = [
@@ -48,7 +53,7 @@ pub(crate) fn render(
     if !data.state.is_visible {
         return None;
     }
-    let mut rows = vec![menu::render(data.state.menu_open, cx).into_any_element()];
+    let mut rows = vec![menu::render(cx).into_any_element()];
     if let Some(prompt) = &data.state.prompt {
         rows.push(prompt::render(prompt, cx).into_any_element());
     }
@@ -56,49 +61,37 @@ pub(crate) fn render(
         simple_row(
             "nav-all-notes",
             "All Notes",
+            IconName::FileText,
             Navigation::AllNotes,
             data.current,
             cx,
         )
         .into_any_element(),
     );
-    rows.push(notebooks::section_header(cx).into_any_element());
-    for visible in tree::visible_notebooks(data.notebooks, &data.state.expanded) {
-        rows.push(
-            notebooks::row(&visible, data.state.inbox.as_ref(), data.current, cx)
-                .into_any_element(),
-        );
-    }
-    rows.push(header("Status", cx).into_any_element());
-    for status in STATUS_ROWS {
-        rows.push(
-            simple_row(
-                &format!("nav-status-{}", status.as_stored()),
-                status_label(status),
-                Navigation::Status(status),
-                data.current,
-                cx,
-            )
-            .into_any_element(),
-        );
-    }
-    rows.push(header("Tags", cx).into_any_element());
-    for summary in data.tags {
-        rows.push(tags::row(summary, data.current, cx).into_any_element());
-    }
     rows.push(
         simple_row(
             "nav-templates",
-            "Templates",
+            "Note Templates",
+            IconName::Copy,
             Navigation::Templates,
             data.current,
             cx,
         )
         .into_any_element(),
     );
-    rows.push(templates::new_row(cx).into_any_element());
+    push_notebooks(&mut rows, data, cx);
+    push_statuses(&mut rows, data, cx);
+    push_tags(&mut rows, data, cx);
     rows.push(
-        simple_row("nav-trash", "Trash", Navigation::Trash, data.current, cx).into_any_element(),
+        simple_row(
+            "nav-trash",
+            "Trash",
+            IconName::Trash,
+            Navigation::Trash,
+            data.current,
+            cx,
+        )
+        .into_any_element(),
     );
     Some(
         div()
@@ -109,8 +102,9 @@ pub(crate) fn render(
             .flex_none()
             .flex()
             .flex_col()
-            .gap_1()
-            .p_2()
+            .gap_px()
+            .px(px(6.))
+            .pb_2()
             .overflow_y_scroll()
             .bg(cx.theme().sidebar)
             .text_color(cx.theme().sidebar_foreground)
@@ -120,30 +114,91 @@ pub(crate) fn render(
     )
 }
 
-fn header(label: &'static str, cx: &mut Context<Workspace>) -> Div {
-    div()
-        .flex()
-        .flex_row()
-        .items_center()
-        .justify_between()
-        .px_2()
-        .pt_2()
-        .text_xs()
-        .text_color(cx.theme().muted_foreground)
-        .child(label)
+fn push_notebooks(rows: &mut Vec<AnyElement>, data: &SidebarData, cx: &mut Context<Workspace>) {
+    rows.push(notebooks::section_header(data.state, cx).into_any_element());
+    if data.state.is_collapsed(Section::Notebooks) {
+        return;
+    }
+    for visible in tree::visible_notebooks(data.notebooks, &data.state.expanded) {
+        rows.push(
+            notebooks::row(&visible, data.state.inbox.as_ref(), data.current, cx)
+                .into_any_element(),
+        );
+    }
+}
+
+fn push_statuses(rows: &mut Vec<AnyElement>, data: &SidebarData, cx: &mut Context<Workspace>) {
+    let spec = header::Spec {
+        label: "Status",
+        section: Section::Status,
+        searchable: false,
+        addable: false,
+    };
+    rows.push(header::render(&spec, data.state, cx).into_any_element());
+    if data.state.is_collapsed(Section::Status) {
+        return;
+    }
+    for status in STATUS_ROWS {
+        rows.push(status_row(status, data.current, cx).into_any_element());
+    }
+}
+
+fn push_tags(rows: &mut Vec<AnyElement>, data: &SidebarData, cx: &mut Context<Workspace>) {
+    let spec = header::Spec {
+        label: "Tags",
+        section: Section::Tags,
+        searchable: true,
+        addable: false,
+    };
+    rows.push(header::render(&spec, data.state, cx).into_any_element());
+    if data.state.is_collapsed(Section::Tags) {
+        return;
+    }
+    for summary in data.tags {
+        rows.push(tags::row(summary, data.current, cx).into_any_element());
+    }
+}
+
+fn status_row(
+    status: NoteStatus,
+    current: &Navigation,
+    cx: &mut Context<Workspace>,
+) -> impl IntoElement + use<> {
+    let target = Navigation::Status(status);
+    let icon = status_glyph(status).map(IntoElement::into_any_element);
+    nav_row(
+        format!("nav-status-{}", status.as_stored()).into(),
+        0,
+        is_current(current, &target),
+        cx,
+    )
+    .test_support()
+    .children(icon)
+    .child(div().flex_1().truncate().child(status_label(status)))
+    .on_click(cx.listener(move |workspace, _, _, cx| workspace.navigate(target.clone(), cx)))
 }
 
 fn simple_row(
     id: &str,
     label: &'static str,
+    icon: IconName,
     target: Navigation,
     current: &Navigation,
     cx: &mut Context<Workspace>,
 ) -> impl IntoElement + use<> {
+    let muted = cx.theme().muted_foreground;
     nav_row(id.to_owned().into(), 0, is_current(current, &target), cx)
         .test_support()
-        .child(label)
+        .child(glyph(icon).text_color(muted))
+        .child(div().flex_1().truncate().child(label))
         .on_click(cx.listener(move |workspace, _, _, cx| workspace.navigate(target.clone(), cx)))
+}
+
+fn count_label(count: usize, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
+    Label::new(count.to_string())
+        .flex_none()
+        .text_size(px(11.))
+        .text_color(cx.theme().muted_foreground)
 }
 
 fn nav_row(
@@ -154,14 +209,16 @@ fn nav_row(
 ) -> Stateful<Div> {
     div()
         .id(id)
+        .h(px(ROW_HEIGHT))
+        .flex_none()
         .flex()
         .flex_row()
         .items_center()
-        .gap_1()
+        .gap(px(8.))
         .pl(px(indent(depth)))
-        .pr_2()
-        .py_1()
-        .rounded_md()
+        .pr(px(8.))
+        .rounded(px(6.))
+        .text_size(px(14.))
         .cursor_pointer()
         .when(is_selected, |row| {
             row.bg(cx.theme().sidebar_accent)

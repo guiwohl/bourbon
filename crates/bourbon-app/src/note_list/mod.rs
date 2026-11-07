@@ -1,18 +1,21 @@
 mod date;
+mod filter;
 mod header;
 mod row;
 mod title;
 
 use bourbon_core::{NoteId, NoteSort, NoteSummary, NotebookNode, TagSummary};
 use gpui_kit::component::ActiveTheme as _;
+use gpui_kit::component::input::InputState;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    Context, InteractiveElement as _, IntoElement, ParentElement as _,
+    Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
 
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
+pub(crate) use filter::{ClearFilter, narrow};
 use header::ListView;
 
 pub(crate) struct NoteListData<'a> {
@@ -23,6 +26,7 @@ pub(crate) struct NoteListData<'a> {
     pub(crate) notes: &'a [NoteSummary],
     pub(crate) templates: &'a [NoteSummary],
     pub(crate) selected: Option<&'a NoteId>,
+    pub(crate) filter: &'a Entity<InputState>,
     pub(crate) width: f32,
 }
 
@@ -64,7 +68,9 @@ pub(crate) fn render(data: &NoteListData, cx: &mut Context<Workspace>) -> impl I
         .flex_col()
         .border_r_1()
         .border_color(cx.theme().border)
+        .bg(cx.theme().background)
         .child(header)
+        .child(filter::render(data.filter, cx))
         .child(
             div()
                 .id("note-list")
@@ -72,15 +78,13 @@ pub(crate) fn render(data: &NoteListData, cx: &mut Context<Workspace>) -> impl I
                 .overflow_y_scroll()
                 .flex()
                 .flex_col()
-                .gap_1()
-                .p_2()
                 .children(rows)
                 .when(data.notes.is_empty(), |list| {
                     list.child(
                         div()
                             .id("no-notes")
                             .test_support()
-                            .p_2()
+                            .p_3()
                             .text_color(cx.theme().muted_foreground)
                             .child("No notes"),
                     )

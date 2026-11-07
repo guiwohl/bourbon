@@ -13,7 +13,7 @@ pub(crate) fn view_title(
         Navigation::Notebook(id, _) => notebook_name(id, notebooks).unwrap_or_default(),
         Navigation::Status(status) => status_label(*status).to_owned(),
         Navigation::Tags(ids) => tag_names(ids, tags),
-        Navigation::Templates => "Templates".to_owned(),
+        Navigation::Templates => "Note Templates".to_owned(),
         Navigation::Trash => "Trash".to_owned(),
     }
 }
@@ -70,7 +70,10 @@ mod tests {
     fn fixed_views_carry_their_names() {
         assert_eq!(view_title(&Navigation::AllNotes, &[], &[]), "All Notes");
         assert_eq!(view_title(&Navigation::Trash, &[], &[]), "Trash");
-        assert_eq!(view_title(&Navigation::Templates, &[], &[]), "Templates");
+        assert_eq!(
+            view_title(&Navigation::Templates, &[], &[]),
+            "Note Templates"
+        );
         assert_eq!(
             view_title(&Navigation::Status(NoteStatus::OnHold), &[], &[]),
             "On Hold"

@@ -40,12 +40,19 @@ pub(crate) enum Prompt {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum Section {
+    Notebooks,
+    Status,
+    Tags,
+}
+
 pub(crate) struct SidebarState {
     pub(crate) is_visible: bool,
     pub(crate) expanded: HashSet<NotebookId>,
     pub(crate) inbox: Option<NotebookId>,
     pub(crate) prompt: Option<Prompt>,
-    pub(crate) menu_open: bool,
+    pub(crate) collapsed: HashSet<Section>,
 }
 
 impl SidebarState {
@@ -55,12 +62,22 @@ impl SidebarState {
             expanded: HashSet::new(),
             inbox,
             prompt: None,
-            menu_open: false,
+            collapsed: HashSet::new(),
         }
     }
 
     pub(crate) fn depth_of(&self, notebook: &NotebookId) -> NotebookDepth {
         tree::depth_for(self.expanded.contains(notebook))
+    }
+
+    pub(crate) fn is_collapsed(&self, section: Section) -> bool {
+        self.collapsed.contains(&section)
+    }
+
+    pub(crate) fn toggle_section(&mut self, section: Section) {
+        if !self.collapsed.remove(&section) {
+            self.collapsed.insert(section);
+        }
     }
 
     pub(crate) fn toggle_expansion(&mut self, notebook: &NotebookId) {
@@ -90,6 +107,17 @@ mod tests {
         assert_eq!(state.depth_of(&notebook), NotebookDepth::DirectOnly);
         state.toggle_expansion(&notebook);
         assert_eq!(state.depth_of(&notebook), NotebookDepth::WithDescendants);
+    }
+
+    #[test]
+    fn sections_start_expanded_and_toggle_independently() {
+        let mut state = SidebarState::new(None);
+        assert!(!state.is_collapsed(Section::Tags));
+        state.toggle_section(Section::Tags);
+        assert!(state.is_collapsed(Section::Tags));
+        assert!(!state.is_collapsed(Section::Status));
+        state.toggle_section(Section::Tags);
+        assert!(!state.is_collapsed(Section::Tags));
     }
 
     #[test]

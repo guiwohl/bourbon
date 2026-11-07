@@ -8,7 +8,7 @@ use gpui_kit::App;
 use gpui_kit::component::{Theme, ThemeMode};
 
 #[cfg(test)]
-pub(crate) const BOURBON_DARK_BACKGROUND: u32 = 0x001c_1613;
+pub(crate) const BOURBON_LIGHT_BACKGROUND: u32 = 0x00f7_f7f8;
 
 pub(crate) use watch::ModificationWatch;
 

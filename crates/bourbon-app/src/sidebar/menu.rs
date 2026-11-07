@@ -1,78 +1,71 @@
+use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme as _;
-use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::{
-    Context, InteractiveElement as _, IntoElement, ParentElement as _,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div,
-};
+use gpui_kit::component::Sizable as _;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::{Context, Entity, IntoElement, ParentElement as _, Styled as _, div, px};
 
 use crate::control_pane::PaneAction;
+use crate::icons::glyph;
 use crate::workspace::Workspace;
 
-pub(super) struct Entry {
-    pub(super) id: &'static str,
-    pub(super) label: &'static str,
-    pub(super) action: PaneAction,
-}
-
-pub(super) const ENTRIES: [Entry; 4] = [
-    Entry {
-        id: "app-menu-back-up",
-        label: "Back up now",
-        action: PaneAction::BackUpNow,
-    },
-    Entry {
-        id: "app-menu-restore",
-        label: "Restore from backup\u{2026}",
-        action: PaneAction::RestoreFromBackup,
-    },
-    Entry {
-        id: "app-menu-export",
-        label: "Export to Markdown\u{2026}",
-        action: PaneAction::ExportToMarkdown,
-    },
-    Entry {
-        id: "app-menu-settings",
-        label: "Settings",
-        action: PaneAction::OpenSettings,
-    },
+pub(super) const ENTRIES: [(&str, PaneAction); 4] = [
+    ("Settings", PaneAction::OpenSettings),
+    ("Back up now", PaneAction::BackUpNow),
+    ("Restore from backup\u{2026}", PaneAction::RestoreFromBackup),
+    ("Export to Markdown\u{2026}", PaneAction::ExportToMarkdown),
 ];
 
-pub(super) fn render(is_open: bool, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
-    let toggle = div()
-        .id("app-menu")
-        .test_support()
-        .px_2()
-        .rounded_md()
-        .cursor_pointer()
-        .child("\u{22ef}")
-        .on_click(cx.listener(|workspace, _, _, cx| workspace.toggle_app_menu(cx)));
-    let entries = ENTRIES.map(|entry| {
-        let action = entry.action;
-        div()
-            .id(entry.id)
-            .test_support()
-            .flex()
-            .justify_between()
-            .px_2()
-            .py_1()
-            .rounded_md()
-            .cursor_pointer()
-            .hover(|row| row.bg(cx.theme().sidebar_accent))
-            .child(entry.label)
-            .children(action.shortcut().map(|shortcut| {
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(shortcut)
-            }))
-            .on_click(cx.listener(move |workspace, _, window, cx| {
-                workspace.run_menu_entry(action, window, cx);
-            }))
-    });
+const TOP_ROW_HEIGHT: f32 = 40.;
+const EDGE_GAP: f32 = 12.;
+
+pub(super) fn render(cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
+    let workspace = cx.entity();
+    let muted = cx.theme().muted_foreground;
+    let gear = Button::new("app-menu")
+        .ghost()
+        .small()
+        .icon(glyph(IconName::Settings))
+        .dropdown_menu(move |menu, _, _| {
+            let shortcut_color = muted;
+            ENTRIES.iter().fold(menu, |menu, (label, action)| {
+                menu.item(entry(label, *action, shortcut_color, &workspace))
+            })
+        });
     div()
+        .h(px(TOP_ROW_HEIGHT))
+        .flex_none()
         .flex()
-        .flex_col()
-        .gap_1()
-        .child(div().flex().justify_end().child(toggle))
-        .when(is_open, |menu| menu.children(entries))
+        .flex_row()
+        .items_center()
+        .justify_end()
+        .pr(px(EDGE_GAP))
+        .child(gear)
+}
+
+fn entry(
+    label: &'static str,
+    action: PaneAction,
+    shortcut_color: gpui_kit::Hsla,
+    workspace: &Entity<Workspace>,
+) -> PopupMenuItem {
+    let workspace = workspace.clone();
+    PopupMenuItem::element(move |_, _| {
+        div()
+            .flex()
+            .flex_row()
+            .justify_between()
+            .gap_4()
+            .child(label)
+            .children(
+                action
+                    .shortcut()
+                    .map(|shortcut| div().text_xs().text_color(shortcut_color).child(shortcut)),
+            )
+    })
+    .on_click(move |_, window, cx| {
+        workspace.update(cx, |workspace, cx| {
+            workspace.run_pane_action(action, window, cx);
+        });
+    })
 }

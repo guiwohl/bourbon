@@ -1,22 +1,22 @@
-use bourbon_core::{NoteId, NoteSummary, Tag, TagId, Timestamp};
-use gpui_kit::assets::{IconName, icon_assets};
+use bourbon_core::{NoteId, NoteSummary, Tag, TagId, TaskProgress, Timestamp};
+use gpui_kit::assets::IconName;
 use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenuItem};
-use gpui_kit::component::tag::Tag as TagChip;
-use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AppContext as _, AssetSource as _, Context, Entity, InteractiveElement as _, IntoElement,
+    AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
     MouseButton, ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _,
-    TestSupportExt as _, div,
+    TestSupportExt as _, div, px,
 };
-use jiff::tz::TimeZone;
 
-use super::date::short_date;
+use super::date::relative_age;
 use crate::dragged_note::DraggedNote;
-use crate::presentation::{chip_color, display_title};
+use crate::icons::{glyph, status_glyph};
+use crate::presentation::{display_title, dot_color};
 use crate::workspace::Workspace;
 
-icon_assets!(PinIcon, [Pin]);
+const PROGRESS_BAR_WIDTH: f32 = 30.;
+const PILL_TINT: f32 = 0.15;
 
 pub(crate) struct RowData<'a> {
     pub(crate) summary: &'a NoteSummary,
@@ -24,62 +24,102 @@ pub(crate) struct RowData<'a> {
     pub(crate) in_trash: bool,
 }
 
+pub(crate) fn progress_label(progress: TaskProgress) -> String {
+    format!("{} of {}", progress.done, progress.total)
+}
+
+pub(crate) fn progress_fill(progress: TaskProgress) -> f32 {
+    if progress.total == 0 {
+        return 0.;
+    }
+    let done = u16::try_from(progress.done).unwrap_or(u16::MAX);
+    let total = u16::try_from(progress.total).unwrap_or(u16::MAX);
+    f32::from(done.min(total)) / f32::from(total)
+}
+
 pub(crate) fn render(data: &RowData, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
     let summary = data.summary;
     let id = summary.id.clone();
     let view = cx.entity();
     let title = display_title(&summary.title);
-    let updated_on = short_date(summary.updated_at, Timestamp::now(), &TimeZone::system());
+    let age = relative_age(summary.updated_at, Timestamp::now());
     let pinned = summary.pinned;
     let in_trash = data.in_trash;
     let menu_id = id.clone();
     let click_id = id.clone();
+    let theme = cx.theme().clone();
     div()
         .id(SharedString::from(format!("note-{id}")))
         .test_support()
-        .px_2()
-        .py_1()
-        .rounded_md()
+        .px(px(12.))
+        .py(px(10.))
+        .border_b_1()
+        .border_color(theme.border)
         .cursor_pointer()
         .flex()
         .flex_col()
         .gap_1()
-        .when(data.is_selected, |row| {
-            row.bg(cx.theme().accent)
-                .text_color(cx.theme().accent_foreground)
+        .when(data.is_selected, |row| row.bg(theme.list_active))
+        .when(!data.is_selected, |row| {
+            row.hover(|row| row.bg(theme.list_hover))
         })
         .child(
             div()
                 .flex()
                 .flex_row()
-                .items_center()
+                .items_start()
                 .gap_1()
                 .when(pinned, |line| {
                     line.child(
                         div()
                             .id(SharedString::from(format!("pin-{id}")))
                             .test_support()
-                            .child(pin_icon().xsmall()),
+                            .flex_none()
+                            .child(glyph(IconName::Pin).small().text_color(theme.primary)),
                     )
                 })
-                .child(div().flex_1().min_w_0().truncate().child(title.to_owned()))
+                .children(
+                    status_glyph(summary.status).map(|icon| div().flex_none().child(icon.small())),
+                )
                 .child(
                     div()
-                        .flex_none()
-                        .text_xs()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(updated_on),
+                        .flex_1()
+                        .min_w_0()
+                        .text_size(px(14.))
+                        .font_weight(FontWeight::BOLD)
+                        .line_clamp(2)
+                        .child(title.to_owned()),
                 ),
         )
         .child(
             div()
-                .truncate()
-                .text_xs()
-                .text_color(cx.theme().muted_foreground)
-                .child(summary.excerpt.clone()),
+                .flex()
+                .flex_row()
+                .flex_wrap()
+                .items_center()
+                .gap_1()
+                .text_size(px(12.))
+                .child(div().text_color(theme.primary).child(age))
+                .children(
+                    summary
+                        .task_progress
+                        .map(|progress| progress_view(progress, cx)),
+                )
+                .children(
+                    summary
+                        .tags
+                        .iter()
+                        .map(|tag| tag_pill(&summary.id, tag, cx)),
+                ),
         )
-        .when(!summary.tags.is_empty(), |row| {
-            row.child(tag_chips(&summary.id, &summary.tags, cx))
+        .when(!summary.excerpt.is_empty(), |row| {
+            row.child(
+                div()
+                    .truncate()
+                    .text_size(px(13.))
+                    .text_color(theme.muted_foreground)
+                    .child(summary.excerpt.clone()),
+            )
         })
         .on_click(
             cx.listener(move |workspace, _, window, cx| workspace.select(&click_id, window, cx)),
@@ -100,24 +140,48 @@ pub(crate) fn render(data: &RowData, cx: &mut Context<Workspace>) -> impl IntoEl
         })
 }
 
-fn tag_chips(note: &NoteId, tags: &[Tag], cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
-    let chips: Vec<_> = tags.iter().map(|tag| tag_chip(note, tag, cx)).collect();
-    div().flex().flex_row().flex_wrap().gap_1().children(chips)
+fn progress_view(progress: TaskProgress, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
+    let theme = cx.theme();
+    div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap_1()
+        .text_color(theme.muted_foreground)
+        .child(glyph(IconName::ListChecks).xsmall())
+        .child(
+            div()
+                .w(px(PROGRESS_BAR_WIDTH))
+                .h(px(4.))
+                .rounded_full()
+                .bg(theme.border)
+                .child(
+                    div()
+                        .h_full()
+                        .w(px(PROGRESS_BAR_WIDTH * progress_fill(progress)))
+                        .rounded_full()
+                        .bg(theme.primary),
+                ),
+        )
+        .child(progress_label(progress))
 }
 
-fn tag_chip(note: &NoteId, tag: &Tag, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
+fn tag_pill(note: &NoteId, tag: &Tag, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
     let tag_id: TagId = tag.id.clone();
+    let color = dot_color(tag.color);
     div()
         .id(SharedString::from(format!("chip-{note}-{}", tag.id)))
         .test_support()
         .cursor_pointer()
+        .px(px(7.))
+        .py(px(1.))
+        .rounded_full()
+        .text_size(px(11.))
+        .text_color(color)
+        .bg(color.opacity(PILL_TINT))
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .on_click(cx.listener(move |workspace, _, _, cx| workspace.select_tag(&tag_id, false, cx)))
-        .child(
-            TagChip::color(chip_color(tag.color))
-                .small()
-                .child(tag.name.clone()),
-        )
+        .child(tag.name.clone())
 }
 
 fn pin_item(id: &NoteId, pinned: bool, view: &Entity<Workspace>) -> PopupMenuItem {
@@ -148,7 +212,19 @@ fn restore_item(id: &NoteId, view: &Entity<Workspace>) -> PopupMenuItem {
     })
 }
 
-fn pin_icon() -> Icon {
-    let svg = PinIcon.load(&IconName::Pin.path()).ok().flatten();
-    svg.map_or_else(Icon::empty, |bytes| Icon::empty().data(&bytes))
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn progress_reads_done_of_total() {
+        assert_eq!(progress_label(TaskProgress { done: 2, total: 4 }), "2 of 4");
+    }
+
+    #[test]
+    fn the_bar_fills_in_proportion_to_the_tasks_done() {
+        assert!((progress_fill(TaskProgress { done: 1, total: 4 }) - 0.25).abs() < f32::EPSILON);
+        assert!((progress_fill(TaskProgress { done: 0, total: 3 })).abs() < f32::EPSILON);
+        assert!((progress_fill(TaskProgress { done: 3, total: 3 }) - 1.).abs() < f32::EPSILON);
+    }
 }

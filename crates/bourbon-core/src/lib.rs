@@ -2,6 +2,7 @@ mod backup;
 mod database_path;
 mod export;
 mod identifier;
+mod markdown_text;
 mod migrations;
 mod note;
 mod note_link;
@@ -14,6 +15,7 @@ mod status;
 mod store;
 mod stored_text;
 mod tag;
+mod task_progress;
 mod template_variables;
 mod timestamp;
 
@@ -36,5 +38,6 @@ pub use settings::{
 pub use status::NoteStatus;
 pub use store::{NoteSeed, NoteStore, SearchHit, StoreError, TRASH_RETENTION, TagSummary};
 pub use tag::{Tag, TagColor};
+pub use task_progress::TaskProgress;
 pub use template_variables::TemplateTimeZone;
 pub use timestamp::Timestamp;

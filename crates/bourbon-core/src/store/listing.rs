@@ -9,6 +9,7 @@ use crate::store::note_filter::{NoteFilter, order_clause};
 use crate::store::tag_rows::{TAG_ORDER, tag_from_row};
 use crate::store::{NoteStore, StoreError};
 use crate::tag::Tag;
+use crate::task_progress::TaskProgress;
 
 impl NoteStore {
     pub fn list_notes(&self, query: &NoteQuery) -> Result<Vec<NoteSummary>, StoreError> {
@@ -35,6 +36,7 @@ impl NoteStore {
                     created_at: row.get(4)?,
                     pinned: row.get(5)?,
                     status: row.get(6)?,
+                    task_progress: TaskProgress::of_body(&body),
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;

@@ -8,7 +8,7 @@ use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, Hsla, TestAppContext, V
 
 use super::{click, isolated_locations, open_view, open_view_with};
 use crate::locations::Locations;
-use crate::theme::BOURBON_DARK_BACKGROUND;
+use crate::theme::BOURBON_LIGHT_BACKGROUND;
 use crate::workspace::Workspace;
 
 const LIGHT_SCHEME: &str = "background = \"#fdf6e3\"\nforeground = \"#586e75\"\naccent = \"#268bd2\"\nselection = \"#93a1a1\"\ncolor1 = \"#dc322f\"\ncolor8 = \"#839496\"\n";
@@ -101,11 +101,11 @@ fn the_back_button_closes_the_settings_view(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn the_app_starts_in_the_dark_bourbon_theme_by_default(cx: &mut TestAppContext) {
+fn the_app_starts_in_the_light_bourbon_theme_by_default(cx: &mut TestAppContext) {
     open_view(cx, NoteStore::open_in_memory().unwrap());
 
-    assert_eq!(background(cx), color(BOURBON_DARK_BACKGROUND));
-    assert!(cx.read(|cx| cx.theme().is_dark()));
+    assert_eq!(background(cx), color(BOURBON_LIGHT_BACKGROUND));
+    assert!(!cx.read(|cx| cx.theme().is_dark()));
 }
 
 #[gpui_kit::test]
@@ -170,11 +170,11 @@ fn the_appearance_choice_is_ignored_while_following_omarchy(cx: &mut TestAppCont
     press(cx, handle, "ctrl-,");
     click(cx, handle, "settings-theme-omarchy");
 
-    click(cx, handle, "settings-appearance-light");
+    click(cx, handle, "settings-appearance-dark");
 
     assert!(cx.read(|cx| cx.theme().is_dark()));
     view.read_with(cx, |view, _| {
-        assert_eq!(view.settings.appearance, Appearance::Dark);
+        assert_eq!(view.settings.appearance, Appearance::Light);
     });
 }
 
@@ -190,7 +190,7 @@ fn an_unreadable_omarchy_file_falls_back_to_bourbon_without_an_error(cx: &mut Te
     press(cx, handle, "ctrl-,");
     click(cx, handle, "settings-theme-omarchy");
 
-    assert_eq!(background(cx), color(BOURBON_DARK_BACKGROUND));
+    assert_eq!(background(cx), color(BOURBON_LIGHT_BACKGROUND));
     view.read_with(cx, |view, _| assert!(view.error_message.is_none()));
 }
 
@@ -249,7 +249,7 @@ fn resizing_clamps_the_widths_and_saves_only_when_the_drag_ends(cx: &mut TestApp
         assert_eq!(view.settings.sidebar_width(), 160);
         assert_eq!(view.settings.note_list_width(), 560);
     });
-    assert_eq!(saved(&locations).sidebar_width(), 240);
+    assert_eq!(saved(&locations).sidebar_width(), 200);
 
     view.update(cx, Workspace::finish_resizing);
     assert_eq!(saved(&locations).sidebar_width(), 160);
@@ -262,7 +262,7 @@ fn dragging_the_note_list_divider_measures_from_the_sidebar_edge(cx: &mut TestAp
 
     view.update(cx, |view, cx| view.resize_note_list_to_pointer(540., cx));
     view.read_with(cx, |view, _| {
-        assert_eq!(view.settings.note_list_width(), 300);
+        assert_eq!(view.settings.note_list_width(), 340);
     });
 
     press(cx, handle, "ctrl-/");
