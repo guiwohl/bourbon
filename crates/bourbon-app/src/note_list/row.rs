@@ -37,6 +37,10 @@ pub(crate) fn progress_fill(progress: TaskProgress) -> f32 {
     f32::from(done.min(total)) / f32::from(total)
 }
 
+fn progress_bar_width(progress: TaskProgress) -> f32 {
+    PROGRESS_BAR_WIDTH * progress_fill(progress)
+}
+
 pub(crate) fn render(data: &RowData, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
     let summary = data.summary;
     let id = summary.id.clone();
@@ -48,6 +52,11 @@ pub(crate) fn render(data: &RowData, cx: &mut Context<Workspace>) -> impl IntoEl
     let menu_id = id.clone();
     let click_id = id.clone();
     let theme = cx.theme().clone();
+    let hover_background = if data.is_selected {
+        theme.list_active
+    } else {
+        theme.list_hover
+    };
     div()
         .id(SharedString::from(format!("note-{id}")))
         .test_support()
@@ -61,9 +70,7 @@ pub(crate) fn render(data: &RowData, cx: &mut Context<Workspace>) -> impl IntoEl
         .flex_col()
         .gap_1()
         .when(data.is_selected, |row| row.bg(theme.list_active))
-        .when(!data.is_selected, |row| {
-            row.hover(|row| row.bg(theme.list_hover))
-        })
+        .hover(move |row| row.bg(hover_background))
         .child(title_line(summary, title, cx))
         .child(
             div()
@@ -87,7 +94,7 @@ pub(crate) fn render(data: &RowData, cx: &mut Context<Workspace>) -> impl IntoEl
                         .map(|tag| tag_pill(&summary.id, tag, cx)),
                 ),
         )
-        .when(!summary.excerpt.is_empty(), |row| {
+        .when_some(summary.excerpt.chars().next(), |row, _| {
             row.child(
                 div()
                     .truncate()
@@ -167,7 +174,7 @@ fn progress_view(progress: TaskProgress, cx: &mut Context<Workspace>) -> impl In
                 .child(
                     div()
                         .h_full()
-                        .w(px(PROGRESS_BAR_WIDTH * progress_fill(progress)))
+                        .w(px(progress_bar_width(progress)))
                         .rounded_full()
                         .bg(theme.primary),
                 ),
@@ -229,6 +236,14 @@ mod tests {
     #[test]
     fn progress_reads_done_of_total() {
         assert_eq!(progress_label(TaskProgress { done: 2, total: 4 }), "2 of 4");
+    }
+
+    #[test]
+    fn the_filled_bar_is_a_share_of_the_full_width() {
+        let half = progress_bar_width(TaskProgress { done: 1, total: 2 });
+        assert!((half - PROGRESS_BAR_WIDTH / 2.).abs() < f32::EPSILON);
+        let empty = progress_bar_width(TaskProgress { done: 0, total: 2 });
+        assert!(empty.abs() < f32::EPSILON);
     }
 
     #[test]

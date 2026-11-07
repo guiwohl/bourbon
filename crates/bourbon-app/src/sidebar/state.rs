@@ -141,6 +141,18 @@ mod tests {
     }
 
     #[test]
+    fn a_status_count_is_looked_up_by_status() {
+        let counts = SidebarCounts {
+            all_notes: 0,
+            templates: 0,
+            by_status: vec![(NoteStatus::Active, 3), (NoteStatus::Dropped, 5)],
+        };
+        assert_eq!(counts.of_status(NoteStatus::Dropped), 5);
+        assert_eq!(counts.of_status(NoteStatus::Active), 3);
+        assert_eq!(counts.of_status(NoteStatus::Completed), 0);
+    }
+
+    #[test]
     fn loaded_counts_cover_all_notes_templates_and_every_status() {
         let store = NoteStore::open_in_memory().unwrap();
         let counts = SidebarCounts::load(&store).unwrap();

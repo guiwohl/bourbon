@@ -213,6 +213,41 @@ mod tests {
     }
 
     #[test]
+    fn blending_mixes_each_channel_by_weight() {
+        let mixed = blend([0.2, 0.4, 0.6], [0.8, 0.6, 0.2], 0.25);
+        for (got, want) in mixed.into_iter().zip([0.35, 0.45, 0.5]) {
+            assert!((got - want).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn luminance_follows_the_srgb_curve() {
+        assert!((luminance([1.; 3]) - 1.).abs() < 1e-4);
+        assert!((luminance([0.5; 3]) - 0.2140).abs() < 1e-3);
+        assert!((luminance([0.02; 3]) - 0.02 / 12.92).abs() < 1e-6);
+        assert!((luminance([1., 0., 0.]) - 0.2126).abs() < 1e-4);
+        assert!((luminance([0., 1., 0.]) - 0.7152).abs() < 1e-4);
+        assert!((luminance([0., 0., 1.]) - 0.0722).abs() < 1e-4);
+    }
+
+    #[test]
+    fn opaque_colours_keep_their_channels() {
+        let rgba = rgba_from([0.1, 0.2, 0.3]);
+        assert_eq!((rgba.r, rgba.g, rgba.b, rgba.a), (0.1, 0.2, 0.3, 1.));
+    }
+
+    #[test]
+    fn pill_text_is_the_readable_shade_made_opaque() {
+        let tag = dot_color(TagColor::Yellow);
+        let backdrop = Hsla::from(rgb(0x00f7_f7f7));
+        let [r, g, b] = readable_shade(channels(TagColor::Yellow), [0.969; 3], 0.);
+        let text = pill_text_color(tag, backdrop, false).to_rgb();
+        assert!((text.a - 1.).abs() < f32::EPSILON);
+        assert!((text.r - r).abs() < 0.01);
+        assert!((text.g - g).abs() < 0.01 && (text.b - b).abs() < 0.01);
+    }
+
+    #[test]
     fn the_dot_colour_is_the_palette_value() {
         assert_eq!(dot_color(TagColor::Red), Hsla::from(rgb(0x00ef_4444)));
     }
