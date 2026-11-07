@@ -58,6 +58,9 @@ architecture:
         rg '^gpui' <<< "$dependencies"
         [ $? -eq 1 ] || exit 1
     done
+    ui_dependencies=$(cargo tree -p bourbon-ui -e normal --prefix none) || exit 1
+    rg '^gpui-(kit|component)' <<< "$ui_dependencies"
+    [ $? -eq 1 ] || exit 1
 
 quick:
     #!/usr/bin/env bash
@@ -67,7 +70,8 @@ quick:
         packages="--workspace"
     else
         packages=""
-        grep -q '^crates/bourbon-app/' <<< "$changed" && packages="$packages -p bourbon-app"
+        grep -q '^crates/bourbon-\(app\|ui\)/' <<< "$changed" && packages="$packages -p bourbon-app"
+        grep -q '^crates/bourbon-ui/' <<< "$changed" && packages="$packages -p bourbon-ui"
         grep -q '^crates/bourbon-cli/' <<< "$changed" && packages="$packages -p bourbon-cli"
         grep -q '^crates/bourbon-markdown/' <<< "$changed" && packages="$packages -p bourbon-markdown"
         grep -q '^crates/bourbon-text/' <<< "$changed" && packages="$packages -p bourbon-text"

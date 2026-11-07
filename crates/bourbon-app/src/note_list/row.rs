@@ -12,7 +12,7 @@ use gpui_kit::{
 use super::date::relative_age;
 use crate::dragged_note::DraggedNote;
 use crate::icons::{glyph, status_glyph};
-use crate::presentation::{display_title, dot_color, pill_text_color};
+use crate::presentation::{display_title, dot_color};
 use crate::workspace::Workspace;
 
 const PROGRESS_BAR_WIDTH: f32 = 30.;
@@ -185,7 +185,7 @@ fn progress_view(progress: TaskProgress, cx: &mut Context<Workspace>) -> impl In
 fn tag_pill(note: &NoteId, tag: &Tag, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
     let tag_id: TagId = tag.id.clone();
     let color = dot_color(tag.color);
-    let text = pill_text_color(color, cx.theme().background, cx.theme().is_dark());
+    let text = bourbon_ui::pill_text_color(color, cx.theme().background, cx.theme().is_dark());
     div()
         .id(SharedString::from(format!("chip-{note}-{}", tag.id)))
         .test_support()

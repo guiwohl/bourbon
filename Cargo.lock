@@ -726,6 +726,7 @@ name = "bourbon-app"
 version = "0.1.0"
 dependencies = [
  "bourbon-core",
+ "bourbon-ui",
  "gpui-kit",
  "jiff",
  "tempfile",
@@ -769,6 +770,14 @@ dependencies = [
  "proptest",
  "ropey 1.6.1",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "bourbon-ui"
+version = "0.1.0"
+dependencies = [
+ "gpui-pre",
+ "gpui-pre-platform",
 ]
 
 [[package]]
