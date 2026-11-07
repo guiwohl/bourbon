@@ -4,6 +4,7 @@ mod cli_command;
 mod control_pane;
 mod dragged_note;
 mod editor;
+mod fonts;
 mod icons;
 mod locations;
 mod navigation;

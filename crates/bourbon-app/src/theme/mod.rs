@@ -7,6 +7,8 @@ use bourbon_core::{Appearance, OmarchyColors, Settings};
 use gpui_kit::App;
 use gpui_kit::component::{Theme, ThemeMode};
 
+use crate::fonts;
+
 #[cfg(test)]
 pub(crate) const BOURBON_LIGHT_BACKGROUND: u32 = 0x00f7_f7f8;
 
@@ -23,5 +25,8 @@ pub(crate) fn apply(settings: &Settings, omarchy_colors_path: &Path, cx: &mut Ap
         Appearance::Light => ThemeMode::Light,
     };
     Theme::change(mode, None, cx);
-    Theme::update(cx, |theme| palette.paint(&mut theme.colors));
+    Theme::update(cx, |theme| {
+        palette.paint(&mut theme.colors);
+        theme.font_family = fonts::UI_FAMILY.into();
+    });
 }

@@ -13,6 +13,7 @@ use crate::editor::actions::{
     SetStatusActive, SetStatusCompleted, SetStatusDropped, SetStatusNone, SetStatusOnHold,
     ToggleFocusMode, ToggleTaskAtCursor,
 };
+use crate::fonts;
 use crate::locations::Locations;
 use crate::note_list::ClearFilter;
 use crate::sidebar::ToggleSidebar;
@@ -50,6 +51,7 @@ pub(crate) fn run(store: NoteStore, locations: Locations, focus_requests: Receiv
         .with_assets(gpui_kit::assets::Assets)
         .run(move |cx| {
             gpui_kit::init(cx);
+            fonts::register(cx);
             bind_keys(cx);
             let opened = gpui_kit::open_window(window_options(&CURRENT), cx, |window, cx| {
                 build_workspace(store, locations, window, cx)
