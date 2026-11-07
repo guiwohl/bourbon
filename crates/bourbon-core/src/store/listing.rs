@@ -4,7 +4,7 @@ use rusqlite::params_from_iter;
 
 use crate::identifier::NoteId;
 use crate::note::{NoteSummary, excerpt_of};
-use crate::query::NoteQuery;
+use crate::query::{NoteQuery, NoteScope};
 use crate::store::note_filter::{NoteFilter, order_clause};
 use crate::store::tag_rows::{TAG_ORDER, tag_from_row};
 use crate::store::{NoteStore, StoreError};
@@ -41,6 +41,19 @@ impl NoteStore {
             })?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(summaries)
+    }
+
+    pub fn count_notes(&self, scope: &NoteScope) -> Result<usize, StoreError> {
+        let filter = NoteFilter::for_scope(scope);
+        let count: i64 = self.connection.query_row(
+            &format!(
+                "{} SELECT COUNT(*) FROM notes n WHERE {}",
+                filter.common_table, filter.condition
+            ),
+            params_from_iter(&filter.parameters),
+            |row| row.get(0),
+        )?;
+        Ok(usize::try_from(count).unwrap_or_default())
     }
 
     fn tags_of_filtered_notes(

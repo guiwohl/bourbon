@@ -454,3 +454,24 @@ fn listing_works_on_a_file_database() {
     let note = titled_note(&store, &inbox(&store), "on disk", 1, 2);
     assert_eq!(listed(&store, NoteScope::AllNotes), vec![note]);
 }
+
+#[test]
+fn counts_follow_the_listing_filters() {
+    let store = store();
+    let notebook = inbox(&store);
+    titled_note(&store, &notebook, "plain", 1, 1);
+    let active = titled_note(&store, &notebook, "active", 2, 2);
+    let done = titled_note(&store, &notebook, "done", 3, 3);
+    let trashed = titled_note(&store, &notebook, "trashed", 4, 4);
+    set_status(&store, &active, NoteStatus::Active);
+    set_status(&store, &done, NoteStatus::Completed);
+    store.trash_note(&trashed, at(5)).unwrap();
+    store.create_template(&notebook, at(6)).unwrap();
+    let count = |scope| store.count_notes(&scope).unwrap();
+    assert_eq!(count(NoteScope::AllNotes), 2);
+    assert_eq!(count(NoteScope::Status(NoteStatus::Active)), 1);
+    assert_eq!(count(NoteScope::Status(NoteStatus::Completed)), 1);
+    assert_eq!(count(NoteScope::Status(NoteStatus::Dropped)), 0);
+    assert_eq!(count(NoteScope::Templates), 1);
+    assert_eq!(count(NoteScope::Trash), 1);
+}

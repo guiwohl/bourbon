@@ -31,7 +31,7 @@ use crate::navigation::{Listing, Navigation};
 use crate::note_list::NoteListData;
 use crate::panes::{self, Divider};
 use crate::settings_view::SettingsData;
-use crate::sidebar::SidebarData;
+use crate::sidebar::{SidebarCounts, SidebarData};
 use crate::sidebar::{SidebarState, ToggleSidebar};
 use crate::theme::{self, ModificationWatch};
 use crate::{autosave, note_list, settings_view, sidebar};
@@ -46,6 +46,7 @@ pub struct Workspace {
     listing: Listing,
     notes: Vec<NoteSummary>,
     templates: Vec<NoteSummary>,
+    counts: SidebarCounts,
     notebooks: Vec<NotebookNode>,
     tags: Vec<TagSummary>,
     selected: Option<NoteId>,
@@ -130,6 +131,7 @@ impl Workspace {
             listing: Listing::default(),
             notes: Vec::new(),
             templates: Vec::new(),
+            counts: SidebarCounts::default(),
             notebooks: Vec::new(),
             tags: Vec::new(),
             selected: None,
@@ -193,6 +195,10 @@ impl Workspace {
         }
         match self.store.list_tags() {
             Ok(tags) => self.tags = tags,
+            Err(error) => self.report(&error, cx),
+        }
+        match SidebarCounts::load(&self.store) {
+            Ok(counts) => self.counts = counts,
             Err(error) => self.report(&error, cx),
         }
         let templates = NoteQuery {
@@ -447,6 +453,7 @@ impl Workspace {
                 current: &self.listing.navigation,
                 notebooks: &self.notebooks,
                 tags: &self.tags,
+                counts: &self.counts,
                 state: &self.sidebar,
                 width: f32::from(self.settings.sidebar_width()),
             },

@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 
-use bourbon_core::{NotebookDepth, NotebookId, TagId};
+use bourbon_core::{
+    NoteScope, NoteStatus, NoteStore, NotebookDepth, NotebookId, StoreError, TagId,
+};
 use gpui_kit::component::input::InputState;
 use gpui_kit::{Entity, SharedString, Subscription};
 
@@ -45,6 +47,35 @@ pub(crate) enum Section {
     Notebooks,
     Status,
     Tags,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct SidebarCounts {
+    pub(crate) all_notes: usize,
+    pub(crate) templates: usize,
+    pub(crate) by_status: Vec<(NoteStatus, usize)>,
+}
+
+impl SidebarCounts {
+    pub(crate) fn load(store: &NoteStore) -> Result<Self, StoreError> {
+        let by_status = NoteStatus::ALL
+            .into_iter()
+            .filter(|status| *status != NoteStatus::None)
+            .map(|status| Ok((status, store.count_notes(&NoteScope::Status(status))?)))
+            .collect::<Result<_, StoreError>>()?;
+        Ok(Self {
+            all_notes: store.count_notes(&NoteScope::AllNotes)?,
+            templates: store.count_notes(&NoteScope::Templates)?,
+            by_status,
+        })
+    }
+
+    pub(crate) fn of_status(&self, status: NoteStatus) -> usize {
+        self.by_status
+            .iter()
+            .find_map(|(candidate, count)| (*candidate == status).then_some(*count))
+            .unwrap_or_default()
+    }
 }
 
 pub(crate) struct SidebarState {
@@ -107,6 +138,16 @@ mod tests {
         assert_eq!(state.depth_of(&notebook), NotebookDepth::DirectOnly);
         state.toggle_expansion(&notebook);
         assert_eq!(state.depth_of(&notebook), NotebookDepth::WithDescendants);
+    }
+
+    #[test]
+    fn loaded_counts_cover_all_notes_templates_and_every_status() {
+        let store = NoteStore::open_in_memory().unwrap();
+        let counts = SidebarCounts::load(&store).unwrap();
+        assert_eq!(counts.all_notes, 0);
+        assert_eq!(counts.templates, 0);
+        assert_eq!(counts.by_status.len(), 4);
+        assert_eq!(counts.of_status(NoteStatus::Active), 0);
     }
 
     #[test]
