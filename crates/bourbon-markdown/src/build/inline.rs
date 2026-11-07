@@ -5,7 +5,7 @@ use crate::url;
 use pulldown_cmark::{Event, Tag};
 
 impl Builder<'_> {
-    pub(super) fn starts_inline(&self) -> bool {
+    pub(super) fn starts_inline(&mut self) -> bool {
         matches!(
             self.peek(),
             Some(

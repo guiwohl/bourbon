@@ -16,11 +16,14 @@ impl<'a> Canvas<'a> {
 
     pub fn paint(&mut self, range: Range<usize>, class: TokenClass) {
         let end = range.end.min(self.source.len());
-        let valid = range.start < end
-            && self.source.is_char_boundary(range.start)
-            && self.source.is_char_boundary(end);
-        if valid {
-            self.classes[range.start..end].fill(Some(class));
+        let on_boundaries =
+            self.source.is_char_boundary(range.start) && self.source.is_char_boundary(end);
+        if let Some(slice) = self
+            .classes
+            .get_mut(range.start..end)
+            .filter(|_| on_boundaries)
+        {
+            slice.fill(Some(class));
         }
     }
 
