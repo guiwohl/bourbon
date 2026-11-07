@@ -280,6 +280,15 @@ mod tests {
     }
 
     #[test]
+    fn compose_merges_adjacent_changes_into_one() {
+        let adjacent = set(vec![Change::delete(0..1), Change::insert(1, "x")]);
+        assert_eq!(
+            adjacent.compose(&ChangeSet::default()).changes(),
+            &[Change::replace(0..1, "x")]
+        );
+    }
+
+    #[test]
     fn compose_with_empty_sets_is_identity() {
         let changes = set(vec![Change::replace(1..2, "X")]);
         assert_eq!(changes.compose(&ChangeSet::default()), changes);
