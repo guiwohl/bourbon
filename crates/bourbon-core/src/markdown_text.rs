@@ -42,28 +42,28 @@ fn ordered_remainder(line: &str) -> &str {
 fn without_links(text: &str) -> String {
     let mut output = String::new();
     let mut rest = text;
-    while let Some(open) = rest.find('[') {
-        let Some((label, after)) = link_at(&rest[open..]) else {
-            output.push_str(&rest[..=open]);
-            rest = &rest[open + 1..];
-            continue;
-        };
-        output.push_str(rest[..open].trim_end_matches('!'));
-        output.push_str(label);
-        rest = after;
+    while let Some((before, after_bracket)) = rest.split_once('[') {
+        if let Some((label, remainder)) = link_after_bracket(after_bracket) {
+            output.push_str(before.trim_end_matches('!'));
+            output.push_str(label);
+            rest = remainder;
+        } else {
+            output.push_str(before);
+            output.push('[');
+            rest = after_bracket;
+        }
     }
     output.push_str(rest);
     output
 }
 
-fn link_at(text: &str) -> Option<(&str, &str)> {
-    let close = text.find("](")?;
-    let label = &text[1..close];
+fn link_after_bracket(text: &str) -> Option<(&str, &str)> {
+    let (label, after_label) = text.split_once("](")?;
     if label.contains('[') {
         return None;
     }
-    let end = text[close..].find(')')?;
-    Some((label, &text[close + end + 1..]))
+    let (_, remainder) = after_label.split_once(')')?;
+    Some((label, remainder))
 }
 
 #[cfg(test)]
