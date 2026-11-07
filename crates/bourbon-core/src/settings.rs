@@ -8,8 +8,8 @@ use tempfile::NamedTempFile;
 pub const SIDEBAR_WIDTH_RANGE: RangeInclusive<u16> = 160..=400;
 pub const NOTE_LIST_WIDTH_RANGE: RangeInclusive<u16> = 220..=560;
 
-const DEFAULT_SIDEBAR_WIDTH: u16 = 240;
-const DEFAULT_NOTE_LIST_WIDTH: u16 = 320;
+const DEFAULT_SIDEBAR_WIDTH: u16 = 200;
+const DEFAULT_NOTE_LIST_WIDTH: u16 = 260;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -22,8 +22,8 @@ pub enum ThemeSource {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Appearance {
-    Light,
     #[default]
+    Light,
     Dark,
 }
 
@@ -268,13 +268,13 @@ mod tests {
     }
 
     #[test]
-    fn defaults_are_bourbon_dark_with_visible_sidebar() {
+    fn defaults_are_bourbon_light_with_visible_sidebar() {
         let settings = Settings::default();
         assert_eq!(settings.theme_source, ThemeSource::Bourbon);
-        assert_eq!(settings.appearance, Appearance::Dark);
+        assert_eq!(settings.appearance, Appearance::Light);
         assert!(settings.sidebar_visible);
-        assert_eq!(settings.sidebar_width(), 240);
-        assert_eq!(settings.note_list_width(), 320);
+        assert_eq!(settings.sidebar_width(), 200);
+        assert_eq!(settings.note_list_width(), 260);
     }
 
     #[test]
@@ -322,9 +322,9 @@ mod tests {
             "theme_source = \"omarchy\"\nappearance = \"purple\"\nsidebar_visible = \"yes\"\nsidebar_width = \"wide\"\nunknown = 1\n",
         );
         assert_eq!(settings.theme_source, ThemeSource::Omarchy);
-        assert_eq!(settings.appearance, Appearance::Dark);
+        assert_eq!(settings.appearance, Appearance::Light);
         assert!(settings.sidebar_visible);
-        assert_eq!(settings.sidebar_width(), 240);
+        assert_eq!(settings.sidebar_width(), 200);
     }
 
     #[test]

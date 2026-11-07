@@ -14,7 +14,7 @@ Pure domain plus SQLite. Never depends on GPUI. No repository trait: one storage
 | `Notebook` | id, name, parent (`None` = top level), created_at |
 | `NotebookNode` | notebook, note_count, children |
 | `Note` | id, title, body, created_at, updated_at, notebook, status, pinned, is_template, tags (`Vec<Tag>`: id, name, colour), trashed_at |
-| `NoteSummary` | id, title, excerpt, updated_at, created_at, pinned, status, tags (`Vec<Tag>`: id, name, colour). No body |
+| `NoteSummary` | id, title, excerpt, updated_at, created_at, pinned, status, tags (`Vec<Tag>`: id, name, colour), `task_progress: Option<TaskProgress { done, total }>`. No body |
 | `NoteQuery` | scope + sort; `Default` is `AllNotes` + `UpdatedNewestFirst` |
 | `NoteScope` | `AllNotes`, `Notebook(NotebookId, NotebookDepth)`, `Status(NoteStatus)`, `Tags(Vec<TagId>)`, `Templates`, `Trash` |
 | `NotebookDepth` | `DirectOnly`, `WithDescendants` |
@@ -79,7 +79,9 @@ Every scope except `Templates` and `Trash` excludes templates.
 
 Order: pinned notes first in every scope, then the sort. `UpdatedNewestFirst`: updated desc, ties created desc. `CreatedNewestFirst`: created desc, ties updated desc. `TitleAlphabetical`: title ascending, ties updated desc; case folding is SQLite `NOCASE`, so it covers ASCII letters only.
 
-`excerpt` is the first non-blank line of the body, trimmed, cut to 100 characters.
+`excerpt` is the first line of the body that has text left after stripping Markdown syntax (`markdown_text.rs`: heading hashes, quote, bullet, ordered and task markers, `**`, `__`, `~~`, `*`, backticks, links and images reduced to their label, code fence lines dropped), cut to 100 characters.
+
+`task_progress` (`task_progress.rs`, `TaskProgress::of_body`) counts `- [ ]`, `- [x]`, `* [ ]`, `+ [ ]` lines (any indent) outside code fences; `None` when the body has no task. The editor keeps its own task-line parser for toggling; unifying the two is open.
 
 `NotebookNode.note_count` counts non-trashed notes in the notebook and all descendants, every status included.
 

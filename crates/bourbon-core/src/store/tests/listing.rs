@@ -46,7 +46,12 @@ fn summary_carries_every_list_field() {
     let store = store();
     let note = store.create_note(&inbox(&store), at(1)).unwrap();
     store
-        .save_note(&note.id, "Hello", "\n  first line  \nsecond", at(9))
+        .save_note(
+            &note.id,
+            "Hello",
+            "\n  first line  \n- [x] a\n- [ ] b",
+            at(9),
+        )
         .unwrap();
     pin(&store, &note.id);
     set_status(&store, &note.id, NoteStatus::Active);
@@ -68,6 +73,7 @@ fn summary_carries_every_list_field() {
                 name: "idea".into(),
                 color: TagColor::Teal
             }],
+            task_progress: Some(crate::TaskProgress { done: 1, total: 2 }),
         }]
     );
 }

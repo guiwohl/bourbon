@@ -1,6 +1,5 @@
 use bourbon_core::{NotebookId, NotebookNode};
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::label::Label;
+use gpui_kit::assets::IconName as GlyphName;
 use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenuItem};
 use gpui_kit::component::{ActiveTheme as _, Icon, IconName, Sizable as _};
 use gpui_kit::{
@@ -8,21 +7,27 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window, div, px,
 };
 
+use super::state::{Section, SidebarState};
 use super::tree::VisibleNotebook;
-use super::{header, nav_row};
+use super::{count_label, header, nav_row};
 use crate::dragged_note::DraggedNote;
+use crate::icons::glyph;
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
 
-pub(super) fn section_header(cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
-    header("Notebooks", cx).child(
-        Button::new("new-notebook")
-            .ghost()
-            .xsmall()
-            .icon(IconName::Plus)
-            .on_click(cx.listener(|workspace, _, window, cx| {
-                workspace.begin_create_notebook(None, window, cx);
-            })),
+pub(super) fn section_header(
+    state: &SidebarState,
+    cx: &mut Context<Workspace>,
+) -> impl IntoElement + use<> {
+    header::render(
+        &header::Spec {
+            label: "Notebooks",
+            section: Section::Notebooks,
+            searchable: true,
+            addable: true,
+        },
+        state,
+        cx,
     )
 }
 
@@ -36,6 +41,11 @@ pub(super) fn row(
     let id = node.notebook.id.clone();
     let is_selected = current.shows_notebook(&id);
     let can_delete = inbox != Some(&id);
+    let icon = if can_delete {
+        GlyphName::Notebook
+    } else {
+        GlyphName::Inbox
+    };
     let selecting = id.clone();
     let dropping = id.clone();
     nav_row(
@@ -46,8 +56,9 @@ pub(super) fn row(
     )
     .test_support()
     .child(disclosure(node, visible.is_expanded, cx))
+    .child(glyph(icon).text_color(cx.theme().muted_foreground))
     .child(div().flex_1().truncate().child(node.notebook.name.clone()))
-    .child(Label::new(node.note_count.to_string()).text_color(cx.theme().muted_foreground))
+    .child(count_label(node.note_count, cx))
     .on_click(cx.listener(move |workspace, _, _, cx| workspace.select_notebook(&selecting, cx)))
     .drag_over::<DraggedNote>(|style, _, _, cx| style.bg(cx.theme().drop_target))
     .on_drop(cx.listener(move |workspace, dragged: &DraggedNote, _, cx| {

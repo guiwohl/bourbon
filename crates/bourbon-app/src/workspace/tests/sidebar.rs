@@ -777,3 +777,27 @@ fn making_a_notebook_the_default_sends_new_notes_there(cx: &mut TestAppContext) 
     });
     assert_eq!(notebook, work.id);
 }
+
+#[gpui_kit::test]
+fn collapsing_a_section_hides_its_rows_and_expanding_brings_them_back(cx: &mut TestAppContext) {
+    let (handle, _) = open_view(cx, NoteStore::open_in_memory().unwrap());
+    assert!(is_listed(cx, handle, "nav-status-active"));
+
+    click(cx, handle, "status-collapse");
+    assert!(!is_listed(cx, handle, "nav-status-active"));
+    assert!(is_listed(cx, handle, "nav-trash"));
+
+    click(cx, handle, "status-collapse");
+    assert!(is_listed(cx, handle, "nav-status-active"));
+}
+
+#[gpui_kit::test]
+fn the_note_list_toggle_button_hides_and_shows_the_sidebar(cx: &mut TestAppContext) {
+    let (handle, _) = open_view(cx, NoteStore::open_in_memory().unwrap());
+
+    click(cx, handle, "toggle-sidebar");
+    assert!(!is_listed(cx, handle, "sidebar"));
+
+    click(cx, handle, "toggle-sidebar");
+    assert!(is_listed(cx, handle, "sidebar"));
+}

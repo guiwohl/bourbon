@@ -1,6 +1,8 @@
 use crate::identifier::{NoteId, NotebookId};
+use crate::markdown_text::strip_line;
 use crate::status::NoteStatus;
 use crate::tag::Tag;
+use crate::task_progress::TaskProgress;
 use crate::timestamp::Timestamp;
 
 const EXCERPT_LENGTH: usize = 100;
@@ -30,11 +32,12 @@ pub struct NoteSummary {
     pub pinned: bool,
     pub status: NoteStatus,
     pub tags: Vec<Tag>,
+    pub task_progress: Option<TaskProgress>,
 }
 
 pub(crate) fn excerpt_of(body: &str) -> String {
     body.lines()
-        .map(str::trim)
+        .map(strip_line)
         .find(|line| !line.is_empty())
         .map(|line| line.chars().take(EXCERPT_LENGTH).collect())
         .unwrap_or_default()
@@ -47,6 +50,15 @@ mod tests {
     #[test]
     fn excerpt_is_the_first_line() {
         assert_eq!(excerpt_of("first\nsecond"), "first");
+    }
+
+    #[test]
+    fn excerpt_shows_the_text_without_markdown_syntax() {
+        assert_eq!(
+            excerpt_of("# **Title** with [a link](u)"),
+            "Title with a link"
+        );
+        assert_eq!(excerpt_of("```\n- code\n```"), "code");
     }
 
     #[test]

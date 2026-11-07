@@ -63,15 +63,15 @@ fn the_sort_selector_reorders_by_updated_created_and_title(cx: &mut TestAppConte
     let (handle, view) = open_view(cx, store);
     assert_eq!(listed_titles(cx, &view), ["Mango", "Apple", "Zebra"]);
 
-    click(cx, handle, "sort-selector");
+    click(cx, handle, "note-list-title");
     choose_menu_item(cx, handle, 1);
     assert_eq!(listed_titles(cx, &view), ["Apple", "Zebra", "Mango"]);
 
-    click(cx, handle, "sort-selector");
+    click(cx, handle, "note-list-title");
     choose_menu_item(cx, handle, 2);
     assert_eq!(listed_titles(cx, &view), ["Apple", "Mango", "Zebra"]);
 
-    click(cx, handle, "sort-selector");
+    click(cx, handle, "note-list-title");
     choose_menu_item(cx, handle, 0);
     assert_eq!(listed_titles(cx, &view), ["Mango", "Apple", "Zebra"]);
     cx.read(|cx| {
@@ -257,7 +257,7 @@ fn the_list_context_menu_offers_pin_duplicate_and_trash(cx: &mut TestAppContext)
 }
 
 #[gpui_kit::test]
-fn the_trash_header_swaps_new_note_for_empty_trash(cx: &mut TestAppContext) {
+fn the_trash_header_swaps_compose_for_empty_trash(cx: &mut TestAppContext) {
     let (store, _) = three_notes();
     let (handle, _) = open_view(cx, store);
     assert!(is_present(cx, handle, "new-note"));
@@ -403,4 +403,57 @@ fn changing_notes_refreshes_the_sidebar_counts(cx: &mut TestAppContext) {
     choose_menu_item(cx, handle, 2);
 
     assert_eq!(count(cx), 2);
+}
+
+#[gpui_kit::test]
+fn the_filter_keeps_only_notes_matching_titles_or_bodies_and_empty_restores(
+    cx: &mut TestAppContext,
+) {
+    let (store, [mango, _, _]) = three_notes();
+    store
+        .save_note(&mango, "Mango", "ripe fruit", at(11))
+        .unwrap();
+    let (handle, view) = open_view(cx, store);
+    assert_eq!(listed_titles(cx, &view).len(), 3);
+
+    type_filter(cx, handle, "fruit");
+    assert_eq!(listed_titles(cx, &view), ["Mango"]);
+
+    press_escape_in_filter(cx, handle);
+    type_filter(cx, handle, "zebra");
+    assert_eq!(listed_titles(cx, &view), ["Zebra"]);
+
+    press_escape_in_filter(cx, handle);
+    assert_eq!(listed_titles(cx, &view).len(), 3);
+}
+
+#[gpui_kit::test]
+fn escape_in_the_filter_clears_it(cx: &mut TestAppContext) {
+    let (store, _) = three_notes();
+    let (handle, view) = open_view(cx, store);
+    type_filter(cx, handle, "apple");
+    assert_eq!(listed_titles(cx, &view), ["Apple"]);
+
+    press_escape_in_filter(cx, handle);
+
+    assert_eq!(listed_titles(cx, &view).len(), 3);
+}
+
+fn type_filter(cx: &mut TestAppContext, handle: AnyWindowHandle, text: &str) {
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("note-filter-input", cx);
+        window.input(text, cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+}
+
+fn press_escape_in_filter(cx: &mut TestAppContext, handle: AnyWindowHandle) {
+    cx.update_window(handle, |_, window, cx| {
+        window.click("note-filter-input", cx);
+        window.press("escape", cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
 }

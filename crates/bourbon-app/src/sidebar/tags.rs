@@ -1,14 +1,12 @@
 use bourbon_core::{TagColor, TagSummary};
-use gpui_kit::component::ActiveTheme as _;
-use gpui_kit::component::label::Label;
 use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenu};
 use gpui_kit::{
     Context, IntoElement, ParentElement as _, StatefulInteractiveElement as _, Styled as _,
     TestSupportExt as _, Window, div, px,
 };
 
-use super::nav_row;
 use super::notebooks::item;
+use super::{count_label, nav_row};
 use crate::navigation::Navigation;
 use crate::presentation::{color_label, dot_color, is_current_color};
 use crate::workspace::Workspace;
@@ -26,13 +24,13 @@ pub(super) fn row(
         .test_support()
         .child(
             div()
-                .size(px(8.))
+                .size(px(10.))
                 .flex_none()
                 .rounded_full()
                 .bg(dot_color(tag.color)),
         )
         .child(div().flex_1().truncate().child(tag.name.clone()))
-        .child(Label::new(summary.note_count.to_string()).text_color(cx.theme().muted_foreground))
+        .child(count_label(summary.note_count, cx))
         .on_click(
             cx.listener(move |workspace, event: &gpui_kit::ClickEvent, _, cx| {
                 workspace.select_tag(&selecting, event.modifiers().control, cx);

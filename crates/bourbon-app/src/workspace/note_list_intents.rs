@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use bourbon_core::{NoteId, NoteSort, NoteStore, StoreError, Timestamp};
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::button::ButtonVariant;
@@ -10,7 +12,34 @@ pub(crate) fn empty_trash_prompt(count: usize) -> String {
     format!("Permanently delete {count} {noun}?")
 }
 
+const FILTER_RESULT_LIMIT: usize = 100_000;
+
 impl Workspace {
+    pub(crate) fn filter_changed(&mut self, cx: &mut Context<Self>) {
+        self.reload_list(cx);
+        cx.notify();
+    }
+
+    pub(crate) fn clear_filter(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let input = self.filter_input.clone();
+        input.update(cx, |input, cx| input.set_value("", window, cx));
+        self.filter_changed(cx);
+    }
+
+    pub(super) fn filter_matches(&mut self, cx: &mut Context<Self>) -> Option<HashSet<NoteId>> {
+        let text = self.filter_input.read(cx).value().to_string();
+        if text.trim().is_empty() {
+            return None;
+        }
+        match self.store.search_notes(&text, FILTER_RESULT_LIMIT) {
+            Ok(hits) => Some(hits.into_iter().map(|hit| hit.summary.id).collect()),
+            Err(error) => {
+                self.report(&error, cx);
+                None
+            }
+        }
+    }
+
     pub(crate) fn sort_by(&mut self, sort: NoteSort, cx: &mut Context<Self>) {
         self.listing.sort = sort;
         self.reload_list(cx);

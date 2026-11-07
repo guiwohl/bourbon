@@ -3,6 +3,7 @@ use rusqlite::{Row, params};
 use crate::identifier::NoteId;
 use crate::note::{NoteSummary, excerpt_of};
 use crate::store::{NoteStore, StoreError};
+use crate::task_progress::TaskProgress;
 
 const MATCH_START: char = '\u{1}';
 const MATCH_END: char = '\u{2}';
@@ -86,6 +87,7 @@ fn hit_row(row: &Row<'_>) -> rusqlite::Result<HitRow> {
             pinned: row.get(5)?,
             status: row.get(6)?,
             tags: Vec::new(),
+            task_progress: TaskProgress::of_body(&body),
         },
         body,
         marked_snippet: row.get(7)?,

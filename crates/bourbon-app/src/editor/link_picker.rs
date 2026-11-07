@@ -90,6 +90,7 @@ mod tests {
                 pinned: false,
                 status: NoteStatus::None,
                 tags: Vec::new(),
+                task_progress: None,
             },
             snippet: String::new(),
         }

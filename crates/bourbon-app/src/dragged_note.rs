@@ -51,6 +51,7 @@ mod tests {
             created_at: Timestamp::from_millis(0),
             status: NoteStatus::None,
             tags: Vec::new(),
+            task_progress: None,
         }
     }
 

@@ -8,7 +8,10 @@ use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext, VisualTestContext};
 use jiff::civil::date;
 
-use super::{click, locations_with_runner, note_in, open_view_with, seeded_store, type_into_title};
+use super::{
+    choose_popup_item, click, locations_with_runner, note_in, open_view_with, popup_labels,
+    seeded_store, type_into_title,
+};
 use crate::backup_runner::{BackupJob, BackupRunner};
 use crate::locations::Locations;
 use crate::navigation::Navigation;
@@ -148,25 +151,20 @@ fn titles(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Vec<String> {
 #[gpui_kit::test]
 fn the_app_menu_lists_its_four_entries_once_opened(cx: &mut TestAppContext) {
     let setup = open_default(cx);
-    let entries = ["back-up", "restore", "export", "settings"];
 
-    let before = entries.map(|entry| is_present(cx, setup.handle, &format!("app-menu-{entry}")));
     click(cx, setup.handle, "app-menu");
-    let after = entries.map(|entry| is_present(cx, setup.handle, &format!("app-menu-{entry}")));
 
-    assert_eq!(before, [false; 4]);
-    assert_eq!(after, [true; 4]);
+    assert_eq!(popup_labels(cx, setup.handle).len(), 4);
 }
 
 #[gpui_kit::test]
-fn the_menu_settings_entry_opens_settings_and_closes_the_menu(cx: &mut TestAppContext) {
+fn the_menu_settings_entry_opens_settings(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     click(cx, setup.handle, "app-menu");
 
-    click(cx, setup.handle, "app-menu-settings");
+    choose_popup_item(cx, setup.handle, 0);
 
     assert!(setup.view.read_with(cx, |view, _| view.settings_open));
-    assert!(!setup.view.read_with(cx, |view, _| view.sidebar.menu_open));
 }
 
 #[gpui_kit::test]
@@ -174,7 +172,7 @@ fn the_menu_back_up_entry_runs_a_backup_of_the_configured_repository(cx: &mut Te
     let setup = open_default(cx);
     click(cx, setup.handle, "app-menu");
 
-    click(cx, setup.handle, "app-menu-back-up");
+    choose_popup_item(cx, setup.handle, 1);
     cx.run_until_parked();
 
     let jobs = setup.runner.backups.lock().unwrap();
@@ -189,7 +187,7 @@ fn the_menu_restore_entry_asks_before_replacing_anything(cx: &mut TestAppContext
     let setup = open_default(cx);
     click(cx, setup.handle, "app-menu");
 
-    click(cx, setup.handle, "app-menu-restore");
+    choose_popup_item(cx, setup.handle, 2);
 
     assert_eq!(
         setup.view.read_with(cx, |view, _| view.restore_question()),

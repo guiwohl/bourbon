@@ -3,7 +3,7 @@ use gpui_kit::VisualTestContext;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
 
-use super::{at, click, listed_titles, note_in, open_view};
+use super::{at, choose_popup_item, click, listed_titles, note_in, open_view, popup_labels};
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
 
@@ -61,29 +61,11 @@ fn title_is_focused(cx: &mut TestAppContext, handle: AnyWindowHandle) -> bool {
     .unwrap()
 }
 
-fn choose_popup_item(cx: &mut TestAppContext, handle: AnyWindowHandle, index: usize) {
-    cx.update_window(handle, |_, window, cx| {
-        window.within("popup-menu").click(index, cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-}
-
-fn popup_labels(cx: &mut TestAppContext, handle: AnyWindowHandle) -> Vec<String> {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        let menu = window.within("popup-menu");
-        (0usize..)
-            .map_while(|index| menu.try_find(index))
-            .map(|item| item.label().unwrap_or_default().to_string())
-            .collect()
-    })
-    .unwrap()
-}
+const FIRST_TEMPLATE_ITEM: usize = 5;
 
 fn new_from_template(cx: &mut TestAppContext, handle: AnyWindowHandle, index: usize) {
-    click(cx, handle, "new-from-template");
-    choose_popup_item(cx, handle, index);
+    click(cx, handle, "note-list-title");
+    choose_popup_item(cx, handle, FIRST_TEMPLATE_ITEM + index);
 }
 
 #[gpui_kit::test]
@@ -106,7 +88,8 @@ fn new_template_creates_selects_and_focuses_a_template(cx: &mut TestAppContext) 
     note_in(&fixture.store, &fixture.inbox, "Plain", 2);
     let (handle, view) = open_view(cx, fixture.store);
 
-    click(cx, handle, "new-template");
+    click(cx, handle, "nav-templates");
+    click(cx, handle, "new-note");
 
     let created = selected_note(cx, &view);
     assert!(created.is_template);
@@ -147,10 +130,10 @@ fn the_new_note_button_in_the_templates_view_creates_a_template(cx: &mut TestApp
     let (handle, view) = open_view(cx, fixture.store);
     click(cx, handle, "nav-templates");
 
-    click(cx, handle, "list-new-template");
+    click(cx, handle, "new-note");
 
     assert!(selected_note(cx, &view).is_template);
-    assert!(!is_present(cx, handle, "new-note"));
+    assert_eq!(navigation(cx, &view), Navigation::Templates);
 }
 
 #[gpui_kit::test]
@@ -159,8 +142,12 @@ fn new_from_template_is_hidden_without_templates(cx: &mut TestAppContext) {
     note_in(&fixture.store, &fixture.inbox, "Plain", 2);
     let (handle, _) = open_view(cx, fixture.store);
 
-    assert!(is_present(cx, handle, "new-note"));
-    assert!(!is_present(cx, handle, "new-from-template"));
+    click(cx, handle, "note-list-title");
+
+    assert_eq!(
+        popup_labels(cx, handle),
+        ["Sort by updated", "Sort by created", "Sort by title"]
+    );
 }
 
 #[gpui_kit::test]
@@ -170,9 +157,11 @@ fn the_menu_lists_templates_by_title_with_untitled_for_blank_ones(cx: &mut TestA
     template_in(&fixture.store, &fixture.inbox, "", 4);
     let (handle, _) = open_view(cx, fixture.store);
 
-    click(cx, handle, "new-from-template");
+    click(cx, handle, "note-list-title");
 
-    assert_eq!(popup_labels(cx, handle), ["Untitled", "Meeting"]);
+    let labels = popup_labels(cx, handle);
+    assert_eq!(labels[FIRST_TEMPLATE_ITEM - 1], "New from template");
+    assert_eq!(labels[FIRST_TEMPLATE_ITEM..], ["Untitled", "Meeting"]);
 }
 
 #[gpui_kit::test]
@@ -294,7 +283,7 @@ fn the_note_actions_menu_offers_unmark_for_a_template(cx: &mut TestAppContext) {
     template_in(&fixture.store, &fixture.inbox, "Meeting", 3);
     let (handle, _) = open_view(cx, fixture.store);
     click(cx, handle, "nav-templates");
-    click(cx, handle, "new-template");
+    click(cx, handle, "new-note");
 
     open_note_actions(cx, handle);
 

@@ -8,9 +8,9 @@ GPUI window over `bourbon-core`. Holds no business rule: it presents state and f
 |---|---|
 | Window | Title "Bourbon", Wayland `app_id` "bourbon" |
 | Startup | Opens `default_database_path()`; failure prints a message and exits 1. Purges expired trash once (errors go to the banner), loads the sidebar data and the list, selects the most recent note |
-| Layout | Three columns: sidebar (240 px) \| note list (320 px) \| editor (flex). Fixed widths; resizing is M5 |
-| Sidebar | Rows: All Notes, the notebook tree flattened with indentation, a Status header (Active, On Hold, Completed, Dropped), a Tags header (one row per tag), Trash. The row of the current navigation is highlighted. Clicking sets the navigation and reloads the list |
-| Note list | Header with a "New note" button (top right); rows show the title (or "Untitled") and the excerpt; the selected row is highlighted; clicking selects |
+| Layout | Three columns: sidebar (200 px) \| note list (260 px) \| editor (flex). Fixed widths; resizing is M5 |
+| Sidebar | See the Sidebar section. Clicking a row sets the navigation and reloads the list |
+| Note list | See the Note list section |
 | Editor | Title input and Markdown editor (soft wrap, no line numbers). Empty state: "No notes yet" with a "New note" button |
 | Navigation | `Navigation { AllNotes, Notebook, Status, Tags, Templates, Trash }` plus the current sort form a `Listing`; `Listing::query()` maps it to a core `NoteQuery` (table below) |
 | New note | Button or `Ctrl+N`: flush, then create so the note is visible in the current list: `Notebook(id, _)` creates in that notebook; `AllNotes` in `default_notebook()`; `Tags(ids)` in `default_notebook()` seeded with every tag; `Status(s)` in `default_notebook()` seeded with status `s` (both through `create_note_with` and a `NoteSeed`, one transaction); `Trash` switches to `AllNotes` first, then as `AllNotes`. Then reload the list and the sidebar, select, focus the title. The root view tracks its own focus handle, focused at startup when no note is selected, so `Ctrl+N` works with nothing else focused |
@@ -72,7 +72,7 @@ Implements decision rows 2, 4, 7, 11, 12 and 23 of [M2 organization](../decision
 
 | Topic | Behaviour |
 |---|---|
-| Sections | All Notes, Notebooks (header with a "+" button creating a top-level notebook), the notebook tree, Status (Active, On Hold, Completed, Dropped), Tags, Templates, Trash |
+| Sections | 40 px top row with the gear menu (`app-menu`: Settings Ctrl+, , Back up now, Restore from backup..., Export to Markdown...), All Notes, Note Templates (`nav-templates`), Notebooks (search, `new-notebook`), the notebook tree, Status (collapse), Tags (search, collapse), Trash. Rows are 30 px, 14 px text, 16 px muted icon (`icons.rs`: FileText, Copy, Notebook, Inbox for the default notebook, Trash; status rows use coloured CirclePlay/CirclePause/CircleCheck/CircleX), count 11 px right. Notebooks, Status and Tags collapse (`SidebarState::collapsed`, memory only; ids `<section>-collapse`, `<section>-search`, header click is not wired). Search icons open the control pane |
 | Tree | Depth-first rows indented per depth; each row shows name and `NotebookNode::note_count`. Rows with children have a disclosure triangle (`toggle-notebook-<id>`) that expands/collapses without navigating |
 | Expansion | `SidebarState::expanded` (set of `NotebookId`), all collapsed at startup, lives in the workspace |
 | Depth | `Navigation::Notebook(id, depth)`. Selecting an expanded notebook uses `DirectOnly`; a collapsed one `WithDescendants`. Toggling the disclosure of the selected notebook re-applies the depth and reloads the list |
@@ -94,8 +94,11 @@ Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure cli
 | File | Responsibility |
 |---|---|
 | `note_list/mod.rs` | Column layout, the "No notes" empty state, selection rule |
-| `note_list/header.rs` | View title, sort selector (Updated, Created, Title), "New from template" (when templates exist), then "New note", in Trash "Empty trash", in Templates "New template" |
-| `note_list/row.rs` | Row: title (or `UNTITLED`), excerpt, short date, pin icon, tag chips, context menu |
+| `note_list/header.rs` | 40 px header: `toggle-sidebar` icon, title button (`note-list-title`) opening a menu (Sort by updated/created/title with check, then "New from template" and one item per template), compose icon (`new-note`; creates a template in Templates; in Trash it is `empty-trash`) |
+| `note_list/filter.rs` | "Filter" input under the header (`note-filter`); `narrow` intersects the listing with core `search_notes` ids (titles and bodies); empty means no filter; Esc clears (`ClearFilter`, key context `NoteFilter`). Search skips templates and trash, so the filter empties those views |
+| `note_list/date.rs` | `relative_age(updated, now)`: just now, N minute(s)/hour(s)/day(s)/week(s)/month(s)/year(s) ago (jiff) |
+| `icons.rs` | `glyph(IconName)` over an embedded subset of the lucide icons, `status_glyph` |
+| `note_list/row.rs` | Full-bleed row, 1 px separator: pin icon, status icon, bold title (2 lines), age in the accent colour, task progress (icon, 30x4 bar, "2 of 4"), tag pills (15% tint of the tag colour), 13 px excerpt, context menu |
 | `note_list/title.rs` | Pure view title: "All Notes", notebook name, status label (from `presentation.rs`), tag names, "Trash" |
 | `note_list/date.rs` | Pure `short_date(updated, now, zone)`: `14:30` today, `Nov 6` this year, `Nov 6, 2025` otherwise; the app passes `jiff::tz::TimeZone::system()` |
 | `workspace/note_list_intents.rs` | `sort_by`, `toggle_pin`, `duplicate`, `move_to_trash`, `restore`, `confirm_empty_trash`, `empty_trash` |
@@ -158,9 +161,9 @@ Implements decision rows 18 and 24 to 28 of [M2 organization](../decisions/2026-
 
 | Topic | Behaviour |
 |---|---|
-| Sidebar | After Tags and before Trash: a "Templates" row (`nav-templates`, `Navigation::Templates`, lists `NoteScope::Templates`) and a "New template" row (`new-template`) |
-| New template | Sidebar row, the list header button in the Templates view (`list-new-template`, replaces "New note" there), or `Ctrl+N` in the Templates view (`create_note` delegates to `create_template`). Flush, navigate to Templates, create in `default_notebook()`, reload, select, focus the title |
-| New from template | `new-from-template` dropdown left of "New note" (or "Empty trash"/"New template"), one item per template titled by `display_title` (`UNTITLED` for blank). Hidden when there are no templates. The workspace keeps the template list (`Workspace::templates`), reloaded by `refresh_listing`, sorted like the current listing |
+| Sidebar | "Note Templates" row (`nav-templates`, after All Notes, lists `NoteScope::Templates`); no "new template" row |
+| New template | The compose button (`new-note`) in the Templates view, or `Ctrl+N` there (`create_note` delegates to `create_template`). Flush, navigate to Templates, create in `default_notebook()`, reload, select, focus the title |
+| New from template | Items at the end of the `note-list-title` menu, one per template titled by `display_title` (`UNTITLED` for blank), absent when there are no templates. The workspace keeps the template list (`Workspace::templates`), reloaded by `refresh_listing`, sorted like the current listing |
 | Placement | `Workspace::new_note_placement` is the single navigation-to-notebook rule of decision 18 (notebook view: that notebook; otherwise `default_notebook()`; tags and status seeds apply only to plain notes). Trash and Templates (`Navigation::hides_new_notes`) switch to All Notes first. Then reload, select, focus the title |
 | Mark and unmark | The editor header "..." button (`note-actions`) offers "Mark as template" or "Unmark template" by `Note::is_template`. The intent runs through `edit_selected` (flush, change, refresh header and listing); the note stays open even though it leaves the current list |
 

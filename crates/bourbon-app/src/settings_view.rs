@@ -327,12 +327,12 @@ mod tests {
         let mut settings = Settings::default();
         assert_eq!(
             flags(appearance_choices(&settings)),
-            [(false, true), (true, true)]
+            [(true, true), (false, true)]
         );
-        settings.appearance = Appearance::Light;
+        settings.appearance = Appearance::Dark;
         assert_eq!(
             flags(appearance_choices(&settings)),
-            [(true, true), (false, true)]
+            [(false, true), (true, true)]
         );
     }
 
@@ -342,7 +342,7 @@ mod tests {
         settings.theme_source = ThemeSource::Omarchy;
         assert_eq!(
             flags(appearance_choices(&settings)),
-            [(false, false), (true, false)]
+            [(true, false), (false, false)]
         );
     }
 

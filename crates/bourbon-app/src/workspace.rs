@@ -67,6 +67,7 @@ pub struct Workspace {
     data: data_intents::DataState,
     repository_input: Entity<InputState>,
     token_input: Entity<InputState>,
+    filter_input: Entity<InputState>,
     focus_handle: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
@@ -99,6 +100,14 @@ impl Workspace {
                 .masked(true)
                 .placeholder("Personal access token")
         });
+        let filter_input = cx.new(|cx| InputState::new(window, cx).placeholder("Filter"));
+        subscriptions.push(
+            cx.subscribe(&filter_input, |view, _, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    view.filter_changed(cx);
+                }
+            }),
+        );
         subscriptions.push(
             cx.subscribe(&repository_input, |view, _, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -142,6 +151,7 @@ impl Workspace {
             data: data_intents::DataState::default(),
             repository_input,
             token_input,
+            filter_input,
             focus_handle: cx.focus_handle(),
             _subscriptions: subscriptions,
         };
@@ -203,8 +213,9 @@ impl Workspace {
     }
 
     fn reload_list(&mut self, cx: &mut Context<Self>) {
+        let matching = self.filter_matches(cx);
         match self.store.list_notes(&self.listing.query()) {
-            Ok(notes) => self.notes = notes,
+            Ok(notes) => self.notes = note_list::narrow(notes, matching.as_ref()),
             Err(error) => self.report(&error, cx),
         }
     }
@@ -454,6 +465,7 @@ impl Workspace {
                     notes: &self.notes,
                     templates: &self.templates,
                     selected: self.selected.as_ref(),
+                    filter: &self.filter_input,
                     width: f32::from(self.settings.note_list_width()),
                 },
                 cx,

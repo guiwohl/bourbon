@@ -112,6 +112,26 @@ fn type_into_title(cx: &mut TestAppContext, handle: AnyWindowHandle, text: &str)
     .unwrap();
 }
 
+fn choose_popup_item(cx: &mut TestAppContext, handle: AnyWindowHandle, index: usize) {
+    cx.update_window(handle, |_, window, cx| {
+        window.within("popup-menu").click(index, cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+}
+
+fn popup_labels(cx: &mut TestAppContext, handle: AnyWindowHandle) -> Vec<String> {
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let menu = window.within("popup-menu");
+        (0usize..)
+            .map_while(|index| menu.try_find(index))
+            .map(|item| item.label().unwrap_or_default().to_string())
+            .collect()
+    })
+    .unwrap()
+}
+
 fn click(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) {
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
