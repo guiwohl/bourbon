@@ -241,6 +241,19 @@ fn link_destination_whitespace_is_excluded_from_the_url() {
 }
 
 #[test]
+fn indented_fence_inside_a_list_item() {
+    assert_eq!(
+        spans("- a\n\n  ```\n  x\n  ```\n"),
+        [
+            ("-", ListMark),
+            ("```", CodeMark),
+            ("x", CodeBlockText),
+            ("```", CodeMark),
+        ]
+    );
+}
+
+#[test]
 fn indented_code_text() {
     assert_eq!(spans("a\n\n    code\n"), [("code", CodeBlockText)]);
 }
