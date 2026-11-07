@@ -12,13 +12,13 @@ Every build, run and quality task goes through `just`. Run `just` alone to list 
 | `just dev` | `watchexec` + `cargo run -p bourbon-app --features dev` | UI loop: rebuild and restart on every save in `crates/`, on the demo database. See [dev-loop.md](dev-loop.md) |
 | `just dev-seed` | `seed_demo` example of `bourbon-core` | Recreate the demo database in `target/dev-data` |
 | `just dev-shot` | `hyprctl` + `grim` | Screenshot the Bourbon Dev window to `target/dev/shot.png` |
-| `just quick` | fmt-check, comments, clippy and nextest on the changed crates | **Daily loop.** Core changed → whole workspace; app and/or cli → those packages; nothing → skips |
+| `just quick` | fmt-check, comments, clippy and nextest on the changed crates | **Daily loop.** Core changed → whole workspace; app and/or cli → those packages; markdown → `bourbon-markdown`; nothing → skips |
 | `just test` | `cargo nextest run --workspace` | Run all tests; fails if none exist |
 | `just fmt` | `cargo fmt --all` | Format the code |
 | `just fmt-check` | `cargo fmt --all -- --check` | Fail if anything is unformatted |
 | `just lint` | `cargo clippy --workspace --all-targets -- -D warnings` | Fail on any clippy warning (pedantic, `todo!`, `unimplemented!`, `dbg!`) |
 | `just deny` | `cargo deny check bans` | Fail if a crate other than `bourbon-app` depends on GPUI |
-| `just architecture` | `cargo tree -p <crate> -e normal --prefix none` + ripgrep, for `bourbon-core` and `bourbon-cli` | Fail if either crate depends, even transitively, on any `gpui*` crate, or if cargo or ripgrep errors |
+| `just architecture` | `cargo tree -p <crate> -e normal --prefix none` + ripgrep, for `bourbon-core`, `bourbon-cli` and `bourbon-markdown` | Fail if any crate depends, even transitively, on any `gpui*` crate, or if cargo or ripgrep errors |
 | `just comments` | ripgrep over `crates/**/*.rs` | Fail if any comment exists in code, or if ripgrep errors |
 | `just check` | `fmt-check`, `lint`, `deny`, `architecture`, `comments`, `test` | **Run before a PR.** Must pass; CI runs it too |
 | `just mutants` | `cargo mutants --in-diff` against `origin/main`, `TMPDIR` in `~/.cache/bourbon-mutants` | Optional locally; CI runs it on every PR (required check `mutants`). Must report 0 missed; the only excluded mutants are listed in `.cargo/mutants.toml` (`main`, `run`, the sidebar indentation and the pin glyph, which headless tests cannot observe) |
