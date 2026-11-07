@@ -8,3 +8,4 @@
 | [app.md](app.md) | bourbon-app: modules, autosave, error banner, tests, dependency guard |
 | [cli.md](cli.md) | bourbon-cli: `bourbon get`, launching the app, exit codes, tests, copy-command action |
 | [markdown.md](markdown.md) | bourbon-markdown: highlight tokens, preview document, scroll-sync math, safe URLs |
+| [text.md](text.md) | bourbon-text: GPUI-free editor text core (rope, changes, selections, history, commands), invariants, tests |

@@ -1,0 +1,15 @@
+[package]
+name = "bourbon-text"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+ropey = { version = "1", default-features = false }
+unicode-segmentation = "1"
+
+[dev-dependencies]
+proptest = "1"
+
+[lints]
+workspace = true

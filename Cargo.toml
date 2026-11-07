@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/bourbon-core", "crates/bourbon-app", "crates/bourbon-cli", "crates/bourbon-markdown"]
+members = ["crates/bourbon-core", "crates/bourbon-app", "crates/bourbon-cli", "crates/bourbon-markdown", "crates/bourbon-text"]
 
 [workspace.package]
 edition = "2024"
@@ -14,6 +14,7 @@ unimplemented = "warn"
 dbg_macro = "warn"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
+must_use_candidate = "allow"
 
 [profile.dev.package."*"]
 debug = false
