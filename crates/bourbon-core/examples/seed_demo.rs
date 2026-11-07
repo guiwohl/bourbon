@@ -32,6 +32,13 @@ const WORK_NOTES: [DemoNote; 3] = [
     },
 ];
 
+const PROFILER_NOTE: DemoNote = DemoNote {
+    title: "App hangs when pasting a 5,000-row table",
+    body: "Pasting a large Markdown table into the editor freezes the window for 10+ seconds.\n\n## Repro\n\n1. Copy a 5,000-row table out of Numbers\n2. Paste it into an empty note\n3. The window stops responding; the beachball shows up after ~2s\n\n## Environment\n\n- macOS 26.2, M4 Pro\n- Inkdrop 6.1.2\n- Desktop only - the mobile app pastes as plain text and is fine\n\n## What the profiler says\n\nThe main thread is parked in the table formatter:\n\n```\nformatTable (table-editor/src/formatter.ts:118)\n  computeWidths (table-editor/src/formatter.ts:64)\n    stringWidth (node_modules/string-width/index.js:12)\n```\n\n`computeWidths` is O(rows x cols) and calls `stringWidth` once per cell - 5,000 x 8 = 40,000 calls, each compiling a fresh regex.\n",
+    status: NoteStatus::Active,
+    pinned: true,
+};
+
 const PERSONAL_NOTES: [DemoNote; 3] = [
     DemoNote {
         title: "Reading list",
@@ -75,6 +82,8 @@ fn seed(path: &Path) -> Result<(), StoreError> {
     let idea = store.create_tag("idea", TagColor::Yellow, now)?.id;
     let urgent = store.create_tag("urgent", TagColor::Red, now)?.id;
     let reference = store.create_tag("reference", TagColor::Blue, now)?.id;
+    let work_tag = store.create_tag("work", TagColor::Blue, now)?.id;
+    let bug = store.create_tag("bug", TagColor::Red, now)?.id;
 
     write_notes(&store, &work, &WORK_NOTES, std::slice::from_ref(&urgent))?;
     write_notes(&store, &personal, &PERSONAL_NOTES, &[reference])?;
@@ -100,6 +109,8 @@ fn seed(path: &Path) -> Result<(), StoreError> {
         }],
         &[idea],
     )?;
+
+    write_notes(&store, &work, &[PROFILER_NOTE], &[work_tag, bug])?;
 
     let trashed = store.create_note(&inbox, now)?;
     store.save_note(

@@ -1,7 +1,7 @@
 use gpui_kit::{AnyWindowHandle, Entity, TestAppContext};
 
 use super::view_modes::{focus_body, is_rendered, press};
-use super::{open_view, seeded_store};
+use super::{click, open_view, seeded_store};
 use crate::workspace::Workspace;
 
 fn columns_are_shown(
@@ -28,6 +28,18 @@ fn ctrl_shift_f_hides_the_sidebar_and_the_list_and_again_restores_them(cx: &mut 
     assert!(is_rendered(cx, handle, "body-editor"));
 
     press(cx, handle, "ctrl-shift-f");
+    assert!(columns_are_shown(cx, handle, &view));
+}
+
+#[gpui_kit::test]
+fn the_expand_button_enters_and_leaves_focus_mode(cx: &mut TestAppContext) {
+    let (store, _) = seeded_store();
+    let (handle, view) = open_view(cx, store);
+
+    click(cx, handle, "focus-toggle");
+    assert!(!columns_are_shown(cx, handle, &view));
+
+    click(cx, handle, "focus-toggle");
     assert!(columns_are_shown(cx, handle, &view));
 }
 

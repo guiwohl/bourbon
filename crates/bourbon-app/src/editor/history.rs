@@ -29,6 +29,14 @@ impl History {
         Some(self.move_to(found))
     }
 
+    pub(crate) fn can_go_back(&self) -> bool {
+        self.position > 0
+    }
+
+    pub(crate) fn can_go_forward(&self) -> bool {
+        self.position + 1 < self.entries.len()
+    }
+
     fn move_to(&mut self, index: usize) -> NoteId {
         self.position = index;
         self.entries[index].clone()

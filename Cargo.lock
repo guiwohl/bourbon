@@ -728,6 +728,7 @@ dependencies = [
  "bourbon-core",
  "gpui-kit",
  "jiff",
+ "serde_json",
  "tempfile",
 ]
 

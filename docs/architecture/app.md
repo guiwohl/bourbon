@@ -11,7 +11,7 @@ GPUI window over `bourbon-core`. Holds no business rule: it presents state and f
 | Layout | Three columns: sidebar (240 px) \| note list (320 px) \| editor (flex). Fixed widths; resizing is M5 |
 | Sidebar | Rows: All Notes, the notebook tree flattened with indentation, a Status header (Active, On Hold, Completed, Dropped), a Tags header (one row per tag), Trash. The row of the current navigation is highlighted. Clicking sets the navigation and reloads the list |
 | Note list | Header with a "New note" button (top right); rows show the title (or "Untitled") and the excerpt; the selected row is highlighted; clicking selects |
-| Editor | Title input and Markdown editor (soft wrap, no line numbers). Empty state: "No notes yet" with a "New note" button |
+| Editor | Inkdrop-style column: toolbar, borderless title, meta row, borderless Markdown editor (soft wrap, line numbers, fold chevrons). See "Editor column layout". Empty state: "No notes yet" with a "New note" button |
 | Navigation | `Navigation { AllNotes, Notebook, Status, Tags, Templates, Trash }` plus the current sort form a `Listing`; `Listing::query()` maps it to a core `NoteQuery` (table below) |
 | New note | Button or `Ctrl+N`: flush, then create so the note is visible in the current list: `Notebook(id, _)` creates in that notebook; `AllNotes` in `default_notebook()`; `Tags(ids)` in `default_notebook()` seeded with every tag; `Status(s)` in `default_notebook()` seeded with status `s` (both through `create_note_with` and a `NoteSeed`, one transaction); `Trash` switches to `AllNotes` first, then as `AllNotes`. Then reload the list and the sidebar, select, focus the title. The root view tracks its own focus handle, focused at startup when no note is selected, so `Ctrl+N` works with nothing else focused |
 | Autosave | Any title or body change restarts one pending 500 ms task; when it fires: `save_note`, then reload the list only. No manual save |
@@ -55,7 +55,7 @@ Each column is a module owned by one concern. Columns render from data the works
 | `note_list/mod.rs` | `render(notes, selected, cx)`: header with the New note button, note rows |
 | `editor/mod.rs` | `EditorPane` (title input, Markdown editor, load/read/focus, change subscriptions), empty state, error banner element |
 | `editor/{tasks,preview_blocks,link_trigger,link_picker,word_count}.rs` | Pure, unit-tested editor logic: task toggling, preview block splitting, `[[` detection, suggestion matching, counts, mode cycle |
-| `editor/{preview,toolbar}.rs` | Preview pane and the mode switch |
+| `editor/{preview,toolbar,icons,markdown_highlight}.rs` | Preview pane, toolbar (focus toggle, history, segmented mode control, note actions), editor icons, Markdown highlight colours |
 | `workspace/writing_intents.rs` | View mode, tasks, link picker and link opening, find, focus mode intents |
 
 ## Tests
@@ -117,6 +117,15 @@ Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure cli
 
 `workspace/tests/note_list.rs`: the context menu and the sort dropdown are driven through the real popup (right click on `note-<id>`, then `down`/`enter` keystrokes; menu labels are checked with `find_by_label`), the dialog through `enter` and `escape`, chips through `chip-<note>-<tag>`, pins through `pin-<note>`. Date, title and prompt text are pure unit tests.
 
+## Editor column layout
+
+Top to bottom, edge to edge, no boxes: toolbar (40 px; expand `focus-toggle`, `history-back`, `history-forward`, segmented control `view-mode-edit` / `view-mode-side-by-side` / `view-mode-preview` with icon-only buttons labelled by `ViewMode::label`, vertical ellipsis `note-actions` menu); title (`Input` with `appearance(false)`, `bordered(false)`, 20 px); meta row (notebook selector, status selector with coloured icon, tag pills with hover-only remove, borderless `tag-input`); body (`Editor` with `appearance(false)`, `bordered(false)`, `EditorState::line_number(true)`, folding on by default) and preview split by a 1 px divider; word count absolute at the bottom-right, 11 px.
+
+- `markdown_highlight::paint_markdown_highlight` runs inside `theme::apply` after the palette: it rewrites the theme's `HighlightTheme` through its serde form (heading text magenta bold, markers and list markers blue, active line tinted from `primary`, muted line numbers). Colours come from `theme.colors`.
+- Icons missing from the default asset bundle (pencil, columns, briefcase, expand, circle variants) are embedded with `icon_assets!` in `editor/icons.rs`.
+- Preview: 16 px text, 1.6 line height, 20 px padding, heading sizes 32/24/20/16, code blocks on `theme.muted`; Preview mode alone is capped at 760 px and centred.
+- Not matchable with gpui-component 0.9.0: larger heading text and a faint rounded background for fenced blocks in the editor (highlight styles only carry colour and weight, `gpui-component/src/highlighter/registry.rs`), and the GitHub-style rule under preview `h2` (`TextViewStyle` has no heading border, `gpui-component/src/text/style.rs`).
+
 ## Editor header
 
 Rows 3, 8, 10, 13, 15 and 19 of the [M2 decisions](../decisions/2026-11-06-m2-organization.md). Rendered above the Markdown editor, under the title, only while a note is open. All logic is in `workspace/editor_intents.rs`; `editor/` only draws and keeps view state.
@@ -162,7 +171,7 @@ Implements decision rows 18 and 24 to 28 of [M2 organization](../decisions/2026-
 | New template | Sidebar row, the list header button in the Templates view (`list-new-template`, replaces "New note" there), or `Ctrl+N` in the Templates view (`create_note` delegates to `create_template`). Flush, navigate to Templates, create in `default_notebook()`, reload, select, focus the title |
 | New from template | `new-from-template` dropdown left of "New note" (or "Empty trash"/"New template"), one item per template titled by `display_title` (`UNTITLED` for blank). Hidden when there are no templates. The workspace keeps the template list (`Workspace::templates`), reloaded by `refresh_listing`, sorted like the current listing |
 | Placement | `Workspace::new_note_placement` is the single navigation-to-notebook rule of decision 18 (notebook view: that notebook; otherwise `default_notebook()`; tags and status seeds apply only to plain notes). Trash and Templates (`Navigation::hides_new_notes`) switch to All Notes first. Then reload, select, focus the title |
-| Mark and unmark | The editor header "..." button (`note-actions`) offers "Mark as template" or "Unmark template" by `Note::is_template`. The intent runs through `edit_selected` (flush, change, refresh header and listing); the note stays open even though it leaves the current list |
+| Mark and unmark | The toolbar vertical-ellipsis button (`note-actions`) offers "Mark as template" or "Unmark template" by `Note::is_template`. The intent runs through `edit_selected` (flush, change, refresh header and listing); the note stays open even though it leaves the current list |
 
 Tests: `workspace/tests/templates.rs`.
 

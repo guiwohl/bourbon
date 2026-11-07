@@ -5,7 +5,7 @@ use gpui_kit::component::input::{Editor, EditorState, Input, InputEvent, InputSt
 use gpui_kit::component::label::Label;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
+    App, AppContext as _, Context, Entity, Hsla, InteractiveElement as _, IntoElement,
     ParentElement as _, SharedString, Styled as _, Subscription, TestSupportExt as _, Window, div,
     px,
 };
@@ -16,8 +16,10 @@ use crate::workspace::Workspace;
 pub(crate) mod actions;
 mod header;
 mod history;
+mod icons;
 mod link_picker;
 mod link_trigger;
+mod markdown_highlight;
 mod preview;
 mod preview_blocks;
 pub(crate) mod tasks;
@@ -29,11 +31,16 @@ pub(crate) use link_picker::{LinkPicker, MAX_SUGGESTIONS};
 pub(crate) use link_trigger::{closing_brackets_after, link_query_before_cursor};
 pub(crate) use tasks::TextEdit;
 
+pub(crate) use markdown_highlight::paint_markdown_highlight;
 pub(crate) use word_count::WordCount;
 
 use header::{HeaderView, NoteHeader};
 
 const FOCUS_COLUMN_WIDTH: f32 = 720.;
+const EDGE_PADDING: f32 = 12.;
+const TITLE_SIZE: f32 = 20.;
+const WORD_COUNT_SIZE: f32 = 11.;
+const WORD_COUNT_INSET: f32 = 8.;
 
 pub(crate) struct EditorPane {
     title_input: Entity<InputState>,
@@ -53,7 +60,7 @@ impl EditorPane {
             EditorState::new(window, cx)
                 .language("markdown")
                 .soft_wrap(true)
-                .line_number(false)
+                .line_number(true)
         });
         let tag_input = cx.new(|cx| InputState::new(window, cx).placeholder("Add tags"));
         let tag_events = cx.subscribe_in(
@@ -303,43 +310,75 @@ impl EditorPane {
             )
         });
         let body = self.body(cx);
-        let mut panes = div().flex_1().min_h_0().flex().gap_2();
+        let border = cx.theme().border;
+        let mut panes = div().flex_1().min_h_0().flex();
         if view.mode.shows_editor() {
-            panes = panes.child(self.render_body_editor(cx));
+            panes = panes.child(self.render_body_editor(view.mode.shows_preview(), border, cx));
         }
         if view.mode.shows_preview() {
-            panes = panes.child(preview::render(&body, cx));
+            panes = panes.child(preview::render(&body, view.mode, cx));
         }
-        div().flex_1().h_full().flex().justify_center().child(
-            div()
-                .w_full()
-                .h_full()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .p_3()
-                .when(view.focus_mode, |column| {
-                    column.max_w(px(FOCUS_COLUMN_WIDTH))
-                })
-                .child(
-                    Input::new(&self.title_input)
-                        .id("title")
-                        .aria_label("Title"),
-                )
-                .children(header)
-                .child(toolbar::render(view.mode, cx))
-                .child(panes)
-                .child(
-                    div().id("word-count").test_support().child(
-                        Label::new(WordCount::of(&body).label())
-                            .text_sm()
-                            .text_color(cx.theme().muted_foreground),
+        div()
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .flex()
+            .justify_center()
+            .child(
+                div()
+                    .relative()
+                    .min_w_0()
+                    .w_full()
+                    .h_full()
+                    .flex()
+                    .flex_col()
+                    .when(view.focus_mode, |column| {
+                        column.max_w(px(FOCUS_COLUMN_WIDTH))
+                    })
+                    .child(toolbar::render(
+                        &toolbar::ToolbarView {
+                            mode: view.mode,
+                            header: self.note_header.as_ref(),
+                            can_go_back: view.can_go_back,
+                            can_go_forward: view.can_go_forward,
+                        },
+                        cx,
+                    ))
+                    .child(
+                        div().px(px(EDGE_PADDING)).child(
+                            Input::new(&self.title_input)
+                                .id("title")
+                                .aria_label("Title")
+                                .appearance(false)
+                                .bordered(false)
+                                .focus_bordered(false)
+                                .text_size(px(TITLE_SIZE)),
+                        ),
+                    )
+                    .children(header)
+                    .child(panes)
+                    .child(
+                        div()
+                            .id("word-count")
+                            .test_support()
+                            .absolute()
+                            .bottom(px(WORD_COUNT_INSET))
+                            .right(px(EDGE_PADDING))
+                            .child(
+                                Label::new(WordCount::of(&body).label())
+                                    .text_size(px(WORD_COUNT_SIZE))
+                                    .text_color(cx.theme().muted_foreground),
+                            ),
                     ),
-                ),
-        )
+            )
     }
 
-    fn render_body_editor(&self, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
+    fn render_body_editor(
+        &self,
+        divided: bool,
+        border: Hsla,
+        cx: &mut Context<Workspace>,
+    ) -> impl IntoElement + use<> {
         div()
             .id("body-editor")
             .test_support()
@@ -351,7 +390,7 @@ impl EditorPane {
             .h_full()
             .flex()
             .flex_col()
-            .gap_1()
+            .when(divided, |pane| pane.border_r_1().border_color(border))
             .children(
                 self.link_picker
                     .as_ref()
@@ -360,6 +399,8 @@ impl EditorPane {
             .child(
                 Editor::new(&self.body_editor)
                     .aria_label("Body")
+                    .appearance(false)
+                    .bordered(false)
                     .h_full()
                     .flex_1(),
             )
@@ -371,6 +412,8 @@ pub(crate) struct EditorView<'a> {
     pub(crate) tags: &'a [TagSummary],
     pub(crate) mode: ViewMode,
     pub(crate) focus_mode: bool,
+    pub(crate) can_go_back: bool,
+    pub(crate) can_go_forward: bool,
 }
 
 pub(crate) fn render_empty(cx: &mut Context<Workspace>) -> impl IntoElement + use<> {

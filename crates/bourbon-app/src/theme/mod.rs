@@ -23,5 +23,8 @@ pub(crate) fn apply(settings: &Settings, omarchy_colors_path: &Path, cx: &mut Ap
         Appearance::Light => ThemeMode::Light,
     };
     Theme::change(mode, None, cx);
-    Theme::update(cx, |theme| palette.paint(&mut theme.colors));
+    Theme::update(cx, |theme| {
+        palette.paint(&mut theme.colors);
+        crate::editor::paint_markdown_highlight(theme);
+    });
 }

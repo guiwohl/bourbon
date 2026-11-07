@@ -353,7 +353,7 @@ fn clicking_a_note_link_in_the_preview_opens_that_note(cx: &mut TestAppContext) 
         window.render_frame(cx);
         window.click_at(
             "preview".to_owned(),
-            gpui_kit::point(gpui_kit::px(14.), gpui_kit::px(16.)),
+            gpui_kit::point(gpui_kit::px(30.), gpui_kit::px(32.)),
             cx,
         );
     })

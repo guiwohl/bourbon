@@ -390,6 +390,8 @@ impl Workspace {
                         tags: &self.tags,
                         mode: self.view_mode,
                         focus_mode: self.focus_mode,
+                        can_go_back: self.history.can_go_back(),
+                        can_go_forward: self.history.can_go_forward(),
                     },
                     cx,
                 )

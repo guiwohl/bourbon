@@ -1,17 +1,53 @@
+use bourbon_core::ViewMode;
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::text::TextView;
+use gpui_kit::component::text::{TextView, TextViewStyle};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     Context, InteractiveElement as _, IntoElement, ParentElement as _,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
+    StatefulInteractiveElement as _, StyleRefinement, Styled as _, TestSupportExt as _, div, px,
+    relative,
 };
 
 use super::preview_blocks::{PreviewBlock, preview_blocks};
 use crate::workspace::Workspace;
 
 const INDENT_STEP: f32 = 6.;
+const PREVIEW_PADDING: f32 = 20.;
+const PREVIEW_TEXT_SIZE: f32 = 16.;
+const PREVIEW_LINE_HEIGHT: f32 = 1.6;
+const PREVIEW_MEASURE: f32 = 760.;
+const CODE_BLOCK_PADDING: f32 = 12.;
 
-pub(super) fn render(body: &str, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
+fn heading_size(level: u8, base: gpui_kit::Pixels) -> gpui_kit::Pixels {
+    match level {
+        1 => base * 2.,
+        2 => base * 1.5,
+        3 => base * 1.25,
+        _ => base,
+    }
+}
+
+fn markdown_style(cx: &gpui_kit::App) -> TextViewStyle {
+    let theme = cx.theme();
+    let code_block = StyleRefinement::default()
+        .rounded_md()
+        .p(px(CODE_BLOCK_PADDING))
+        .bg(theme.muted)
+        .text_size(px(14.));
+    let mut style = TextViewStyle::default()
+        .heading_font_size(heading_size)
+        .code_block(code_block);
+    style.heading_base_font_size = px(PREVIEW_TEXT_SIZE);
+    style.highlight_theme = theme.highlight_theme.clone();
+    style
+}
+
+pub(super) fn render(
+    body: &str,
+    mode: ViewMode,
+    cx: &mut Context<Workspace>,
+) -> impl IntoElement + use<> {
     let blocks = preview_blocks(body)
         .into_iter()
         .enumerate()
@@ -34,16 +70,27 @@ pub(super) fn render(body: &str, cx: &mut Context<Workspace>) -> impl IntoElemen
         .min_w_0()
         .h_full()
         .overflow_y_scroll()
-        .p_2()
-        .flex()
-        .flex_col()
-        .text_color(cx.theme().foreground)
-        .children(blocks)
+        .child(
+            div()
+                .p(px(PREVIEW_PADDING))
+                .flex()
+                .flex_col()
+                .mx_auto()
+                .w_full()
+                .when(mode == ViewMode::Preview, |column| {
+                    column.max_w(px(PREVIEW_MEASURE))
+                })
+                .text_size(px(PREVIEW_TEXT_SIZE))
+                .line_height(relative(PREVIEW_LINE_HEIGHT))
+                .text_color(cx.theme().foreground)
+                .children(blocks),
+        )
 }
 
 fn markdown(id: String, text: String, cx: &mut Context<Workspace>) -> TextView {
     let owner = cx.entity().downgrade();
     TextView::markdown(id, text)
+        .style(markdown_style(cx))
         .selectable(true)
         .on_link_click(move |url, _, window, cx| {
             owner
