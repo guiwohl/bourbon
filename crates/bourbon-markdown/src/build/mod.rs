@@ -64,17 +64,21 @@ impl<'a> Builder<'a> {
     fn blocks(&mut self) -> Vec<Block> {
         let mut blocks = Vec::new();
         loop {
+            let before = self.position;
             if self.starts_inline() {
                 blocks.push(self.implicit_paragraph());
-                continue;
-            }
-            match self.peek() {
-                None => break,
-                Some(Event::End(_)) => {
-                    self.position += 1;
-                    break;
+            } else {
+                match self.peek() {
+                    None => break,
+                    Some(Event::End(_)) => {
+                        self.position += 1;
+                        break;
+                    }
+                    Some(_) => blocks.extend(self.block()),
                 }
-                Some(_) => blocks.extend(self.block()),
+            }
+            if self.position == before {
+                break;
             }
         }
         blocks

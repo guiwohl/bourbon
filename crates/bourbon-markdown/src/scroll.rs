@@ -67,14 +67,7 @@ pub fn preview_offset_for_line(anchors: &[Anchor], line: f32) -> f32 {
         .map_or(DOCUMENT_START, start_stop);
     let below = anchors
         .iter()
-        .filter(|anchor| anchor.line_start > whole_line)
-        .reduce(|best, anchor| {
-            if anchor.line_start < best.line_start {
-                anchor
-            } else {
-                best
-            }
-        })
+        .find(|anchor| anchor.line_start > whole_line)
         .map(start_stop)
         .or_else(|| anchors.last().map(end_stop))
         .unwrap_or(above);
@@ -172,7 +165,7 @@ mod tests {
     fn preview_offset_uses_first_anchor_sharing_a_line() {
         let anchors = vec![
             anchor(2, 6, 10.0, 80.0),
-            anchor(2, 3, 10.0, 20.0),
+            anchor(2, 3, 20.0, 20.0),
             anchor(6, 7, 100.0, 20.0),
         ];
         assert_close(preview_offset_for_line(&anchors, 4.0), 55.0 - 10.0);
@@ -207,6 +200,13 @@ mod tests {
         let anchors = vec![anchor(4, 5, 100.0, 40.0)];
         assert_close(line_for_preview_offset(&anchors, 50.0), 2.0);
         assert_close(line_for_preview_offset(&anchors, -20.0), 0.0);
+    }
+
+    #[test]
+    fn zero_height_last_anchor_does_not_divide_by_zero() {
+        let anchors = vec![anchor(3, 3, 50.0, 0.0)];
+        assert_close(line_for_preview_offset(&anchors, 60.0), 3.0);
+        assert_close(preview_offset_for_line(&anchors, 9.0), 40.0);
     }
 
     #[test]
