@@ -17,7 +17,7 @@ use gpui_kit::{
     px,
 };
 
-pub(crate) use state::{DeletionTarget, NameTarget, Prompt, Section, SidebarState};
+pub(crate) use state::{DeletionTarget, NameTarget, Prompt, Section, SidebarCounts, SidebarState};
 pub(crate) use tree::subtree_ids;
 
 use crate::icons::{glyph, status_glyph};
@@ -42,6 +42,7 @@ pub(crate) struct SidebarData<'a> {
     pub(crate) current: &'a Navigation,
     pub(crate) notebooks: &'a [NotebookNode],
     pub(crate) tags: &'a [TagSummary],
+    pub(crate) counts: &'a SidebarCounts,
     pub(crate) state: &'a SidebarState,
     pub(crate) width: f32,
 }
@@ -63,6 +64,7 @@ pub(crate) fn render(
             "All Notes",
             IconName::FileText,
             Navigation::AllNotes,
+            Some(data.counts.all_notes),
             data.current,
             cx,
         )
@@ -74,6 +76,7 @@ pub(crate) fn render(
             "Note Templates",
             IconName::Copy,
             Navigation::Templates,
+            Some(data.counts.templates),
             data.current,
             cx,
         )
@@ -88,6 +91,7 @@ pub(crate) fn render(
             "Trash",
             IconName::Trash,
             Navigation::Trash,
+            None,
             data.current,
             cx,
         )
@@ -139,7 +143,9 @@ fn push_statuses(rows: &mut Vec<AnyElement>, data: &SidebarData, cx: &mut Contex
         return;
     }
     for status in STATUS_ROWS {
-        rows.push(status_row(status, data.current, cx).into_any_element());
+        rows.push(
+            status_row(status, data.counts.of_status(status), data.current, cx).into_any_element(),
+        );
     }
 }
 
@@ -161,6 +167,7 @@ fn push_tags(rows: &mut Vec<AnyElement>, data: &SidebarData, cx: &mut Context<Wo
 
 fn status_row(
     status: NoteStatus,
+    count: usize,
     current: &Navigation,
     cx: &mut Context<Workspace>,
 ) -> impl IntoElement + use<> {
@@ -175,6 +182,7 @@ fn status_row(
     .test_support()
     .children(icon)
     .child(div().flex_1().truncate().child(status_label(status)))
+    .child(count_label(count, cx))
     .on_click(cx.listener(move |workspace, _, _, cx| workspace.navigate(target.clone(), cx)))
 }
 
@@ -183,6 +191,7 @@ fn simple_row(
     label: &'static str,
     icon: IconName,
     target: Navigation,
+    count: Option<usize>,
     current: &Navigation,
     cx: &mut Context<Workspace>,
 ) -> impl IntoElement + use<> {
@@ -191,6 +200,7 @@ fn simple_row(
         .test_support()
         .child(glyph(icon).text_color(muted))
         .child(div().flex_1().truncate().child(label))
+        .children(count.map(|count| count_label(count, cx)))
         .on_click(cx.listener(move |workspace, _, _, cx| workspace.navigate(target.clone(), cx)))
 }
 
