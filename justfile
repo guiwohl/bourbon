@@ -53,7 +53,7 @@ comments:
 
 architecture:
     #!/usr/bin/env bash
-    for package in bourbon-core bourbon-cli; do
+    for package in bourbon-core bourbon-cli bourbon-markdown; do
         dependencies=$(cargo tree -p "$package" -e normal --prefix none) || exit 1
         rg '^gpui' <<< "$dependencies"
         [ $? -eq 1 ] || exit 1
@@ -70,6 +70,8 @@ quick:
         grep -q '^crates/bourbon-cli/' <<< "$changed" && packages="$packages -p bourbon-cli"
     elif grep -q '^crates/bourbon-cli/' <<< "$changed"; then
         packages="-p bourbon-cli"
+    elif grep -q '^crates/bourbon-markdown/' <<< "$changed"; then
+        packages="-p bourbon-markdown"
     else
         echo "no crate changed"
         exit 0

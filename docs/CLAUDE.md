@@ -6,7 +6,7 @@
 |---|---|
 | [decisions/](decisions/CLAUDE.md) | Decisions taken with the user |
 | [development/](development/CLAUDE.md) | How to build, test and lint |
-| [architecture/](architecture/CLAUDE.md) | How the crates are built: core, app and cli |
+| [architecture/](architecture/CLAUDE.md) | How the crates are built: core, app, cli and markdown |
 | [brand/](brand/CLAUDE.md) | Logo and icon assets |
 | [research/](research/CLAUDE.md) | UI analysis, theming and reverse-engineered Inkdrop shell, editor and preview |
 
