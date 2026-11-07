@@ -53,7 +53,7 @@ comments:
 
 architecture:
     #!/usr/bin/env bash
-    for package in bourbon-core bourbon-cli bourbon-markdown; do
+    for package in bourbon-core bourbon-cli bourbon-markdown bourbon-text; do
         dependencies=$(cargo tree -p "$package" -e normal --prefix none) || exit 1
         rg '^gpui' <<< "$dependencies"
         [ $? -eq 1 ] || exit 1
@@ -65,16 +65,13 @@ quick:
     changed=$( { git diff --name-only origin/main...HEAD; git diff --name-only HEAD; git ls-files --others --exclude-standard; } )
     if grep -q '^crates/bourbon-core/' <<< "$changed"; then
         packages="--workspace"
-    elif grep -q '^crates/bourbon-app/' <<< "$changed"; then
-        packages="-p bourbon-app"
-        grep -q '^crates/bourbon-cli/' <<< "$changed" && packages="$packages -p bourbon-cli"
-    elif grep -q '^crates/bourbon-cli/' <<< "$changed"; then
-        packages="-p bourbon-cli"
-    elif grep -q '^crates/bourbon-markdown/' <<< "$changed"; then
-        packages="-p bourbon-markdown"
     else
-        echo "no crate changed"
-        exit 0
+        packages=""
+        grep -q '^crates/bourbon-app/' <<< "$changed" && packages="$packages -p bourbon-app"
+        grep -q '^crates/bourbon-cli/' <<< "$changed" && packages="$packages -p bourbon-cli"
+        grep -q '^crates/bourbon-markdown/' <<< "$changed" && packages="$packages -p bourbon-markdown"
+        grep -q '^crates/bourbon-text/' <<< "$changed" && packages="$packages -p bourbon-text"
+        [ -n "$packages" ] || { echo "no crate changed"; exit 0; }
     fi
     just fmt-check comments
     {{cargo}} clippy $packages --all-targets -- -D warnings
