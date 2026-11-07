@@ -21,7 +21,7 @@ use crate::presentation::{dot_color, status_label};
 use crate::workspace::Workspace;
 
 const INDENT_STEP: f32 = 12.;
-const TAG_INPUT_WIDTH: f32 = 90.;
+const TAG_INPUT_WIDTH: f32 = 80.;
 const META_TEXT_SIZE: f32 = 13.;
 const META_ROW_HEIGHT: f32 = 28.;
 const META_GAP: f32 = 10.;
@@ -147,13 +147,16 @@ pub(crate) fn render(view: &HeaderView, cx: &mut Context<Workspace>) -> impl Int
         .child(
             div()
                 .flex()
-                .flex_wrap()
                 .items_center()
                 .gap(px(META_GAP))
                 .min_h(px(META_ROW_HEIGHT))
                 .text_size(px(META_TEXT_SIZE))
-                .child(notebook_selector(view, rows, cx))
-                .child(status_button(view.header.status, cx))
+                .child(div().flex_none().child(notebook_selector(view, rows, cx)))
+                .child(
+                    div()
+                        .flex_none()
+                        .child(status_button(view.header.status, cx)),
+                )
                 .children(
                     view.header
                         .tags
@@ -322,6 +325,7 @@ fn tag_chip(tag: &Tag, cx: &mut Context<Workspace>) -> impl IntoElement + use<> 
     let group = format!("tag-pill-{}", tag.id);
     div()
         .id(format!("tag-chip-{}", tag.id))
+        .flex_none()
         .group(group.clone())
         .test_support()
         .flex()

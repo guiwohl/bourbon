@@ -62,7 +62,7 @@ impl EditorPane {
                 .soft_wrap(true)
                 .line_number(true)
         });
-        let tag_input = cx.new(|cx| InputState::new(window, cx).placeholder("Add tags"));
+        let tag_input = cx.new(|cx| InputState::new(window, cx).placeholder("Add Tags"));
         let tag_events = cx.subscribe_in(
             &tag_input,
             window,
