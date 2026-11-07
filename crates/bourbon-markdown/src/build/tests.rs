@@ -252,6 +252,15 @@ fn math_blocks_and_inline_math() {
 }
 
 #[test]
+fn a_lone_inline_math_stays_a_paragraph() {
+    let doc = PreviewDoc::parse("$a+b$\n");
+    assert_eq!(
+        doc.blocks[0].kind,
+        BlockKind::Paragraph(vec![Inline::InlineMath("a+b".to_owned())])
+    );
+}
+
+#[test]
 fn footnote_reference_and_definition() {
     let doc = PreviewDoc::parse("a[^1]\n\n[^1]: note\n");
     assert_eq!(
