@@ -12,7 +12,7 @@ Every build, run and quality task goes through `just`. Run `just` alone to list 
 | `just dev` | `watchexec` + `cargo run -p bourbon-app --features dev` | UI loop: rebuild and restart on every save in `crates/`, on the demo database. See [dev-loop.md](dev-loop.md) |
 | `just dev-seed` | `seed_demo` example of `bourbon-core` | Recreate the demo database in `target/dev-data` |
 | `just dev-shot` | `hyprctl` + `grim` | Screenshot the Bourbon Dev window to `target/dev/shot.png` |
-| `just quick` | fmt-check, comments, clippy and nextest on the changed crates | **Daily loop.** Core changed → whole workspace; app, cli, markdown, text and/or ui → those packages (ui also runs `bourbon-app`); nothing → skips |
+| `just quick` | fmt-check, comments, clippy and nextest on the changed crates | **Daily loop.** Core changed → whole workspace; app, cli, markdown, text, editor and/or ui → those packages (ui also runs `bourbon-app`); nothing → skips |
 | `just test` | `cargo nextest run --workspace` | Run all tests; fails if none exist |
 | `just fmt` | `cargo fmt --all` | Format the code |
 | `just fmt-check` | `cargo fmt --all -- --check` | Fail if anything is unformatted |

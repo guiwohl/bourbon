@@ -1,0 +1,328 @@
+use std::collections::HashMap;
+use std::ops::Range;
+use std::rc::Rc;
+use std::time::{Duration, Instant};
+
+use bourbon_markdown::{HighlightSpan, highlight};
+use bourbon_text::{
+    EditorState, History, Selection, SelectionRange, Text, Transaction, TransactionKind,
+};
+use gpui::{
+    Bounds, Context, EventEmitter, FocusHandle, Focusable, IntoElement, Pixels, Render, Window, px,
+};
+
+use crate::layout::{LineLayout, ShapeRequest};
+use crate::line_heights::LineHeights;
+use crate::segments::{hanging_prefix_len, heading_level, line_segments};
+use crate::theme::EditorTheme;
+
+const BLINK_INTERVAL: Duration = Duration::from_millis(530);
+const LAYOUT_CACHE_LIMIT: usize = 512;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EditorEvent {
+    Changed(String),
+    TaskToggled { line: usize },
+}
+
+#[allow(clippy::struct_excessive_bools)]
+pub struct Editor {
+    pub(crate) state: EditorState,
+    pub(crate) history: History,
+    pub(crate) spans: Vec<HighlightSpan>,
+    pub(crate) theme: Rc<EditorTheme>,
+    pub(crate) heights: LineHeights,
+    pub(crate) scroll_top: Pixels,
+    pub(crate) focus_handle: FocusHandle,
+    pub(crate) caret_visible: bool,
+    pub(crate) focused: bool,
+    blink_epoch: u64,
+    pub(crate) marked: Option<Range<usize>>,
+    pub(crate) goal_x: Option<Pixels>,
+    pub(crate) line_numbers: bool,
+    started: Instant,
+    layouts: HashMap<usize, Rc<LineLayout>>,
+    pub(crate) viewport: Option<Bounds<Pixels>>,
+    pub(crate) text_left: Pixels,
+    pub(crate) wrap_width: Option<Pixels>,
+    pub(crate) dragging: bool,
+    pub(crate) scroll_to_caret: bool,
+}
+
+impl EventEmitter<EditorEvent> for Editor {}
+
+impl Focusable for Editor {
+    fn focus_handle(&self, _cx: &gpui::App) -> FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl Editor {
+    pub fn new(text: &str, theme: EditorTheme, cx: &mut Context<Self>) -> Self {
+        let state = EditorState::new(Text::new(text), Selection::cursor(0));
+        let estimate = line_height_of(&theme, theme.font_size);
+        let mut editor = Self {
+            spans: highlight(text),
+            heights: LineHeights::new(state.text.line_count(), f32::from(estimate)),
+            state,
+            history: History::new(),
+            theme: Rc::new(theme),
+            scroll_top: px(0.0),
+            focus_handle: cx.focus_handle(),
+            caret_visible: true,
+            focused: false,
+            blink_epoch: 0,
+            marked: None,
+            goal_x: None,
+            line_numbers: false,
+            started: Instant::now(),
+            layouts: HashMap::new(),
+            viewport: None,
+            text_left: px(0.0),
+            wrap_width: None,
+            dragging: false,
+            scroll_to_caret: false,
+        };
+        editor.restart_blink(cx);
+        editor
+    }
+
+    pub fn focus_handle(&self) -> &FocusHandle {
+        &self.focus_handle
+    }
+
+    pub fn text(&self) -> String {
+        self.state.text.to_string()
+    }
+
+    pub fn set_text(&mut self, text: &str, cx: &mut Context<Self>) {
+        self.state = EditorState::new(Text::new(text), Selection::cursor(0));
+        self.history = History::new();
+        self.marked = None;
+        self.scroll_top = px(0.0);
+        self.refresh_after_text_change(cx);
+        cx.notify();
+    }
+
+    pub fn theme(&self) -> &EditorTheme {
+        &self.theme
+    }
+
+    pub fn set_theme(&mut self, theme: EditorTheme, cx: &mut Context<Self>) {
+        self.theme = Rc::new(theme);
+        self.invalidate_all_heights();
+        cx.notify();
+    }
+
+    pub fn line_numbers(&self) -> bool {
+        self.line_numbers
+    }
+
+    pub fn set_line_numbers(&mut self, enabled: bool, cx: &mut Context<Self>) {
+        self.line_numbers = enabled;
+        self.invalidate_all_heights();
+        cx.notify();
+    }
+
+    pub fn scroll_top(&self) -> Pixels {
+        self.scroll_top
+    }
+
+    pub fn selected_range(&self) -> Range<usize> {
+        let main = self.state.selection.main();
+        main.from()..main.to()
+    }
+
+    pub fn set_selection(&mut self, anchor: usize, head: usize, cx: &mut Context<Self>) {
+        let length = self.state.text.len();
+        self.select(
+            SelectionRange::new(anchor.min(length), head.min(length)),
+            cx,
+        );
+    }
+
+    pub(crate) fn select(&mut self, range: SelectionRange, cx: &mut Context<Self>) {
+        self.state.selection = Selection::single(range);
+        self.marked = None;
+        self.goal_x = None;
+        self.caret_moved(cx);
+    }
+
+    pub(crate) fn select_keeping_goal(&mut self, range: SelectionRange, cx: &mut Context<Self>) {
+        self.state.selection = Selection::single(range);
+        self.marked = None;
+        self.caret_moved(cx);
+    }
+
+    fn caret_moved(&mut self, cx: &mut Context<Self>) {
+        self.scroll_to_caret = true;
+        self.restart_blink(cx);
+        cx.notify();
+    }
+
+    pub(crate) fn run_command(
+        &mut self,
+        command: impl FnOnce(&EditorState) -> Option<Transaction>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        match command(&self.state) {
+            Some(transaction) => {
+                self.apply(&transaction, cx);
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub(crate) fn apply(&mut self, transaction: &Transaction, cx: &mut Context<Self>) {
+        let recorded = !matches!(
+            transaction.kind,
+            TransactionKind::Undo | TransactionKind::Redo
+        );
+        if recorded {
+            self.history
+                .record(&self.state, transaction, self.started.elapsed());
+        }
+        let before = self.state.clone();
+        self.state = before.apply(transaction);
+        self.marked = None;
+        self.goal_x = None;
+        if transaction.changes.is_empty() {
+            self.caret_moved(cx);
+            return;
+        }
+        self.heights
+            .apply_changes(&before.text, &transaction.changes);
+        self.refresh_after_text_change(cx);
+        self.scroll_to_caret = true;
+        self.restart_blink(cx);
+        cx.emit(EditorEvent::Changed(self.text()));
+        cx.notify();
+    }
+
+    pub(crate) fn undo(&mut self, cx: &mut Context<Self>) {
+        if let Some(transaction) = self.history.undo(&self.state) {
+            self.apply(&transaction, cx);
+        }
+    }
+
+    pub(crate) fn redo(&mut self, cx: &mut Context<Self>) {
+        if let Some(transaction) = self.history.redo(&self.state) {
+            self.apply(&transaction, cx);
+        }
+    }
+
+    fn refresh_after_text_change(&mut self, _cx: &mut Context<Self>) {
+        self.spans = highlight(&self.state.text.to_string());
+        if self.heights.line_count() != self.state.text.line_count() {
+            let estimate = line_height_of(&self.theme, self.theme.font_size);
+            self.heights = LineHeights::new(self.state.text.line_count(), f32::from(estimate));
+        }
+        self.heights.refresh();
+        self.layouts.clear();
+    }
+
+    pub(crate) fn invalidate_all_heights(&mut self) {
+        let estimate = line_height_of(&self.theme, self.theme.font_size);
+        self.heights.reset(f32::from(estimate));
+        self.heights.refresh();
+        self.layouts.clear();
+        self.wrap_width = None;
+    }
+
+    pub(crate) fn invalidate_layouts(&mut self) {
+        self.layouts.clear();
+    }
+
+    pub(crate) fn clear_layouts(&mut self) {
+        self.layouts.clear();
+    }
+
+    pub(crate) fn restart_blink(&mut self, cx: &mut Context<Self>) {
+        self.caret_visible = true;
+        self.blink_epoch += 1;
+        Self::schedule_blink(self.blink_epoch, cx);
+    }
+
+    fn schedule_blink(epoch: u64, cx: &mut Context<Self>) {
+        cx.spawn(async move |editor, cx| {
+            cx.background_executor().timer(BLINK_INTERVAL).await;
+            editor.update(cx, |editor, cx| editor.blink(epoch, cx)).ok();
+        })
+        .detach();
+    }
+
+    fn blink(&mut self, epoch: u64, cx: &mut Context<Self>) {
+        if epoch != self.blink_epoch {
+            return;
+        }
+        self.caret_visible = !self.caret_visible;
+        if self.focused {
+            cx.notify();
+        }
+        Self::schedule_blink(epoch, cx);
+    }
+
+    pub(crate) fn shape_line(&self, line: usize, window: &mut Window) -> LineLayout {
+        let text = &self.state.text;
+        let start = text.line_start(line);
+        let end = text.line_end(line);
+        let content = text.line_text(line);
+        let level = heading_level(start..end, &self.spans);
+        let scale = level.map_or(1.0, |level| self.theme.heading_scale(level));
+        let font_size = self.theme.font_size * scale;
+        let segments = line_segments(start..end, &self.spans, self.marked.as_ref());
+        LineLayout::shape(
+            &ShapeRequest {
+                text: &content,
+                segments: &segments,
+                prefix_len: hanging_prefix_len(&content),
+                font_size,
+                line_height: line_height_of(&self.theme, font_size),
+                wrap_width: self.wrap_width,
+                bold: level.is_some(),
+                theme: &self.theme,
+            },
+            window,
+        )
+    }
+
+    pub(crate) fn layout_for_line(&mut self, line: usize, window: &mut Window) -> Rc<LineLayout> {
+        if let Some(layout) = self.layouts.get(&line) {
+            return layout.clone();
+        }
+        if self.layouts.len() >= LAYOUT_CACHE_LIMIT {
+            self.layouts.clear();
+        }
+        let layout = Rc::new(self.shape_line(line, window));
+        self.layouts.insert(line, layout.clone());
+        layout
+    }
+
+    pub(crate) fn max_scroll(&self) -> Pixels {
+        let viewport = self
+            .viewport
+            .map_or(0.0, |bounds| f32::from(bounds.size.height));
+        px((self.heights.total() - viewport).max(0.0))
+    }
+
+    pub(crate) fn scroll_by(&mut self, delta: Pixels, cx: &mut Context<Self>) {
+        let target = (self.scroll_top + delta)
+            .max(px(0.0))
+            .min(self.max_scroll());
+        if target != self.scroll_top {
+            self.scroll_top = target;
+            cx.notify();
+        }
+    }
+}
+
+pub(crate) fn line_height_of(theme: &EditorTheme, font_size: Pixels) -> Pixels {
+    font_size * theme.line_height
+}
+
+impl Render for Editor {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        crate::view::editor_root(self, cx)
+    }
+}
