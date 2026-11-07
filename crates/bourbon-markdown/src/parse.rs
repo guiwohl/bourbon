@@ -3,12 +3,12 @@ use std::ops::Range;
 
 pub fn options() -> Options {
     Options::ENABLE_TABLES
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_FOOTNOTES
-        | Options::ENABLE_MATH
-        | Options::ENABLE_GFM
-        | Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
+        .union(Options::ENABLE_TASKLISTS)
+        .union(Options::ENABLE_STRIKETHROUGH)
+        .union(Options::ENABLE_FOOTNOTES)
+        .union(Options::ENABLE_MATH)
+        .union(Options::ENABLE_GFM)
+        .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
 }
 
 pub fn events(source: &str) -> Vec<(Event<'_>, Range<usize>)> {
