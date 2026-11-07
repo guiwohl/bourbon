@@ -77,6 +77,12 @@ mod tests {
     }
 
     #[test]
+    fn a_status_glyph_exists_only_for_notes_with_a_status() {
+        assert!(status_glyph(NoteStatus::None).is_none());
+        assert!(status_glyph(NoteStatus::Active).is_some());
+    }
+
+    #[test]
     fn each_status_has_its_own_colour() {
         let mut colors: Vec<_> = NoteStatus::ALL
             .into_iter()

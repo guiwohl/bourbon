@@ -95,6 +95,10 @@ pub(crate) fn render(data: HeaderData, cx: &mut Context<Workspace>) -> impl Into
         .child(primary_action)
 }
 
+fn is_current_sort(sort: NoteSort, current: NoteSort) -> bool {
+    sort == current
+}
+
 fn title_menu_items(
     menu: PopupMenu,
     current: NoteSort,
@@ -106,7 +110,7 @@ fn title_menu_items(
         let sort = *sort;
         menu.item(
             PopupMenuItem::new(*label)
-                .checked(sort == current)
+                .checked(is_current_sort(sort, current))
                 .on_click(move |_, _, cx| {
                     view.update(cx, |workspace, cx| workspace.sort_by(sort, cx));
                 }),
@@ -137,6 +141,12 @@ fn title_menu_items(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_current_sort_is_checked() {
+        assert!(is_current_sort(SORTS[0].0, SORTS[0].0));
+        assert!(!is_current_sort(SORTS[0].0, SORTS[1].0));
+    }
 
     #[test]
     fn the_list_view_follows_the_navigation() {
