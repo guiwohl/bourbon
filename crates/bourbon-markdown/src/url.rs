@@ -72,6 +72,12 @@ mod tests {
     }
 
     #[test]
+    fn scheme_must_start_with_a_letter() {
+        assert!(is_safe("1a:b"));
+        assert!(!is_safe("a+b-c.d:x"));
+    }
+
+    #[test]
     fn extracts_note_id() {
         assert_eq!(note_id("bourbon://note/abcdefghij12"), Some("abcdefghij12"));
     }

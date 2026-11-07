@@ -192,6 +192,55 @@ fn code_fence_content_that_looks_like_markdown_stays_code() {
 }
 
 #[test]
+fn fence_info_is_trimmed_on_both_sides() {
+    assert_eq!(
+        spans("```   rust  \nx\n```"),
+        [
+            ("```", CodeMark),
+            ("rust", CodeBlockInfo),
+            ("x", CodeBlockText),
+            ("```", CodeMark),
+        ]
+    );
+}
+
+#[test]
+fn last_line_that_is_not_a_fence_is_code_text() {
+    assert_eq!(
+        spans("```\nx\n`\n"),
+        [("```", CodeMark), ("x\n`", CodeBlockText)]
+    );
+    assert_eq!(
+        spans("```\nx\n``` y\n"),
+        [("```", CodeMark), ("x\n``` y", CodeBlockText)]
+    );
+}
+
+#[test]
+fn text_after_a_code_block_is_not_code() {
+    assert_eq!(
+        spans("```\nx\n```\n\nafter"),
+        [("```", CodeMark), ("x", CodeBlockText), ("```", CodeMark)]
+    );
+}
+
+#[test]
+fn link_destination_whitespace_is_excluded_from_the_url() {
+    assert_eq!(
+        spans("[a](  u  )"),
+        [
+            ("[", LinkMark),
+            ("a", LinkText),
+            ("](", LinkMark),
+            ("  ", LinkText),
+            ("u", Url),
+            ("  ", LinkText),
+            (")", LinkMark),
+        ]
+    );
+}
+
+#[test]
 fn indented_code_text() {
     assert_eq!(spans("a\n\n    code\n"), [("code", CodeBlockText)]);
 }

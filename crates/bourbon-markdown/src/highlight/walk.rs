@@ -74,7 +74,7 @@ impl<'a> Walk<'a> {
                 self.canvas
                     .paint(body.clone(), TokenClass::Heading(*level as u8));
                 let mark = marks::heading_mark(self.source, body);
-                self.mark_all(mark, TokenClass::HeaderMark);
+                self.mark_all([mark], TokenClass::HeaderMark);
             }
             Tag::Emphasis => self.styled(body, TokenClass::Emphasis, 1, TokenClass::EmphasisMark),
             Tag::Strong => self.styled(body, TokenClass::Strong, 2, TokenClass::StrongMark),
@@ -96,7 +96,7 @@ impl<'a> Walk<'a> {
             }
             Tag::Item => {
                 let mark = marks::list_marker(self.source, body);
-                self.mark_all(mark, TokenClass::ListMark);
+                self.mark_all([mark], TokenClass::ListMark);
             }
             Tag::TableHead => self.table_head(body),
             Tag::MetadataBlock(_) => self.canvas.paint(body.clone(), TokenClass::Frontmatter),
@@ -106,7 +106,7 @@ impl<'a> Walk<'a> {
 
     fn styled(&mut self, body: &Range<usize>, class: TokenClass, length: usize, mark: TokenClass) {
         self.canvas.paint(body.clone(), class);
-        let delimiters = marks::delimiters(self.source, body, length);
+        let delimiters = marks::delimiters(body, length);
         self.mark_all(delimiters, mark);
     }
 
@@ -136,7 +136,7 @@ impl<'a> Walk<'a> {
         };
         self.mark_all([fence.open], TokenClass::CodeMark);
         self.mark_all(fence.close, TokenClass::CodeMark);
-        self.mark_all(fence.info, TokenClass::CodeBlockInfo);
+        self.mark_all([fence.info], TokenClass::CodeBlockInfo);
     }
 
     fn link(&mut self, body: &Range<usize>, link_type: LinkType, dest_url: &str) {
@@ -173,7 +173,7 @@ impl<'a> Walk<'a> {
         } else {
             TokenClass::Url
         };
-        self.mark_all(parts.url, url_class);
+        self.mark_all([parts.url], url_class);
     }
 
     fn table_head(&mut self, body: &Range<usize>) {
