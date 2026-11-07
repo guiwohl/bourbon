@@ -756,6 +756,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bourbon-editor"
+version = "0.1.0"
+dependencies = [
+ "bourbon-markdown",
+ "bourbon-text",
+ "gpui-pre",
+ "gpui-pre-platform",
+ "proptest",
+]
+
+[[package]]
 name = "bourbon-markdown"
 version = "0.1.0"
 dependencies = [

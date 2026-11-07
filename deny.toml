@@ -9,6 +9,7 @@ deny = [
         "gpui-component",
         "gpui-kit",
         "gpui-kit-assets",
+        "bourbon-editor",
         "gpui-pre-apple",
         "gpui-pre-ios",
         "gpui-pre-linux",

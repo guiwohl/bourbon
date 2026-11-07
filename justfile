@@ -75,6 +75,7 @@ quick:
         grep -q '^crates/bourbon-cli/' <<< "$changed" && packages="$packages -p bourbon-cli"
         grep -q '^crates/bourbon-markdown/' <<< "$changed" && packages="$packages -p bourbon-markdown"
         grep -q '^crates/bourbon-text/' <<< "$changed" && packages="$packages -p bourbon-text"
+        grep -q '^crates/bourbon-editor/' <<< "$changed" && packages="$packages -p bourbon-editor"
         [ -n "$packages" ] || { echo "no crate changed"; exit 0; }
     fi
     just fmt-check comments
