@@ -7,14 +7,17 @@ use crate::doc::{
 use crate::lines::LineIndex;
 use crate::parse;
 use crate::slug::Slugger;
-use pulldown_cmark::{BlockQuoteKind, CodeBlockKind, Event, HeadingLevel, Tag, TagEnd};
+use pulldown_cmark::{BlockQuoteKind, CodeBlockKind, Event, HeadingLevel, Tag};
+use std::iter::Peekable;
 use std::ops::Range;
+use std::vec::IntoIter;
 use text::plain_text;
 
 struct Builder<'a> {
     source: &'a str,
-    events: Vec<(Event<'a>, Range<usize>)>,
-    position: usize,
+    events: Peekable<IntoIter<(Event<'a>, Range<usize>)>>,
+    consumed: usize,
+    last_end: usize,
     lines: LineIndex,
     slugger: Slugger,
 }
@@ -24,8 +27,9 @@ impl PreviewDoc {
     pub fn parse(source: &str) -> Self {
         let mut builder = Builder {
             source,
-            events: parse::events(source),
-            position: 0,
+            events: parse::events(source).into_iter().peekable(),
+            consumed: 0,
+            last_end: 0,
             lines: LineIndex::new(source),
             slugger: Slugger::default(),
         };
@@ -36,20 +40,30 @@ impl PreviewDoc {
 }
 
 impl<'a> Builder<'a> {
-    fn peek(&self) -> Option<&Event<'a>> {
-        self.events.get(self.position).map(|(event, _)| event)
+    fn peek(&mut self) -> Option<&Event<'a>> {
+        self.events.peek().map(|(event, _)| event)
+    }
+
+    fn peek_range(&mut self) -> Option<Range<usize>> {
+        self.events.peek().map(|(_, range)| range.clone())
+    }
+
+    fn take_if(
+        &mut self,
+        predicate: impl FnOnce(&Event<'a>) -> bool,
+    ) -> Option<(Event<'a>, Range<usize>)> {
+        let taken = self.events.next_if(|(event, _)| predicate(event))?;
+        self.consumed += 1;
+        self.last_end = taken.1.end;
+        Some(taken)
     }
 
     fn next_event(&mut self) -> Option<Event<'a>> {
-        let event = self.events.get(self.position)?.0.clone();
-        self.position += 1;
-        Some(event)
+        self.take_if(|_| true).map(|(event, _)| event)
     }
 
     fn skip_end(&mut self) {
-        if matches!(self.peek(), Some(Event::End(_))) {
-            self.position += 1;
-        }
+        self.take_if(|event| matches!(event, Event::End(_)));
     }
 
     fn lines_of(&self, range: &Range<usize>) -> SourceLines {
@@ -64,20 +78,20 @@ impl<'a> Builder<'a> {
     fn blocks(&mut self) -> Vec<Block> {
         let mut blocks = Vec::new();
         loop {
-            let before = self.position;
+            let before = self.consumed;
             if self.starts_inline() {
                 blocks.push(self.implicit_paragraph());
             } else {
                 match self.peek() {
                     None => break,
                     Some(Event::End(_)) => {
-                        self.position += 1;
+                        self.skip_end();
                         break;
                     }
                     Some(_) => blocks.extend(self.block()),
                 }
             }
-            if self.position == before {
+            if self.consumed == before {
                 break;
             }
         }
@@ -85,9 +99,9 @@ impl<'a> Builder<'a> {
     }
 
     fn implicit_paragraph(&mut self) -> Block {
-        let first = self.position;
+        let first = self.peek_range().map_or(0, |range| range.start);
         let inlines = self.inline_run();
-        let range = self.events[first].1.start..self.events[self.position - 1].1.end;
+        let range = first..self.last_end;
         Block {
             source_lines: self.lines_of(&range),
             kind: BlockKind::Paragraph(inlines),
@@ -95,8 +109,7 @@ impl<'a> Builder<'a> {
     }
 
     fn block(&mut self) -> Vec<Block> {
-        let range = self.events[self.position].1.clone();
-        let Some(event) = self.next_event() else {
+        let (Some(range), Some(event)) = (self.peek_range(), self.next_event()) else {
             return Vec::new();
         };
         let kind = match event {
@@ -137,22 +150,13 @@ impl<'a> Builder<'a> {
     }
 
     fn paragraph(&mut self) -> BlockKind {
-        let display_math = match (
-            self.events.get(self.position),
-            self.events.get(self.position + 1),
-        ) {
-            (Some((Event::DisplayMath(text), _)), Some((Event::End(TagEnd::Paragraph), _))) => {
-                Some(text.to_string())
-            }
-            _ => None,
-        };
-        if let Some(text) = display_math {
-            self.position += 2;
-            return BlockKind::Math(text);
-        }
+        let starts_with_display_math = matches!(self.peek(), Some(Event::DisplayMath(_)));
         let inlines = self.inline_run();
         self.skip_end();
-        BlockKind::Paragraph(inlines)
+        match inlines.as_slice() {
+            [Inline::InlineMath(text)] if starts_with_display_math => BlockKind::Math(text.clone()),
+            _ => BlockKind::Paragraph(inlines),
+        }
     }
 
     fn heading(&mut self, level: HeadingLevel) -> BlockKind {
@@ -193,8 +197,8 @@ impl<'a> Builder<'a> {
     fn list(&mut self, start: Option<u64>) -> BlockKind {
         let mut items = Vec::new();
         let mut loose = false;
-        while let Some((Event::Start(Tag::Item), range)) = self.events.get(self.position).cloned() {
-            self.position += 1;
+        while let Some((_, range)) = self.take_if(|event| matches!(event, Event::Start(Tag::Item)))
+        {
             let task = self.task_marker();
             loose |= matches!(self.peek(), Some(Event::Start(Tag::Paragraph)));
             let children = self.blocks();
@@ -214,12 +218,10 @@ impl<'a> Builder<'a> {
     }
 
     fn task_marker(&mut self) -> Option<bool> {
-        let Some(Event::TaskListMarker(checked)) = self.peek() else {
-            return None;
-        };
-        let checked = *checked;
-        self.position += 1;
-        Some(checked)
+        match self.take_if(|event| matches!(event, Event::TaskListMarker(_))) {
+            Some((Event::TaskListMarker(checked), _)) => Some(checked),
+            _ => None,
+        }
     }
 
     fn table(&mut self, alignments: &[pulldown_cmark::Alignment]) -> BlockKind {
@@ -244,8 +246,10 @@ impl<'a> Builder<'a> {
 
     fn cells(&mut self) -> Vec<Vec<Inline>> {
         let mut cells = Vec::new();
-        while matches!(self.peek(), Some(Event::Start(Tag::TableCell))) {
-            self.position += 1;
+        while self
+            .take_if(|event| matches!(event, Event::Start(Tag::TableCell)))
+            .is_some()
+        {
             cells.push(self.inline_run());
             self.skip_end();
         }
