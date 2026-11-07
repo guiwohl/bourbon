@@ -68,9 +68,7 @@ fn rgba_from(channels: [f32; 3]) -> Rgba {
 fn readable_shade(tag: [f32; 3], backdrop: [f32; 3], toward: f32) -> [f32; 3] {
     let tinted = blend(backdrop, tag, PILL_TINT);
     (0..=DARKENING_STEPS)
-        .map(|step| {
-            blend(tag, [toward; 3], f32::from(step) * DARKENING_STEP)
-        })
+        .map(|step| blend(tag, [toward; 3], f32::from(step) * DARKENING_STEP))
         .find(|shade| contrast(*shade, tinted) >= MINIMUM_CONTRAST)
         .unwrap_or([toward; 3])
 }
@@ -210,7 +208,12 @@ mod tests {
         for (channel, original) in shade.into_iter().zip(tag) {
             assert!(channel > 0. && channel < original);
             let steps = channel / original;
-            assert!(((1. - steps) * 20.).fract().min(1. - ((1. - steps) * 20.).fract()) < 1e-3);
+            assert!(
+                ((1. - steps) * 20.)
+                    .fract()
+                    .min(1. - ((1. - steps) * 20.).fract())
+                    < 1e-3
+            );
         }
     }
 
