@@ -2,6 +2,7 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::Duration;
 
 use bourbon_core::NoteStore;
+use bourbon_editor::{FindNext, FindPrevious};
 use gpui::{
     AnyWindowHandle, App, AppContext as _, Entity, KeyBinding, TitlebarOptions, Window,
     WindowOptions,
@@ -85,6 +86,7 @@ fn forward_focus_requests(window: AnyWindowHandle, focus_requests: Receiver<()>,
 pub(crate) fn bind_keys(cx: &mut App) {
     bourbon_ui::init(cx);
     bourbon_editor::bind_text_field_keys(cx);
+    bourbon_editor::bind_search_keys(cx);
     bourbon_editor::bind_editor_keys(cx);
     cx.bind_keys([
         KeyBinding::new("ctrl-n", NewNote, None),
@@ -104,6 +106,9 @@ pub(crate) fn bind_keys(cx: &mut App) {
         KeyBinding::new("ctrl-e", CycleViewMode, Some("Input")),
         KeyBinding::new("ctrl-f", FindInNote, None),
         KeyBinding::new("ctrl-h", ReplaceInNote, None),
+        KeyBinding::new("ctrl-alt-f", ReplaceInNote, None),
+        KeyBinding::new("ctrl-g", FindNext, None),
+        KeyBinding::new("ctrl-shift-g", FindPrevious, None),
         KeyBinding::new("ctrl-shift-f", ToggleFocusMode, None),
         KeyBinding::new("ctrl-shift-f", ToggleFocusMode, Some("Input")),
         KeyBinding::new("escape", ExitFocusMode, None),

@@ -51,6 +51,7 @@ pub struct Editor {
     pub(crate) dragging: bool,
     pub(crate) scroll_to_caret: bool,
     reported_scroll: Pixels,
+    pub(crate) search_matches: Vec<Range<usize>>,
 }
 
 impl EventEmitter<EditorEvent> for Editor {}
@@ -88,6 +89,7 @@ impl Editor {
             dragging: false,
             scroll_to_caret: false,
             reported_scroll: px(0.0),
+            search_matches: Vec::new(),
         };
         editor.restart_blink(cx);
         editor

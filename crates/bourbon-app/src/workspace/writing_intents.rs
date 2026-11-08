@@ -138,15 +138,27 @@ impl Workspace {
         });
     }
 
-    pub(crate) fn find_in_note(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn find_in_note(
+        &mut self,
+        replacing: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.selected.is_none() {
             return;
         }
-        if self.view_mode.shows_editor() {
-            self.editor.focus_body(window, cx);
-        } else {
+        if !self.view_mode.shows_editor() {
             self.set_view_mode(ViewMode::Edit, window, cx);
         }
+        self.editor.open_search(replacing, window, cx);
+    }
+
+    pub(crate) fn find_next_in_note(&mut self, cx: &mut Context<Self>) {
+        self.editor.find_next(cx);
+    }
+
+    pub(crate) fn find_previous_in_note(&mut self, cx: &mut Context<Self>) {
+        self.editor.find_previous(cx);
     }
 
     pub(crate) fn toggle_focus_mode(&mut self, window: &mut Window, cx: &mut Context<Self>) {

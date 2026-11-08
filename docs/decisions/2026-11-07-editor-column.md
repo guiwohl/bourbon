@@ -6,7 +6,7 @@ Routine choices taken alone while rebuilding the editor column ([app](../archite
 |---|---|---|---|
 | 1 | First toolbar button | **Distraction-free toggle** (hides sidebar and note list, `Ctrl+Shift+F`), maximize-2 / minimize-2 icons | Inkdrop's first button; the sidebar alone already has its toggle in the note list header |
 | 2 | Title and Add Tags fields | **`bourbon_editor::TextField` `borderless()` + `text_size`**, height and inset from the wrapping row | Same field as the filter; Inkdrop's title and tag inputs have no border |
-| 3 | Find / replace | **`Ctrl+F` / `Ctrl+H` focus the body (switching from Preview)**; no search panel | `bourbon-editor` has none yet; recorded as a known gap |
+| 3 | Find / replace | ~~`Ctrl+F` / `Ctrl+H` focus the body~~ superseded by [find and replace](2026-11-08-find-replace.md) | `bourbon-editor` had no panel then |
 | 4 | `Ctrl+Enter` | **`bourbon-editor`'s toggle**: a plain line becomes a task | One task rule for editor and keys; the old app-only rule is gone |
 | 5 | Tag removal | **× next to each pill at 40 % opacity, full on hover** | Inkdrop has no visible ×; keeps the existing mouse path |
 | 6 | Word count | **Kept, in a 24 px status bar on the right** | Existing Bourbon feature; Inkdrop's status bar slot is empty |

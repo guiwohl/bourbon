@@ -95,7 +95,7 @@ impl Workspace {
     ) -> Self {
         let settings = locations.settings.load();
         theme::apply(&settings, &locations.omarchy_colors, cx);
-        let editor = EditorPane::new(cx);
+        let editor = EditorPane::new(window, cx);
         let mut subscriptions = editor.subscribe_to_edits(window, cx);
         subscriptions.push(cx.on_app_quit(|view, cx| {
             view.flush_before_closing(cx);

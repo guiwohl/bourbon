@@ -15,6 +15,10 @@ Run the demo: `cargo run -p bourbon-editor --example editor_demo` (app id `bourb
 | `TextField::new(cx)`, `.placeholder(text)`, `.leading_icon(IconName)`, `.borderless(Borderless { font_size, height, inset })`, `text()`, `set_text()` (drops line breaks, caret at the end, resets history, no event), `selected_range()`, `focus(window, cx)` | Single-line field. `EventEmitter<TextFieldEvent>`, `Focusable`, `Render`, `EntityInputHandler` |
 | `TextFieldEvent::Changed(String)`, `Submit`, `Cancel` | `Changed` on every text change; Enter emits `Submit`, Esc emits `Cancel`; neither edits the text |
 | `bind_text_field_keys(cx)`, `TEXT_FIELD_CONTEXT` | Key bindings for context `BourbonTextField` |
+| `TextField::select_all(cx)` | Selects the whole text (the search panel uses it on open) |
+| `SearchPanel::new(editor, window, cx)`, `open(replacing)`, `close()`, `refresh()`, `find_next()`, `find_previous()`, `replace_current()`, `replace_all()`, `toggle_match_case/regex/whole_word()`, `set_options()`, `matches()`, `count_label()`, `is_open()`, `is_replacing()`, `find_field()`, `replace_field()` | Find / replace panel bound to one `Editor`. Renders nothing while closed |
+| `SearchOptions`, `match_count_label(current, total, valid)` | Option flags; label `n of m`, `No results`, `Invalid pattern` |
+| `bind_search_keys(cx)`, `SEARCH_CONTEXT`, `FindNext`, `FindPrevious`, `ToggleMatchCase`, `ToggleRegex`, `ToggleWholeWord`, `ReplaceAll` | Keys for context `BourbonSearch` |
 | `PreviewView::new(source, theme, cx)`, `set_source()`, `set_theme()`, `doc()`, `block_layouts()`, `scroll_top()`, `set_scroll_top(px)`, `scroll_anchors()` | Preview entity; scrolling goes through its own `ScrollHandle` |
 | `PreviewEvent::ToggleTask { source_line }`, `OpenLink(href)`, `OpenNote(id)`, `Scrolled` | Never mutates the document; the owner applies the toggle to the editor. `Scrolled` fires from prepaint when the scroll offset changed |
 | `scroll_anchors(&[BlockLayout])` | Top-level blocks as `bourbon_markdown::Anchor`s, tops shifted by the 10 px padding so they are in scroll-content coordinates |
@@ -35,6 +39,17 @@ Run the demo: `cargo run -p bourbon-editor --example editor_demo` (app id `bourb
 - IME: `EntityInputHandler` with UTF-16 conversions in `utf16` (pure, proptested). `replace_and_mark_text_in_range` inserts through `insert_text` and tracks the marked byte range, drawn underlined. A single typed character goes through `type_character` (auto-pair).
 - Keys: arrows (+shift, ctrl word), home/end, ctrl-home/end, pageup/down, backspace/delete (+ctrl word), enter (list continuation, plain newline fallback), tab / shift-tab (list indent / outdent, two spaces fallback), ctrl-z, ctrl-shift-z, ctrl-y, ctrl-a, ctrl-c/x/v (plain text, paste is its own undo step), ctrl-b, ctrl-i, ctrl-shift-x, ctrl-`, ctrl-enter.
 
+## Search panel
+
+Files: `src/search.rs`, `src/search/{panel,view,keys,highlights}.rs`. Matching is `bourbon_text::Search` (no GPUI).
+
+- `open(replacing)`: a single-line editor selection prefills the find field; the field text is selected and focused. Every query or option change recomputes the matches and selects the first one at or after the selection start (the editor scrolls to it through its usual caret reveal).
+- Find field: Enter next, Shift+Enter previous, Esc closes. Replace field: Enter replaces the current match and moves on (no current match: it only selects the next one), Esc closes. In the panel: `Ctrl+G` / `Ctrl+Shift+G`, `Alt+C` case, `Alt+R` regex, `Alt+W` whole word, `Ctrl+Enter` replace all. Close clears the highlights and focuses the editor.
+- Replace and Replace all apply one `bourbon_text` transaction each (one undo step). The panel listens to `EditorEvent::Changed` and recomputes the matches (typing, undo); the owner calls `refresh()` after `set_text`.
+- Highlights: the editor keeps the match ranges (`search_matches`); `build_frame` adds `MatchRect`s for visible lines (selection-rect geometry), painted under the selection: amber 25 %, the match equal to the selection amber 50 % with a 1 px amber outline, radius 0.4 em (research 2.2).
+- Look (`bourbon-ui` tokens): padding 8, gap 6, `section_header_background`, bottom `internal_border`; find row = field, `Aa` / `ab` / `.*` toggles (accessory size, `primary` text on `button_active_background` when on), a 140 px column with the count (min 5 em, `muted_text`) and up / down / close icon buttons; replace row = field plus Replace and All buttons in the same 140 px column.
+- Tests: `tests/search.rs` (keys, options, prefill, replace, undo, refresh), unit tests in `search/highlights.rs` (rects, current match, multi-line).
+
 ## Text field
 
 Run the demo: `cargo run -p bourbon-editor --example text_field_demo` (app id `bourbon-text-field-demo`): filter and rename fields, light (left) and dark (right).
@@ -53,7 +68,7 @@ Blocks become `div` trees; inlines are flattened (`inline::flatten_inlines`: tex
 
 ## Known gaps
 
-- Editor: no search panel (the app's `Ctrl+F` only focuses the body), no folding (no fold chevrons), rows with inline code are not taller, no search, completion, multi-cursor, horizontal scroll, drag auto-scroll, Home/End by visual row, mouse selection by words after a double-click drag.
+- Editor: no folding (no fold chevrons), rows with inline code are not taller, completion, multi-cursor, horizontal scroll, drag auto-scroll, Home/End by visual row, mouse selection by words after a double-click drag.
 - Preview: inline code uses a background only (highlights cannot switch the font family), tables use equal column widths, no images, math or footnotes layout, code blocks wrap instead of scrolling, list markers of nested ordered lists are numbers, no virtualisation; scroll anchors are top-level blocks only (no list items).
 - Hit testing and geometry tests run on GPUI's test text system (fixed 0.6 em advance), not on real fonts.
 
