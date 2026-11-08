@@ -255,6 +255,13 @@ mod tests {
     }
 
     #[test]
+    fn the_first_measurement_counts_even_at_the_estimated_height() {
+        let mut heights = heights(1);
+        assert!(heights.set_measured(0, 20.0));
+        assert!(heights.is_measured(0));
+    }
+
+    #[test]
     fn a_change_of_exactly_epsilon_is_not_a_change() {
         let mut heights = heights(1);
         heights.set_measured(0, 1.0);

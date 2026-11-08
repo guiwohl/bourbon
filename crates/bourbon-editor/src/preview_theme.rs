@@ -145,6 +145,14 @@ mod tests {
     }
 
     #[test]
+    fn colours_are_converted_from_hsl_degrees_and_percent() {
+        let theme = PreviewTheme::light();
+        assert_eq!(theme.text, hsla(0.0, 0.0, 0.0, 0.87));
+        assert_eq!(theme.solid_border, hsla(240.0 / 360.0, 0.05, 0.84, 1.0));
+        assert_eq!(theme.code_border, hsla(213.0 / 360.0, 0.27, 0.84, 0.50));
+    }
+
+    #[test]
     fn heading_scales_follow_the_research() {
         let theme = PreviewTheme::light();
         let scales: Vec<f32> = (1..=6).map(|level| theme.heading_scale(level)).collect();

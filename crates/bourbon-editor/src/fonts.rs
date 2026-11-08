@@ -11,10 +11,14 @@ const FACES: [&[u8]; 4] = [
     include_bytes!("../assets/fonts/JetBrainsMono-BoldItalic.ttf"),
 ];
 
-pub fn register_editor_fonts(cx: &App) {
+pub fn register_editor_fonts(cx: &App) -> usize {
     let faces = FACES.iter().map(|face| Cow::Borrowed(*face)).collect();
-    if let Err(error) = cx.text_system().add_fonts(faces) {
-        eprintln!("bourbon-editor: cannot load the monospace font: {error}");
+    match cx.text_system().add_fonts(faces) {
+        Ok(()) => FACES.len(),
+        Err(error) => {
+            eprintln!("bourbon-editor: cannot load the monospace font: {error}");
+            0
+        }
     }
 }
 
@@ -26,6 +30,11 @@ mod tests {
     fn every_bundled_face_is_a_font_file() {
         assert_eq!(FACES.len(), 4);
         assert!(FACES.iter().all(|face| face.len() > 100_000));
+    }
+
+    #[gpui::test]
+    fn registering_reports_every_face(cx: &mut gpui::TestAppContext) {
+        assert_eq!(cx.update(|cx| register_editor_fonts(cx)), 4);
     }
 
     #[test]
