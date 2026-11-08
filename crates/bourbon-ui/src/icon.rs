@@ -184,14 +184,13 @@ impl Icon {
 }
 
 impl RenderOnce for Icon {
-    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let color = self.color.unwrap_or_else(|| window.text_style().color);
         let mut glyph = svg()
             .path(icon_path(self.name, self.stroke))
             .size(self.size)
-            .flex_none();
-        if let Some(color) = self.color {
-            glyph = glyph.text_color(color);
-        }
+            .flex_none()
+            .text_color(color);
         if self.quarter_turns != 0. {
             glyph = glyph.with_transformation(Transformation::rotate(radians(
                 self.quarter_turns * std::f32::consts::FRAC_PI_2,
