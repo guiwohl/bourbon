@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use bourbon_text::current_match;
-use gpui::{Bounds, Context, Pixels, Point, Window, fill, px};
+use gpui::{Bounds, Context, PaintQuad, Pixels, Point, fill, px};
 
 use crate::editor::Editor;
 use crate::layout::LineLayout;
@@ -52,18 +52,15 @@ impl Editor {
     }
 }
 
-pub(crate) fn paint_match_rects(rects: &[MatchRect], theme: &EditorTheme, window: &mut Window) {
-    let radius = theme.font_size * MATCH_RADIUS_EM;
-    for rect in rects {
-        let quad = if rect.current {
-            fill(rect.bounds, theme.search_match_current)
-                .border_widths(px(1.0))
-                .border_color(theme.search_match_outline)
-        } else {
-            fill(rect.bounds, theme.search_match)
-        };
-        window.paint_quad(quad.corner_radii(radius));
-    }
+pub(crate) fn match_quad(rect: &MatchRect, theme: &EditorTheme) -> PaintQuad {
+    let quad = if rect.current {
+        fill(rect.bounds, theme.search_match_current)
+            .border_widths(px(1.0))
+            .border_color(theme.search_match_outline)
+    } else {
+        fill(rect.bounds, theme.search_match)
+    };
+    quad.corner_radii(theme.font_size * MATCH_RADIUS_EM)
 }
 
 #[cfg(test)]
@@ -144,6 +141,34 @@ mod tests {
             rects.iter().map(|rect| rect.current).collect::<Vec<_>>(),
             vec![false, true]
         );
+    }
+
+    #[test]
+    fn matches_are_rounded_amber_and_the_current_one_is_outlined() {
+        let theme = EditorTheme::light();
+        let bounds = Bounds::new(point(px(1.0), px(2.0)), size(px(3.0), px(4.0)));
+        let other = match_quad(
+            &MatchRect {
+                bounds,
+                current: false,
+            },
+            &theme,
+        );
+        let current = match_quad(
+            &MatchRect {
+                bounds,
+                current: true,
+            },
+            &theme,
+        );
+        assert_eq!(other.bounds, bounds);
+        assert_eq!(other.background, theme.search_match.into());
+        assert_eq!(other.border_widths.top, px(0.0));
+        assert_eq!(current.background, theme.search_match_current.into());
+        assert_eq!(current.border_widths.left, px(1.0));
+        assert_eq!(current.border_color, theme.search_match_outline);
+        assert!(near(other.corner_radii.top_left, 13.0 * 0.4));
+        assert!(near(current.corner_radii.bottom_right, 13.0 * 0.4));
     }
 
     #[gpui::test]

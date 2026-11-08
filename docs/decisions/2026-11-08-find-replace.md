@@ -10,5 +10,5 @@ Routine choices taken alone; to review at the UI pass. Research: [editor 2.2, 3.
 | 4 | Empty matches | **Skipped** (`^`, `x*` never highlight) | Nothing to draw or select; keeps every loop moving forward |
 | 5 | Regex replace | **`$1` / `$name` expansion in regex mode only** | Plain mode must insert `$` literally |
 | 6 | Search while typing | **Selects the first match at or after the selection start** | Incremental search; the editor scrolls to it |
-| 7 | Count | **`n of m`, `0 of m` off a match, `No results`, `Invalid pattern`** | Inkdrop's count label, min 5 em |
+| 7 | Count | **`n of m`, `0 of m` off a match, `No results`, `Invalid pattern`** | Inkdrop's count label, min 5 em (64 px) |
 | 8 | Colours | **Amber 500 at 25 %, current at 50 % with 1 px outline, same in both themes** | Research 2.2 |

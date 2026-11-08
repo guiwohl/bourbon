@@ -14,7 +14,7 @@ use super::panel::SearchPanel;
 const PANEL_PADDING: f32 = 8.;
 const ROW_GAP: f32 = 6.;
 const BUTTON_COLUMN_WIDTH: f32 = 140.;
-const COUNT_MIN_WIDTH_EM: f32 = 5.;
+const COUNT_MIN_WIDTH: f32 = 64.;
 
 type PanelAction = fn(&mut SearchPanel, &mut Window, &mut Context<SearchPanel>);
 
@@ -94,7 +94,7 @@ fn find_row(panel: &SearchPanel, cx: &mut Context<SearchPanel>) -> impl IntoElem
                 .child(
                     div()
                         .flex_1()
-                        .min_w(tokens.scale.small * COUNT_MIN_WIDTH_EM)
+                        .min_w(px(COUNT_MIN_WIDTH))
                         .text_color(colors.muted_text)
                         .child(count),
                 )

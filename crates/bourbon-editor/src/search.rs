@@ -3,7 +3,7 @@ mod keys;
 mod panel;
 mod view;
 
-pub(crate) use highlights::{MatchRect, paint_match_rects};
+pub(crate) use highlights::{MatchRect, match_quad};
 pub use keys::{
     FindNext, FindPrevious, ReplaceAll, SEARCH_CONTEXT, ToggleMatchCase, ToggleRegex,
     ToggleWholeWord, bind_search_keys,
