@@ -13,6 +13,7 @@ use gpui_kit::{
     ScrollHandle, SharedString, Styled as _, TestSupportExt as _, div, px,
 };
 
+pub(crate) use prompt::prompt_dialog;
 pub(crate) use state::{DeletionTarget, NameTarget, Prompt, Section, SidebarCounts, SidebarState};
 pub(crate) use tree::subtree_ids;
 
@@ -49,9 +50,6 @@ pub(crate) fn render(
         return None;
     }
     let mut rows: Vec<AnyElement> = Vec::new();
-    if let Some(prompt) = &data.state.prompt {
-        rows.push(prompt::render(prompt, cx).into_any_element());
-    }
     rows.push(
         simple_row(
             "nav-all-notes",

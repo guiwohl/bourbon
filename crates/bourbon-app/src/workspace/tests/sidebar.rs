@@ -799,3 +799,71 @@ fn the_menu_hands_the_focus_back_to_the_sidebar_when_it_closes(cx: &mut TestAppC
         .unwrap();
     assert!(focused);
 }
+
+#[gpui_kit::test]
+fn enter_confirms_the_deletion_dialog(cx: &mut TestAppContext) {
+    let tree = tree_store();
+    let (handle, view) = open_view(cx, tree.store);
+
+    choose_menu_item(cx, handle, &row(&tree.work), DELETE_NOTEBOOK);
+    VisualTestContext::from_window(handle, cx).simulate_keystrokes("enter");
+
+    assert_eq!(notebook_names(cx, &view), ["Inbox", "Other"]);
+    assert!(!is_listed(cx, handle, "sidebar-prompt"));
+}
+
+#[gpui_kit::test]
+fn escape_declines_the_deletion_dialog(cx: &mut TestAppContext) {
+    let tree = tree_store();
+    let (handle, view) = open_view(cx, tree.store);
+
+    choose_menu_item(cx, handle, &row(&tree.work), DELETE_NOTEBOOK);
+    VisualTestContext::from_window(handle, cx).simulate_keystrokes("escape");
+
+    assert_eq!(notebook_names(cx, &view), ["Inbox", "Other", "Work", "Sub"]);
+    assert!(!is_listed(cx, handle, "sidebar-prompt"));
+}
+
+#[gpui_kit::test]
+fn clicking_beside_the_deletion_dialog_declines_it(cx: &mut TestAppContext) {
+    let tree = tree_store();
+    let (handle, view) = open_view(cx, tree.store);
+
+    choose_menu_item(cx, handle, &row(&tree.work), DELETE_NOTEBOOK);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click_at("sidebar-prompt", point(px(5.), px(5.)), cx);
+    })
+    .unwrap();
+
+    assert_eq!(notebook_names(cx, &view), ["Inbox", "Other", "Work", "Sub"]);
+    assert!(!is_listed(cx, handle, "sidebar-prompt"));
+}
+
+#[gpui_kit::test]
+fn shortcuts_work_again_after_a_dialog_closes(cx: &mut TestAppContext) {
+    let tree = tree_store();
+    let (handle, view) = open_view(cx, tree.store);
+
+    click(cx, handle, "new-notebook");
+    VisualTestContext::from_window(handle, cx).simulate_keystrokes("escape");
+    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
+        .unwrap();
+    VisualTestContext::from_window(handle, cx).simulate_keystrokes("ctrl-,");
+
+    assert!(view.read_with(cx, |view, _| view.settings_open));
+}
+
+#[gpui_kit::test]
+fn shortcuts_work_again_after_a_confirmation_closes(cx: &mut TestAppContext) {
+    let tree = tree_store();
+    let (handle, view) = open_view(cx, tree.store);
+
+    choose_menu_item(cx, handle, &row(&tree.work), DELETE_NOTEBOOK);
+    VisualTestContext::from_window(handle, cx).simulate_keystrokes("escape");
+    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
+        .unwrap();
+    VisualTestContext::from_window(handle, cx).simulate_keystrokes("ctrl-,");
+
+    assert!(view.read_with(cx, |view, _| view.settings_open));
+}

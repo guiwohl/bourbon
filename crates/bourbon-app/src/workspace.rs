@@ -3,6 +3,7 @@ mod tests;
 
 mod control_pane_intents;
 mod data_intents;
+mod dialogs;
 mod editor_intents;
 mod menus;
 mod note_list_intents;
@@ -21,7 +22,6 @@ use bourbon_core::{
 };
 use bourbon_editor::{TextField, TextFieldEvent};
 use bourbon_ui::{IconName, Splitter, ThemeExt as _};
-use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AppContext as _, Context, Entity, FocusHandle, Focusable, InteractiveElement as _,
@@ -34,7 +34,7 @@ use crate::editor::{self, EditorPane, EditorView, History};
 use crate::locations::Locations;
 use crate::navigation::{Listing, Navigation};
 use crate::note_list::NoteListData;
-use crate::settings_view::SettingsData;
+use crate::settings_view::{SettingsData, SettingsPage};
 use crate::sidebar::{SidebarCounts, SidebarData};
 use crate::sidebar::{SidebarState, ToggleSidebar};
 use crate::theme::{self, ModificationWatch};
@@ -71,14 +71,16 @@ pub struct Workspace {
     error_message: Option<SharedString>,
     notice: Option<SharedString>,
     data: data_intents::DataState,
-    repository_input: Entity<InputState>,
-    token_input: Entity<InputState>,
+    settings_page: SettingsPage,
+    repository_input: Entity<TextField>,
+    token_input: Entity<TextField>,
     filter_input: Entity<TextField>,
     focus_handle: FocusHandle,
     sidebar_focus: FocusHandle,
     note_list_focus: FocusHandle,
     sidebar_scroll: ScrollHandle,
     open_menu: Option<OpenMenu>,
+    dialogs: dialogs::DialogState,
     menu_origin: Point<Pixels>,
     _subscriptions: Vec<Subscription>,
 }
@@ -98,19 +100,7 @@ impl Workspace {
             view.flush_before_closing(cx);
             std::future::ready(())
         }));
-        let repository_input = cx.new(|cx| InputState::new(window, cx).placeholder("owner/name"));
-        repository_input.update(cx, |input, cx| {
-            input.set_value(
-                settings.backup_repository.clone().unwrap_or_default(),
-                window,
-                cx,
-            );
-        });
-        let token_input = cx.new(|cx| {
-            InputState::new(window, cx)
-                .masked(true)
-                .placeholder("Personal access token")
-        });
+        let (repository_input, token_input) = backup_inputs(&settings, &mut subscriptions, cx);
         let filter_input = cx.new(|cx| {
             TextField::new(cx)
                 .placeholder("Filter")
@@ -125,20 +115,6 @@ impl Workspace {
                 TextFieldEvent::Cancel => view.clear_filter(cx),
             },
         ));
-        subscriptions.push(
-            cx.subscribe(&repository_input, |view, _, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    view.repository_changed(cx);
-                }
-            }),
-        );
-        subscriptions.push(
-            cx.subscribe(&token_input, |view, _, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    view.token_changed(cx);
-                }
-            }),
-        );
         let mut sidebar = SidebarState::new(store.default_notebook().ok());
         sidebar.is_visible = settings.sidebar_visible;
         let omarchy_watch = ModificationWatch::new(locations.omarchy_colors.clone());
@@ -168,6 +144,7 @@ impl Workspace {
             error_message: None,
             notice: None,
             data: data_intents::DataState::default(),
+            settings_page: SettingsPage::default(),
             repository_input,
             token_input,
             filter_input,
@@ -176,6 +153,7 @@ impl Workspace {
             note_list_focus: cx.focus_handle(),
             sidebar_scroll: ScrollHandle::new(),
             open_menu: None,
+            dialogs: dialogs::DialogState::new(cx.focus_handle()),
             menu_origin: Point::default(),
             _subscriptions: subscriptions,
         };
@@ -415,20 +393,23 @@ impl Workspace {
 }
 
 impl Workspace {
+    fn settings_screen(&self, cx: &mut Context<Self>) -> AnyElement {
+        settings_view::render(
+            &SettingsData {
+                settings: &self.settings,
+                page: self.settings_page,
+                repository_input: &self.repository_input,
+                token_input: &self.token_input,
+                repository_error: self.data.repository_error.clone(),
+                status: self.data.status.clone(),
+            },
+            cx,
+        )
+        .into_any_element()
+    }
+
     fn open_pane(&self, cx: &mut Context<Self>) -> AnyElement {
-        if self.settings_open {
-            settings_view::render(
-                &SettingsData {
-                    settings: &self.settings,
-                    repository_input: &self.repository_input,
-                    token_input: &self.token_input,
-                    repository_error: self.data.repository_error.clone(),
-                    status: self.data.status.clone(),
-                },
-                cx,
-            )
-            .into_any_element()
-        } else if self.selected.is_some() {
+        if self.selected.is_some() {
             self.editor
                 .render(
                     &EditorView {
@@ -444,6 +425,39 @@ impl Workspace {
             editor::render_empty(cx).into_any_element()
         }
     }
+}
+
+fn backup_inputs(
+    settings: &Settings,
+    subscriptions: &mut Vec<Subscription>,
+    cx: &mut Context<Workspace>,
+) -> (Entity<TextField>, Entity<TextField>) {
+    let repository = cx.new(|cx| {
+        let mut field = TextField::new(cx).placeholder("owner/name");
+        field.set_text(
+            settings.backup_repository.as_deref().unwrap_or_default(),
+            cx,
+        );
+        field
+    });
+    let token = cx.new(|cx| {
+        TextField::new(cx)
+            .masked(true)
+            .placeholder("Personal access token")
+    });
+    subscriptions.push(
+        cx.subscribe(&repository, |view, _, event: &TextFieldEvent, cx| {
+            if matches!(event, TextFieldEvent::Changed(_)) {
+                view.repository_changed(cx);
+            }
+        }),
+    );
+    subscriptions.push(cx.subscribe(&token, |view, _, event: &TextFieldEvent, cx| {
+        if matches!(event, TextFieldEvent::Changed(_)) {
+            view.token_changed(cx);
+        }
+    }));
+    (repository, token)
 }
 
 const OMARCHY_POLL_INTERVAL: Duration = Duration::from_secs(2);
@@ -568,14 +582,31 @@ impl Workspace {
     }
 }
 
+impl Workspace {
+    fn columns(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
+        let pane = self.open_pane(cx);
+        div()
+            .flex_1()
+            .min_w_0()
+            .flex()
+            .children(self.sidebar_column(window, cx))
+            .children(self.sidebar_splitter(cx))
+            .children(self.note_list_column(window, cx))
+            .children(self.note_list_splitter(cx))
+            .child(pane)
+            .into_any_element()
+    }
+}
+
 impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let pane = self.open_pane(cx);
-        let sidebar = self.sidebar_column(window, cx);
-        let sidebar_splitter = self.sidebar_splitter(cx);
-        let note_list = self.note_list_column(window, cx);
-        let note_list_splitter = self.note_list_splitter(cx);
+        let body = if self.settings_open {
+            self.settings_screen(cx)
+        } else {
+            self.columns(window, cx)
+        };
         let menu = self.menu_popover(cx);
+        let dialog = self.dialog(window, cx);
         div()
             .track_focus(&self.focus_handle)
             .relative()
@@ -601,25 +632,13 @@ impl Render for Workspace {
             .when_some(self.notice.clone(), |root, message| {
                 root.child(settings_view::notice_banner(message, cx))
             })
-            .when_some(self.restore_question(), |root, question| {
-                root.child(settings_view::restore_confirmation(question, cx))
-            })
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .flex()
-                    .children(sidebar)
-                    .children(sidebar_splitter)
-                    .children(note_list)
-                    .children(note_list_splitter)
-                    .child(pane),
-            )
+            .child(div().flex_1().min_h_0().flex().child(body))
             .children(
                 self.control_pane
                     .as_ref()
-                    .map(|open_pane| control_pane::render(open_pane, cx)),
+                    .map(|open_pane| control_pane::render(open_pane, window, cx)),
             )
+            .children(dialog)
             .children(menu)
     }
 }

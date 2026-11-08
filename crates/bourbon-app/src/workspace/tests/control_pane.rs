@@ -463,12 +463,16 @@ fn the_move_to_notebook_action_opens_the_notebook_selector(cx: &mut TestAppConte
 #[gpui_kit::test]
 fn the_empty_trash_action_shows_the_trash_and_asks_for_confirmation(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
-    store.trash_note(&seeded.older, at(9)).unwrap();
+    store
+        .trash_note(&seeded.older, bourbon_core::Timestamp::now())
+        .unwrap();
     let (handle, view) = open_view(cx, store);
 
     run_action(cx, handle, "empty trash");
+    let listed_before = found_count(cx, &view);
     press(cx, handle, "enter");
 
+    assert_eq!(listed_before, 1);
     assert_eq!(navigation(cx, &view), Navigation::Trash);
     assert_eq!(found_count(cx, &view), 0);
 }
@@ -599,4 +603,63 @@ fn the_copy_cli_command_action_needs_an_open_note(cx: &mut TestAppContext) {
     type_text(cx, handle, "copy cli");
 
     assert!(!offered_actions(cx, &view).contains(&PaneAction::CopyCliCommand));
+}
+
+#[gpui_kit::test]
+fn hovering_a_row_highlights_it(cx: &mut TestAppContext) {
+    let (store, _) = seeded_store();
+    let (handle, view) = open_view(cx, store);
+    press(cx, handle, "ctrl-o");
+
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.hover("pane-row-1", cx);
+    })
+    .unwrap();
+
+    assert_eq!(highlighted(cx, &view), 1);
+}
+
+#[gpui_kit::test]
+fn cancelling_the_empty_trash_dialog_keeps_the_notes(cx: &mut TestAppContext) {
+    let (store, seeded) = seeded_store();
+    store
+        .trash_note(&seeded.older, bourbon_core::Timestamp::now())
+        .unwrap();
+    let (handle, view) = open_view(cx, store);
+
+    run_action(cx, handle, "empty trash");
+    click(cx, handle, "empty-trash-cancel");
+
+    assert_eq!(found_count(cx, &view), 1);
+    assert!(!view.read_with(cx, |view, _| view.dialogs.empty_trash));
+}
+
+#[gpui_kit::test]
+fn the_empty_trash_dialog_button_empties_it(cx: &mut TestAppContext) {
+    let (store, seeded) = seeded_store();
+    store
+        .trash_note(&seeded.older, bourbon_core::Timestamp::now())
+        .unwrap();
+    let (handle, view) = open_view(cx, store);
+
+    run_action(cx, handle, "empty trash");
+    click(cx, handle, "empty-trash-confirm");
+
+    assert_eq!(found_count(cx, &view), 0);
+}
+
+#[gpui_kit::test]
+fn escape_closes_the_empty_trash_dialog(cx: &mut TestAppContext) {
+    let (store, seeded) = seeded_store();
+    store
+        .trash_note(&seeded.older, bourbon_core::Timestamp::now())
+        .unwrap();
+    let (handle, view) = open_view(cx, store);
+
+    run_action(cx, handle, "empty trash");
+    press(cx, handle, "escape");
+
+    assert_eq!(found_count(cx, &view), 1);
+    assert!(!view.read_with(cx, |view, _| view.dialogs.empty_trash));
 }

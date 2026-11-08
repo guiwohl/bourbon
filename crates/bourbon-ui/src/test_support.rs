@@ -2,8 +2,8 @@ use gpui::{
     AnyElement, App, Context, IntoElement, Render, TestAppContext, VisualTestContext, Window,
 };
 
-use crate::menu;
 use crate::theme::{Appearance, Theme};
+use crate::{menu, modal};
 
 pub(crate) struct Host {
     build: Box<dyn Fn() -> AnyElement>,
@@ -27,6 +27,7 @@ pub(crate) fn prepare(cx: &mut TestAppContext) {
     cx.update(|cx: &mut App| {
         Theme::install(Appearance::Light, cx);
         menu::bind_keys(cx);
+        modal::bind_keys(cx);
     });
 }
 

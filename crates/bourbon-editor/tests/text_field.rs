@@ -460,3 +460,26 @@ fn clicking_a_scrolled_field_counts_the_hidden_text(cx: &mut TestAppContext) {
     let offset = field.selection().start;
     assert!((38..=39).contains(&offset), "offset {offset}");
 }
+
+#[gpui::test]
+fn a_masked_field_keeps_the_real_text_and_maps_clicks_through_the_bullets(cx: &mut TestAppContext) {
+    let mut field = open_with(cx, "abcdef", |field| field.masked(true));
+    field.mouse_down(column_x(4.0), 1, false);
+    assert_eq!(field.selection(), 4..4);
+    field.keys("x");
+    assert_eq!(field.text(), "abcdxef");
+}
+
+#[gpui::test]
+fn a_borderless_field_starts_the_text_at_its_left_edge(cx: &mut TestAppContext) {
+    let mut field = open_with(cx, "abcdef", TextField::borderless);
+    field.mouse_down(column_x(4.0) - TEXT_LEFT, 1, false);
+    assert_eq!(field.selection(), 4..4);
+}
+
+#[gpui::test]
+fn a_larger_text_size_widens_the_characters(cx: &mut TestAppContext) {
+    let mut field = open_with(cx, "abcdef", |field| field.text_size(px(28.0)));
+    field.mouse_down(TEXT_LEFT + 4.0 * CHAR_WIDTH * 2.0 + 1.0, 1, false);
+    assert_eq!(field.selection(), 4..4);
+}

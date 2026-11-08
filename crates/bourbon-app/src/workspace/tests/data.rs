@@ -9,8 +9,8 @@ use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext, VisualT
 use jiff::civil::date;
 
 use super::{
-    choose_menu_entry, click, locations_with_runner, menu_labels, note_in, open_view_with,
-    seeded_store, type_into_title,
+    choose_menu_entry, choose_setting, click, locations_with_runner, menu_labels, note_in,
+    open_view_with, seeded_store, type_into_title,
 };
 use crate::backup_runner::{BackupJob, BackupRunner};
 use crate::locations::Locations;
@@ -605,6 +605,7 @@ fn the_settings_repository_field_validates_and_saves(cx: &mut TestAppContext) {
         Arc::new(FakeRunner::default()),
     );
     press(cx, setup.handle, "ctrl-,");
+    click(cx, setup.handle, "settings-page-backup");
     click(cx, setup.handle, "settings-backup-repository");
 
     type_text(cx, setup.handle, "not a repo");
@@ -635,9 +636,10 @@ fn choosing_the_token_login_shows_a_token_field_whose_text_is_saved_privately(
 ) {
     let setup = open_default(cx);
     press(cx, setup.handle, "ctrl-,");
+    click(cx, setup.handle, "settings-page-backup");
     let hidden = !is_present(cx, setup.handle, "settings-backup-token");
 
-    click(cx, setup.handle, "settings-backup-auth-token");
+    choose_setting(cx, setup.handle, "settings-backup-auth", 1);
     click(cx, setup.handle, "settings-backup-token");
     type_text(cx, setup.handle, "ghp_abc");
 
@@ -660,6 +662,7 @@ fn choosing_the_token_login_shows_a_token_field_whose_text_is_saved_privately(
 fn the_settings_toggle_and_buttons_drive_the_backup(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     press(cx, setup.handle, "ctrl-,");
+    click(cx, setup.handle, "settings-page-backup");
 
     click(cx, setup.handle, "settings-backup-enabled");
     click(cx, setup.handle, "settings-backup-now");

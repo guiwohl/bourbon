@@ -164,6 +164,12 @@ fn choose_menu_entry(cx: &mut TestAppContext, handle: AnyWindowHandle, position:
     cx.run_until_parked();
 }
 
+fn choose_setting(cx: &mut TestAppContext, handle: AnyWindowHandle, select: &str, position: usize) {
+    click(cx, handle, select);
+    cx.run_until_parked();
+    choose_menu_entry(cx, handle, position);
+}
+
 fn click(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) {
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);

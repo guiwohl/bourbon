@@ -34,16 +34,21 @@ pub(super) fn render(
         .gap(px(HORIZONTAL_PADDING))
         .w_full()
         .min_w_0()
-        .h(px(FIELD_HEIGHT))
-        .px(px(HORIZONTAL_PADDING))
-        .rounded(tokens.scale.radius_default)
-        .border_1()
-        .border_color(border_color(focused, &colors))
         .cursor(CursorStyle::IBeam)
         .on_mouse_down(MouseButton::Left, cx.listener(TextField::on_mouse_down))
         .on_mouse_move(cx.listener(TextField::on_mouse_move))
         .on_mouse_up(MouseButton::Left, cx.listener(TextField::on_mouse_up))
         .on_mouse_up_out(MouseButton::Left, cx.listener(TextField::on_mouse_up));
+    let framed = !field.look.borderless;
+    let root = if framed {
+        root.h(px(FIELD_HEIGHT))
+            .px(px(HORIZONTAL_PADDING))
+            .rounded(tokens.scale.radius_default)
+            .border_1()
+            .border_color(border_color(focused, &colors))
+    } else {
+        root
+    };
     with_actions(root, cx)
         .children(field.leading_icon.map(|icon| {
             div()
@@ -57,7 +62,7 @@ pub(super) fn render(
                 .min_w_0()
                 .child(TextFieldElement::new(cx.entity())),
         )
-        .children(focused.then(|| {
+        .children((framed && focused).then(|| {
             div()
                 .absolute()
                 .top(ring_inset)

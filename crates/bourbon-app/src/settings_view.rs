@@ -1,23 +1,63 @@
 use bourbon_core::{Appearance, BackupAuth, Settings, ThemeSource};
-use gpui_kit::component::ActiveTheme as _;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::{
+use bourbon_editor::TextField;
+use bourbon_ui::popover::below;
+use bourbon_ui::{Button, Checkbox, IconButton, IconName, MenuItem, Select, ThemeExt as _, Tokens};
+use gpui::prelude::FluentBuilder as _;
+use gpui::{
     AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
-    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div,
+    SharedString, StatefulInteractiveElement as _, Styled as _, div, px,
 };
+use gpui_kit::TestSupportExt as _;
 
-use crate::workspace::Workspace;
+use crate::overlay::tagged;
+use crate::workspace::{MenuBuilder, Workspace};
+
+const MENU_WIDTH: f32 = 160.;
+const MENU_ITEM_HEIGHT: f32 = 36.;
+const MENU_ITEM_PADDING: f32 = 14.;
+const MENU_TOP_PADDING: f32 = 8.;
+const MENU_ACCENT_WIDTH: f32 = 3.;
+const INACTIVE_ITEM_OPACITY: f32 = 0.6;
+const CONTENT_PADDING: f32 = 12.;
+const CONTENT_MAX_WIDTH: f32 = 640.;
+const SECTION_GAP: f32 = 24.;
+const FIELD_GAP: f32 = 6.;
+const ACTION_GAP: f32 = 7.;
+const NOTICE_TINT: f32 = 0.1;
+const NOTICE_PADDING_VERTICAL: f32 = 8.;
+const NOTICE_PADDING_HORIZONTAL: f32 = 14.;
 
 type Apply = fn(&mut Workspace, &mut Context<Workspace>);
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum SettingsPage {
+    #[default]
+    General,
+    Backup,
+}
+
+impl SettingsPage {
+    const ALL: [Self; 2] = [Self::General, Self::Backup];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::General => "General",
+            Self::Backup => "Backup",
+        }
+    }
+
+    fn id(self) -> &'static str {
+        match self {
+            Self::General => "settings-page-general",
+            Self::Backup => "settings-page-backup",
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 struct Choice {
-    id: &'static str,
     label: &'static str,
     selected: bool,
-    enabled: bool,
     apply: Apply,
 }
 
@@ -25,344 +65,426 @@ fn theme_choices(settings: &Settings) -> [Choice; 2] {
     let source = settings.theme_source;
     [
         Choice {
-            id: "settings-theme-bourbon",
             label: "Bourbon",
             selected: source == ThemeSource::Bourbon,
-            enabled: true,
             apply: |view, cx| view.set_theme_source(ThemeSource::Bourbon, cx),
         },
         Choice {
-            id: "settings-theme-omarchy",
             label: "Follow Omarchy",
             selected: source == ThemeSource::Omarchy,
-            enabled: true,
             apply: |view, cx| view.set_theme_source(ThemeSource::Omarchy, cx),
         },
     ]
 }
 
 fn appearance_choices(settings: &Settings) -> [Choice; 2] {
-    let follows_omarchy = settings.theme_source == ThemeSource::Omarchy;
     [
         Choice {
-            id: "settings-appearance-light",
             label: "Light",
             selected: settings.appearance == Appearance::Light,
-            enabled: !follows_omarchy,
             apply: |view, cx| view.set_appearance(Appearance::Light, cx),
         },
         Choice {
-            id: "settings-appearance-dark",
             label: "Dark",
             selected: settings.appearance == Appearance::Dark,
-            enabled: !follows_omarchy,
             apply: |view, cx| view.set_appearance(Appearance::Dark, cx),
         },
     ]
 }
 
-fn opacity_of(enabled: bool) -> f32 {
-    if enabled { 1. } else { 0.5 }
-}
-
-pub(crate) struct SettingsData<'a> {
-    pub(crate) settings: &'a Settings,
-    pub(crate) repository_input: &'a Entity<InputState>,
-    pub(crate) token_input: &'a Entity<InputState>,
-    pub(crate) repository_error: Option<SharedString>,
-    pub(crate) status: Option<SharedString>,
-}
-
 fn backup_auth_choices(settings: &Settings) -> [Choice; 2] {
     [
         Choice {
-            id: "settings-backup-auth-gh",
             label: "GitHub CLI",
             selected: settings.backup_auth == BackupAuth::GhCli,
-            enabled: true,
             apply: |view, cx| view.set_backup_auth(BackupAuth::GhCli, cx),
         },
         Choice {
-            id: "settings-backup-auth-token",
             label: "Personal access token",
             selected: settings.backup_auth == BackupAuth::Token,
-            enabled: true,
             apply: |view, cx| view.set_backup_auth(BackupAuth::Token, cx),
         },
     ]
 }
 
-fn backup_enabled_choice(settings: &Settings) -> Choice {
-    Choice {
-        id: "settings-backup-enabled",
-        label: if settings.backup_enabled {
-            "Automatic backup: on"
-        } else {
-            "Automatic backup: off"
-        },
-        selected: settings.backup_enabled,
-        enabled: true,
-        apply: Workspace::toggle_backup_enabled,
-    }
+fn appearance_is_editable(settings: &Settings) -> bool {
+    settings.theme_source == ThemeSource::Bourbon
 }
 
-fn backup_section(data: &SettingsData, cx: &mut Context<Workspace>) -> AnyElement {
-    let settings = data.settings;
-    let auth_options = div()
-        .flex()
-        .gap_2()
-        .children(backup_auth_choices(settings).map(|choice| button(choice, cx)));
-    let actions = div()
-        .flex()
-        .gap_2()
-        .child(
-            Button::new("settings-backup-now")
-                .label("Back up now")
-                .on_click(cx.listener(|view, _, _, cx| view.back_up_now(cx))),
-        )
-        .child(
-            Button::new("settings-restore")
-                .label("Restore from backup\u{2026}")
-                .on_click(cx.listener(|view, _, _, cx| view.begin_restore(cx))),
-        );
-    let repository = div()
-        .flex()
-        .flex_col()
-        .gap_1()
-        .child(Input::new(data.repository_input).id("settings-backup-repository"))
-        .children(data.repository_error.clone().map(|message| {
-            div()
-                .id("settings-backup-repository-error")
-                .test_support()
-                .text_sm()
-                .text_color(cx.theme().danger)
-                .child(message)
-        }));
-    div()
-        .flex()
-        .flex_col()
-        .gap_4()
-        .child(
-            div()
-                .text_sm()
-                .text_color(cx.theme().muted_foreground)
-                .child("Backup"),
-        )
-        .child(labelled("Repository", repository))
-        .child(labelled("Sign in with", auth_options))
-        .when(settings.backup_auth == BackupAuth::Token, |section| {
-            section.child(labelled(
-                "Token",
-                Input::new(data.token_input).id("settings-backup-token"),
-            ))
+fn current_label(choices: &[Choice; 2]) -> &'static str {
+    choices
+        .iter()
+        .find(|choice| choice.selected)
+        .map_or(choices[0].label, |choice| choice.label)
+}
+
+fn choices_menu(choices: [Choice; 2]) -> MenuBuilder {
+    choices
+        .into_iter()
+        .fold(MenuBuilder::default(), |menu, choice| {
+            let apply = choice.apply;
+            menu.item(
+                MenuItem::new(choice.label).checked(choice.selected),
+                move |view, _, cx| apply(view, cx),
+            )
         })
-        .child(button(backup_enabled_choice(settings), cx))
-        .child(actions)
-        .children(data.status.clone().map(|status| {
-            div()
-                .id("settings-backup-status")
-                .test_support()
-                .text_sm()
-                .child(status)
-        }))
-        .into_any_element()
 }
 
-pub(crate) fn restore_confirmation(
-    question: String,
-    cx: &mut Context<Workspace>,
-) -> impl IntoElement + use<> {
-    div()
-        .id("restore-confirmation")
-        .test_support()
-        .flex()
-        .flex_col()
-        .gap_2()
-        .p_3()
-        .rounded_md()
-        .border_1()
-        .border_color(cx.theme().border)
-        .bg(cx.theme().muted)
-        .child(question)
-        .child(
-            div()
-                .flex()
-                .gap_2()
-                .child(
-                    Button::new("restore-confirm")
-                        .label("Restore")
-                        .danger()
-                        .on_click(cx.listener(|view, _, _, cx| view.confirm_restore(cx))),
-                )
-                .child(
-                    Button::new("restore-cancel")
-                        .label("Cancel")
-                        .on_click(cx.listener(|view, _, _, cx| view.cancel_restore(cx))),
-                ),
-        )
-}
-
-pub(crate) fn notice_banner(
-    message: SharedString,
-    cx: &mut Context<Workspace>,
-) -> impl IntoElement + use<> {
-    div()
-        .id("notice-banner")
-        .test_support()
-        .px_3()
-        .py_1()
-        .rounded_md()
-        .bg(cx.theme().muted)
-        .text_color(cx.theme().foreground)
-        .child(message)
+pub(crate) struct SettingsData<'a> {
+    pub(crate) settings: &'a Settings,
+    pub(crate) page: SettingsPage,
+    pub(crate) repository_input: &'a Entity<TextField>,
+    pub(crate) token_input: &'a Entity<TextField>,
+    pub(crate) repository_error: Option<SharedString>,
+    pub(crate) status: Option<SharedString>,
 }
 
 pub(crate) fn render(data: &SettingsData, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
-    let settings = data.settings;
-    let theme_options = div()
-        .flex()
-        .gap_2()
-        .children(theme_choices(settings).map(|choice| button(choice, cx)));
-    let appearance_options = div()
-        .flex()
-        .gap_2()
-        .children(appearance_choices(settings).map(|choice| button(choice, cx)));
-    let back = Choice {
-        id: "settings-close",
-        label: "Back to notes",
-        selected: false,
-        enabled: true,
-        apply: Workspace::close_settings,
+    let tokens = cx.theme().tokens.clone();
+    let page = match data.page {
+        SettingsPage::General => general_page(data.settings, &tokens, cx),
+        SettingsPage::Backup => backup_page(data, &tokens, cx),
     };
+    let content = div()
+        .id("settings-content")
+        .flex_1()
+        .min_w_0()
+        .h_full()
+        .overflow_y_scroll()
+        .p(px(CONTENT_PADDING))
+        .bg(tokens.colors.page_background)
+        .child(
+            div()
+                .flex()
+                .justify_between()
+                .items_start()
+                .child(
+                    div()
+                        .flex_1()
+                        .max_w(px(CONTENT_MAX_WIDTH))
+                        .flex()
+                        .flex_col()
+                        .gap(px(SECTION_GAP))
+                        .child(page),
+                )
+                .child(
+                    div().id("settings-close").test_support().child(
+                        IconButton::new("settings-close-button", IconName::X)
+                            .tooltip("Back to notes")
+                            .on_click(cx.listener(|view, _, _, cx| view.close_settings(cx))),
+                    ),
+                ),
+        );
     div()
         .id("settings")
         .test_support()
         .flex_1()
         .h_full()
         .flex()
-        .flex_col()
-        .gap_4()
-        .p_6()
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .justify_between()
-                .child(div().text_xl().child("Settings"))
-                .child(button(back, cx)),
-        )
-        .child(
-            div()
-                .text_sm()
-                .text_color(cx.theme().muted_foreground)
-                .child("Appearance"),
-        )
-        .child(labelled("Theme", theme_options))
-        .child(labelled("Appearance", appearance_options))
-        .child(backup_section(data, cx))
+        .text_color(tokens.colors.text)
+        .font_family(tokens.fonts.ui_family.clone())
+        .text_size(tokens.scale.medium)
+        .child(page_menu(data.page, &tokens, cx))
+        .child(content)
 }
 
-fn labelled(label: &'static str, options: impl IntoElement) -> impl IntoElement {
+fn page_menu(
+    current: SettingsPage,
+    tokens: &Tokens,
+    cx: &mut Context<Workspace>,
+) -> impl IntoElement + use<> {
+    let colors = tokens.colors;
+    div()
+        .flex_none()
+        .w(px(MENU_WIDTH))
+        .h_full()
+        .pt(px(MENU_TOP_PADDING))
+        .flex()
+        .flex_col()
+        .bg(colors.sidebar_background)
+        .border_r_1()
+        .border_color(colors.sidebar_border)
+        .children(SettingsPage::ALL.map(|page| {
+            let active = page == current;
+            div()
+                .id(page.id())
+                .test_support()
+                .relative()
+                .flex()
+                .items_center()
+                .h(px(MENU_ITEM_HEIGHT))
+                .px(px(MENU_ITEM_PADDING))
+                .cursor_pointer()
+                .when(!active, |item| item.opacity(INACTIVE_ITEM_OPACITY))
+                .when(active, |item| {
+                    item.bg(colors.selection_inactive).child(
+                        div()
+                            .absolute()
+                            .top_0()
+                            .bottom_0()
+                            .left_0()
+                            .w(px(MENU_ACCENT_WIDTH))
+                            .bg(colors.primary),
+                    )
+                })
+                .on_click(cx.listener(move |view, _, _, cx| view.show_settings_page(page, cx)))
+                .child(page.label())
+        }))
+}
+
+fn heading(title: &'static str, tokens: &Tokens) -> impl IntoElement + use<> {
+    div()
+        .text_size(tokens.scale.medium)
+        .font_weight(tokens.scale.weight_semibold)
+        .child(title)
+}
+
+fn field(
+    label: &'static str,
+    control: impl IntoElement,
+    description: Option<&'static str>,
+    tokens: &Tokens,
+) -> AnyElement {
     div()
         .flex()
         .flex_col()
-        .gap_1()
+        .gap(px(FIELD_GAP))
         .child(div().child(label))
-        .child(options)
+        .child(control)
+        .when_some(description, |field, description| {
+            field.child(
+                div()
+                    .text_size(tokens.scale.small)
+                    .text_color(tokens.colors.muted_text)
+                    .child(description),
+            )
+        })
+        .into_any_element()
 }
 
-fn button(choice: Choice, cx: &mut Context<Workspace>) -> AnyElement {
-    let theme = cx.theme();
-    let (background, foreground) = if choice.selected {
-        (theme.primary, theme.primary_foreground)
-    } else {
-        (theme.muted, theme.foreground)
-    };
-    let apply = choice.apply;
-    let look = div()
-        .id(SharedString::from(choice.id))
+fn choice_select(
+    id: &'static str,
+    choices: [Choice; 2],
+    enabled: bool,
+    cx: &mut Context<Workspace>,
+) -> impl IntoElement + use<> {
+    let select = div().id(id).test_support().child(
+        Select::new(
+            SharedString::from(format!("{id}-select")),
+            current_label(&choices),
+        )
+        .disabled(!enabled)
+        .on_open({
+            let view = cx.entity();
+            move |bounds, window, cx| {
+                view.update(cx, |view, cx| {
+                    view.open_menu(below(bounds), choices_menu(choices), window, cx);
+                });
+            }
+        }),
+    );
+    div().flex().child(select)
+}
+
+fn general_page(settings: &Settings, tokens: &Tokens, cx: &mut Context<Workspace>) -> AnyElement {
+    let editable = appearance_is_editable(settings);
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(SECTION_GAP))
+        .child(heading("Appearance", tokens))
+        .child(field(
+            "Theme",
+            choice_select("settings-theme", theme_choices(settings), true, cx),
+            None,
+            tokens,
+        ))
+        .child(field(
+            "Appearance",
+            choice_select(
+                "settings-appearance",
+                appearance_choices(settings),
+                editable,
+                cx,
+            ),
+            (!editable).then_some("Omarchy decides the appearance while you follow its theme."),
+            tokens,
+        ))
+        .into_any_element()
+}
+
+fn backup_page(data: &SettingsData, tokens: &Tokens, cx: &mut Context<Workspace>) -> AnyElement {
+    let settings = data.settings;
+    let repository = div()
+        .flex()
+        .flex_col()
+        .gap(px(FIELD_GAP))
+        .child(tagged(
+            "settings-backup-repository",
+            data.repository_input.clone(),
+        ))
+        .children(data.repository_error.clone().map(|message| {
+            div()
+                .id("settings-backup-repository-error")
+                .test_support()
+                .text_size(tokens.scale.small)
+                .text_color(tokens.colors.negative)
+                .child(message)
+        }));
+    let actions = div()
+        .flex()
+        .justify_end()
+        .gap(px(ACTION_GAP))
+        .child(tagged(
+            "settings-backup-now",
+            Button::new("settings-backup-now-button")
+                .label("Back up now")
+                .on_click(cx.listener(|view, _, _, cx| view.back_up_now(cx))),
+        ))
+        .child(tagged(
+            "settings-restore",
+            Button::new("settings-restore-button")
+                .label("Restore from backup\u{2026}")
+                .on_click(cx.listener(|view, _, _, cx| view.begin_restore(cx))),
+        ));
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(SECTION_GAP))
+        .child(heading("Backup", tokens))
+        .child(field(
+            "Repository",
+            repository,
+            Some("The GitHub repository that keeps your notes, as owner/name."),
+            tokens,
+        ))
+        .child(field(
+            "Sign in with",
+            choice_select(
+                "settings-backup-auth",
+                backup_auth_choices(settings),
+                true,
+                cx,
+            ),
+            None,
+            tokens,
+        ))
+        .when(settings.backup_auth == BackupAuth::Token, |page| {
+            page.child(field(
+                "Token",
+                tagged("settings-backup-token", data.token_input.clone()),
+                None,
+                tokens,
+            ))
+        })
+        .child(tagged(
+            "settings-backup-enabled",
+            Checkbox::new(
+                "settings-backup-enabled-checkbox",
+                "Back up automatically",
+                settings.backup_enabled,
+            )
+            .description("Pushes your notes after changes and when Bourbon closes.")
+            .on_toggle({
+                let view = cx.entity();
+                move |_, _, cx| view.update(cx, Workspace::toggle_backup_enabled)
+            }),
+        ))
+        .child(actions)
+        .children(data.status.clone().map(|status| {
+            div()
+                .id("settings-backup-status")
+                .test_support()
+                .text_size(tokens.scale.small)
+                .text_color(tokens.colors.muted_text)
+                .child(status)
+        }))
+        .into_any_element()
+}
+
+pub(crate) fn notice_banner(
+    message: SharedString,
+    cx: &mut Context<Workspace>,
+) -> impl IntoElement + use<> {
+    let tokens = cx.theme().tokens.clone();
+    div()
+        .id("notice-banner")
         .test_support()
-        .px_3()
-        .py_1()
-        .rounded_md()
-        .border_1()
-        .border_color(theme.border)
-        .bg(background)
-        .text_color(foreground)
-        .opacity(opacity_of(choice.enabled))
-        .child(choice.label);
-    if choice.enabled {
-        look.cursor_pointer()
-            .on_click(cx.listener(move |view, _, _, cx| apply(view, cx)))
-            .into_any_element()
-    } else {
-        look.into_any_element()
-    }
+        .py(px(NOTICE_PADDING_VERTICAL))
+        .px(px(NOTICE_PADDING_HORIZONTAL))
+        .bg(tokens.colors.info.opacity(NOTICE_TINT))
+        .border_b_1()
+        .border_color(tokens.colors.internal_border)
+        .text_color(tokens.colors.text)
+        .font_family(tokens.fonts.ui_family.clone())
+        .text_size(tokens.scale.small)
+        .child(message)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn flags(choices: [Choice; 2]) -> [(bool, bool); 2] {
-        choices.map(|choice| (choice.selected, choice.enabled))
+    fn selected(choices: [Choice; 2]) -> [bool; 2] {
+        choices.map(|choice| choice.selected)
     }
 
     #[test]
     fn the_theme_choice_marks_the_current_source() {
         let mut settings = Settings::default();
-        assert_eq!(
-            flags(theme_choices(&settings)),
-            [(true, true), (false, true)]
-        );
+        assert_eq!(selected(theme_choices(&settings)), [true, false]);
         settings.theme_source = ThemeSource::Omarchy;
-        assert_eq!(
-            flags(theme_choices(&settings)),
-            [(false, true), (true, true)]
-        );
+        assert_eq!(selected(theme_choices(&settings)), [false, true]);
     }
 
     #[test]
-    fn the_appearance_choice_marks_the_current_appearance_and_is_enabled_for_bourbon() {
+    fn the_appearance_choice_marks_the_current_appearance() {
         let mut settings = Settings::default();
-        assert_eq!(
-            flags(appearance_choices(&settings)),
-            [(true, true), (false, true)]
-        );
+        assert_eq!(selected(appearance_choices(&settings)), [true, false]);
         settings.appearance = Appearance::Dark;
-        assert_eq!(
-            flags(appearance_choices(&settings)),
-            [(false, true), (true, true)]
-        );
+        assert_eq!(selected(appearance_choices(&settings)), [false, true]);
     }
 
     #[test]
-    fn the_appearance_choice_is_disabled_while_following_omarchy() {
+    fn the_appearance_is_editable_only_with_the_bourbon_theme() {
         let mut settings = Settings::default();
+        assert!(appearance_is_editable(&settings));
         settings.theme_source = ThemeSource::Omarchy;
-        assert_eq!(
-            flags(appearance_choices(&settings)),
-            [(true, false), (false, false)]
-        );
+        assert!(!appearance_is_editable(&settings));
     }
 
     #[test]
     fn the_backup_auth_choice_marks_the_current_login() {
         let mut settings = Settings::default();
-        assert_eq!(
-            flags(backup_auth_choices(&settings)),
-            [(true, true), (false, true)]
-        );
+        assert_eq!(selected(backup_auth_choices(&settings)), [true, false]);
+        settings.backup_auth = BackupAuth::Token;
+        assert_eq!(selected(backup_auth_choices(&settings)), [false, true]);
+    }
+
+    #[test]
+    fn the_select_shows_the_selected_choice() {
+        let mut settings = Settings::default();
         settings.backup_auth = BackupAuth::Token;
         assert_eq!(
-            flags(backup_auth_choices(&settings)),
-            [(false, true), (true, true)]
+            current_label(&backup_auth_choices(&settings)),
+            "Personal access token"
+        );
+        assert_eq!(current_label(&theme_choices(&settings)), "Bourbon");
+    }
+
+    #[test]
+    fn the_choice_menu_lists_every_choice_in_order() {
+        let settings = Settings::default();
+        assert_eq!(
+            choices_menu(theme_choices(&settings)).item_labels(),
+            ["Bourbon", "Follow Omarchy"]
         );
     }
 
     #[test]
-    fn disabled_buttons_are_dimmed() {
-        assert!((opacity_of(true) - 1.).abs() < f32::EPSILON);
-        assert!(opacity_of(false) < 1.);
+    fn the_pages_are_general_then_backup() {
+        let labels = SettingsPage::ALL.map(SettingsPage::label);
+        assert_eq!(labels, ["General", "Backup"]);
+        assert_eq!(SettingsPage::default(), SettingsPage::General);
     }
 }

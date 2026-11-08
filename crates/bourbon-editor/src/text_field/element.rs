@@ -9,6 +9,7 @@ use gpui::{
 
 use super::TextField;
 use super::geometry::{LineGeometry, revealing_scroll};
+use super::mask::Mask;
 
 const CARET_WIDTH: Pixels = px(1.0);
 
@@ -83,6 +84,15 @@ fn text_runs(
 }
 
 impl TextField {
+    fn font_size(&self, tokens: &Tokens) -> Pixels {
+        self.look.text_size.unwrap_or(tokens.scale.medium)
+    }
+
+    pub(crate) fn line_height(&self, tokens: &Tokens) -> Pixels {
+        let ratio = tokens.scale.line_height / tokens.scale.medium;
+        (self.font_size(tokens) * ratio).round()
+    }
+
     fn layout_line(
         &mut self,
         bounds: Bounds<Pixels>,
@@ -91,8 +101,10 @@ impl TextField {
     ) -> TextFieldFrame {
         let tokens = &cx.theme().tokens;
         let font = ui_font(tokens);
-        let font_size = tokens.scale.medium;
+        let font_size = self.font_size(tokens);
         let shows_placeholder = self.state.text.is_empty();
+        let text = self.text();
+        let mask = self.look.masked.then(|| Mask::of(&text));
         let (content, runs) = if shows_placeholder {
             let placeholder_run = TextRun {
                 len: self.placeholder.len(),
@@ -104,15 +116,17 @@ impl TextField {
             };
             (self.placeholder.clone(), vec![placeholder_run])
         } else {
-            (
-                SharedString::from(self.text()),
-                text_runs(
-                    self.state.text.len(),
-                    self.marked.as_ref(),
-                    &font,
-                    &tokens.colors,
-                ),
-            )
+            let shown = mask.as_ref().map_or(text, Mask::shown);
+            let shown_offset = |offset: usize| {
+                mask.as_ref()
+                    .map_or(offset, |mask| mask.shown_offset(offset))
+            };
+            let marked = self
+                .marked
+                .as_ref()
+                .map(|range| shown_offset(range.start)..shown_offset(range.end));
+            let runs = text_runs(shown.len(), marked.as_ref(), &font, &tokens.colors);
+            (SharedString::from(shown), runs)
         };
         let line = window
             .text_system()
@@ -121,7 +135,7 @@ impl TextField {
         let caret_x = if shows_placeholder {
             px(0.0)
         } else {
-            line.x_for_index(head)
+            line.x_for_index(mask.as_ref().map_or(head, |mask| mask.shown_offset(head)))
         };
         let content_width = if shows_placeholder {
             px(0.0)
@@ -141,6 +155,7 @@ impl TextField {
             origin: bounds.origin,
             line_height: bounds.size.height,
             scroll_x,
+            mask,
         };
         let selected = self.selected_range();
         let selection = (!selected.is_empty()).then(|| {
@@ -186,7 +201,8 @@ impl Element for TextFieldElement {
     ) -> (LayoutId, Self::RequestLayoutState) {
         let mut style = Style::default();
         style.size.width = relative(1.0).into();
-        style.size.height = cx.theme().tokens.scale.line_height.into();
+        let line_height = self.field.read(cx).line_height(&cx.theme().tokens);
+        style.size.height = line_height.into();
         (window.request_layout(style, [], cx), ())
     }
 

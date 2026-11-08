@@ -46,7 +46,9 @@ Each column is a module owned by one concern. Columns render from data the works
 | `single_instance.rs` | GPUI-free Unix socket claim and focus listener (see Single instance) |
 | `window.rs` | GPUI application, key binding, window options, the close hook |
 | `autosave.rs` | The 500 ms delayed task |
-| `control_pane/` | The centred search and command overlay (see Control pane) |
+| `control_pane/` | The search and command palette (see Control pane) |
+| `overlay.rs` | `tagged(id, element)` and `layer(id, dialog)`: wrap `bourbon-ui` overlays and buttons in test-visible ids |
+| `workspace/dialogs.rs` | `DialogState` (dialog focus, empty trash pending), `Workspace::dialog` (sidebar prompt, restore, empty trash; one at a time), the generic confirmation dialog (Cancel + danger confirm, Enter confirms, Esc and backdrop cancel). Dialogs without a field take the dialog focus when shown |
 | `navigation.rs` | `Navigation`, `Listing`, the pure mapping to `NoteQuery` |
 | `workspace.rs` | Root view: owns `NoteStore`, listing, selection, autosave and flush, trash purge, error banner state; lays out the three columns |
 | `dragged_note.rs` | `DraggedNote` drag payload and preview, built from a `NoteSummary` |
@@ -66,7 +68,7 @@ Headless, through `gpui-kit` `test-support` (`#[gpui_kit::test]`, `TestAppContex
 
 ## Dependency guard
 
-`just architecture` fails if `cargo tree -p bourbon-core -e normal --prefix none` lists any crate starting with `gpui`, so it cannot go stale as GPUI crates are added. Proven by adding `gpui-pre-util` to `bourbon-core`: the recipe failed; reverted, it passed. `deny.toml` bans `gpui-kit`, `gpui-component`, `gpui-base` and `gpui-pre`, each with `wrappers` listing its exact direct parents (from `cargo tree -i`). Only `bourbon-app` may depend on `gpui-kit`, the entry point of the whole chain. Proven by adding `gpui-kit` to `bourbon-core`: `error[banned]`. `just deny` also prints many `duplicate` warnings from GPUI; they are expected.
+`just architecture` fails if `cargo tree -p bourbon-core -e normal --prefix none` lists any crate starting with `gpui`, so it cannot go stale as GPUI crates are added. Proven by adding `gpui-pre-util` to `bourbon-core`: the recipe failed; reverted, it passed. `deny.toml` bans `gpui-kit`, `gpui-component`, `gpui-base` and `gpui-pre`, each with `wrappers` listing its exact direct parents (from `cargo tree -i`). Only `bourbon-app` may depend on `gpui-kit`, the entry point of the whole chain. `bourbon-app` also depends on `gpui-pre` directly (`gpui` in code), so the overlays use GPUI without the kit. Proven by adding `gpui-kit` to `bourbon-core`: `error[banned]`. `just deny` also prints many `duplicate` warnings from GPUI; they are expected.
 
 ## Sidebar
 
@@ -81,7 +83,7 @@ Implements decision rows 2, 4, 7, 11, 12 and 23 of [M2 organization](../decision
 | Notebook menu | Right click (our `Menu`, `notebooks::notebook_menu`): New sub-notebook (also expands the parent), Rename, Use for new notes (sets the default notebook), Delete. The Inbox (`default_notebook()`, read once at startup) has no Delete |
 | Tag rows | Colour dot (fixed palette in `presentation.rs`, independent of the theme), name, `TagSummary::note_count`. Click selects the tag alone; `Ctrl+click` toggles it in the `Navigation::Tags` selection (notes having all of them); removing the last tag goes to All Notes |
 | Tag menu | Rename, Change colour (the owner replaces the menu with the 14 `TagColor` values, current one checked, at the same position), Delete |
-| Prompt | One inline panel at the top of the sidebar (`SidebarState::prompt`; the name field is a `bourbon_editor::TextField` wrapped in `sidebar-prompt-name`, the buttons are `bourbon_ui::Button`): a name field with Save/Cancel (Enter saves, Esc cancels) for create and rename, a question with Delete/Cancel for deletions ("Delete notebook X? Its notes move to Trash."). No dialog: the dialog layer needs `Root` as the window root view, which the app does not use. A core error (empty name, duplicate tag) goes to the banner and the prompt stays open; success clears the banner and the prompt |
+| Prompt | A `bourbon_ui::Dialog` over the window (`SidebarState::prompt`, rendered by `sidebar::prompt_dialog` from `Workspace::dialog`; overlay id `sidebar-prompt`, field `sidebar-prompt-name` is a `bourbon_editor::TextField`, buttons `sidebar-prompt-confirm` / `sidebar-prompt-cancel`): title New notebook / New sub-notebook / Rename notebook / Rename tag with Cancel + Save (primary); Delete notebook / Delete tag with the question and Cancel + Delete (danger). Enter confirms, Esc or a backdrop click cancels. A core error (empty name, duplicate tag) goes to the banner and the dialog stays open; success clears both |
 | After a mutation | `refresh_listing` once (sidebar data and list). Deleting a notebook first flushes the pending save, and afterwards deselects the open note if it is now trashed or gone (empty state). Creating a sub-notebook re-applies the parent's depth to the navigation without reloading, so the single reload covers it. Deleting a notebook whose subtree contains the current notebook, or deleting a selected tag, adjusts the navigation first (All Notes, or the remaining tags) |
 | `Ctrl+/` | `ToggleSidebar` action bound in `window::bind_keys`; `SidebarState::is_visible`, the other two columns take the space |
 | Drop target | Notebook rows accept a dragged note (`on_drop::<DraggedNote>`) and the row takes the active selection colour while one is over it. The drop calls `Workspace::drop_note_on_notebook` |
@@ -111,7 +113,7 @@ Tests (`workspace/tests/sidebar.rs`) drive real elements: row clicks (wrapper id
 - The context menu (right click) outside Trash offers Pin or Unpin, Duplicate, Move to Trash; in Trash only Restore.
 - Every change goes through one path (`change_notes`): `flush_then`, call the core, `refresh_listing`, report a store error in the banner. Pin uses the core `toggle_pin`; the app does not read its list to pick a direction. A tag chip click calls the sidebar's single-tag selection (`select_tag`).
 - Duplicate selects the copy. Move to Trash on the selected note selects the next row, else the previous, else nothing (editor empty state); on another row the selection is untouched.
-- "Empty trash" opens an alert dialog ("Permanently delete N notes?"); only OK calls `empty_trash`. A selected note that was purged is deselected.
+- "Empty trash" opens the Empty trash dialog ("Permanently delete N notes?", Cancel + Empty trash in danger red; ids `empty-trash-confirmation`, `empty-trash-confirm`, `empty-trash-cancel`); only the confirm button or Enter calls `empty_trash`, Esc and the backdrop cancel. A selected note that was purged is deselected.
 - A tag chip navigates to that single tag. Its mouse-down stops propagation so the row is not selected.
 - Rows outside Trash are draggable (`on_drag` with a `DraggedNote { id, title }`, defined in `dragged_note.rs`; the preview is a compact chip with the title, `UNTITLED` when empty). Dropped on a sidebar notebook row, the note moves through `move_note_to`, the same path as the notebook selector and `Ctrl+Alt+M`: `flush_then`, `move_note`, `refresh_listing`. The header is reloaded only when the dropped note is the open one; the open note stays open. Trash rows are not draggable.
 - Tag colours map from `TagColor` to the component palette (`ColorName`) in `presentation.rs`, shared with the editor header chips.
@@ -173,7 +175,9 @@ Tests: `workspace/tests/templates.rs`.
 
 ## Control pane
 
-Decisions in [M3 navigation](../decisions/2026-11-06-m3-navigation.md). `Workspace::control_pane: Option<ControlPane>`; rendered last in the root view as an absolute overlay (`pane-backdrop` > `pane-panel` with `pane-input` and `pane-row-<n>`).
+Decisions in [M3 navigation](../decisions/2026-11-06-m3-navigation.md), look in [overlays](../decisions/2026-11-08-overlays.md). `Workspace::control_pane: Option<ControlPane>`; rendered as a `bourbon_ui::Modal` placed 56 px from the top (`pane-backdrop` > `pane-panel` with `pane-input` and `pane-row-<n>`).
+
+Look (research 3.11): 600 px wide, max height = window - 56 - 28, page background, 1 px border, radius 12, shadow `0 10 30` at 30 %. Input row 48 px with a 20 px search icon and a borderless 18 px `TextField`; rows margin 2 8, padding 8 10, radius 7, 20 px icon slot (note: file icon, action: chevron), label weight 500, snippet 12 px muted, shortcut 12 px muted on the right; hover tint `selection_list_hover`, highlighted row `selection_list_active` plus a 3 px info bar; the pointer moving over a row highlights it. "No results found" when empty. Footer hints: `↑↓ to navigate`, `↵ to open` / `↵ to run`, `esc to close`.
 
 | File | Responsibility |
 |---|---|
@@ -181,13 +185,13 @@ Decisions in [M3 navigation](../decisions/2026-11-06-m3-navigation.md). `Workspa
 | `control_pane/actions.rs` | `PaneAction` (21 commands), `name`, `shortcut`, `needs_selected_note`, pure `matching(text, has_selected_note)`: filter and rank |
 | `control_pane/highlight.rs` | Pure `next(current, length)` and `previous(current)`, clamped at both ends |
 | `control_pane/mod.rs` | `ControlPane` state: the input, the highlighted row, `Results::{Notes(Vec<SearchHit>), Actions(Vec<PaneAction>)}`; `search(query, store, has_selected_note)` |
-| `control_pane/render.rs` | Overlay: input, rows (note: title or `UNTITLED` plus snippet; action: name plus the shortcut on the right) |
+| `control_pane/render.rs` | Modal: input row, rows (note: title or `UNTITLED` plus snippet; action: name plus the shortcut on the right), empty state, footer hints (`footer_hints(mode)`) |
 | `workspace/control_pane_intents.rs` | `open_note_search`, `open_action_search`, `close_control_pane`, query change, highlight movement, activation and `run_pane_action` |
 
 Behaviour:
 
 - Every query change recomputes the results and resets the highlight to the first row. `set_value` emits no change, so opening computes the first results itself.
-- `Up`, `Down` and `Esc` are captured at the overlay (like the tag suggestions) so the single-line input does not swallow them. `Enter` is the input's `PressEnter`. A mouse down on the backdrop closes; the panel stops propagation.
+- `Up` / `Down` are `control_pane::HighlightNext` / `HighlightPrevious`, bound in the `ControlPane` key context (the text field binds neither). `Enter` and `Esc` are the field's `Submit` and `Cancel`. A mouse down on the backdrop closes; the panel stops propagation.
 - Activating a row closes the pane, restores focus to the workspace root, then runs the target. A note goes through `flush_then`: if it is not in `Workspace::notes` the navigation becomes All Notes, then `select`. An action calls the existing intent: `create_note`, `create_template`, `toggle_sidebar`, `navigate`, `sort_by`, `set_selected_status`, `open_notebook_selector`, `duplicate`, `toggle_pin`, `move_to_trash`, `history_back`, `history_forward`; Empty Trash navigates to Trash and opens `confirm_empty_trash`.
 - No selected note: the actions that need one are hidden from the list.
 - Startup now always focuses the workspace root, so `Ctrl+O` and `Ctrl+P` work before any click.
@@ -198,7 +202,7 @@ Tests: pure unit tests next to each file; `workspace/tests/control_pane.rs` driv
 
 - `locations.rs`: `Locations` (settings file, Omarchy colors path) is injected into `Workspace::new`; tests pass temp paths.
 - `theme/`: `palette.rs` holds the Bourbon palettes as data, the Omarchy mapping and `resolve`; `tokens.rs` resolves the `bourbon_ui::Tokens` (Inkdrop light/dark, or `omarchy_tokens` for Omarchy) and `apply` installs them next to gpui-component's `Theme`, which still paints the editor column; `watch.rs` is the mtime watch. `Workspace` polls the watch every 2 s.
-- `settings_view.rs` replaces the editor column; `workspace/settings_intents.rs` holds the intents (`open_settings`, `set_theme_source`, `set_appearance`, `resize_*`, `finish_resizing`). Each change applies the theme and saves.
+- `settings_view.rs` is the Inkdrop preferences layout and replaces the three columns while open (Inkdrop uses a separate window): a 160 px page menu (`settings-page-general`, `settings-page-backup`; inactive items at 60 %, active one tinted with a 3 px primary bar) and a scrolling content pane (12 px padding, max 640 px, close button `settings-close`). General: Theme and Appearance `bourbon_ui::Select`s (ids `settings-theme`, `settings-appearance`; Appearance disabled with a hint while following Omarchy) opening our `Menu` under the trigger with the current choice checked. Backup: repository and (token login only, masked) token `TextField`s, Sign in with select (`settings-backup-auth`), "Back up automatically" `Checkbox` (`settings-backup-enabled`), Back up now / Restore buttons right-aligned. `workspace/settings_intents.rs` holds the intents (`open_settings`, `show_settings_page`, `set_theme_source`, `set_appearance`, `resize_*`, `finish_resizing`). Each change applies the theme and saves.
 - Column widths come from `Settings` and flow into `SidebarData` and `NoteListData`; `bourbon_ui::Splitter` reports them through `resize_sidebar` / `resize_note_list` and `finish_resizing` saves on release.
 - Keys: `Ctrl+,` opens settings; control pane action "Open settings".
 
@@ -207,7 +211,7 @@ Tests: pure unit tests next to each file; `workspace/tests/control_pane.rs` driv
 - `backup_runner.rs`: `BackupRunner` trait and `GitBackupRunner`; `Locations` carries the database path, token file, work dir and runner.
 - `workspace/data_intents.rs`: `DataState` (running, dirty, status, timers), `back_up_now`, the 5 minute timer (`note_data_changed`), `request_close` (bounded 20 s), `begin_restore`/`confirm_restore`/`cancel_restore`, `export_to_markdown`/`export_into`.
 - `sidebar/menu.rs`: the gear menu; entries run `PaneAction`s through `run_pane_action`.
-- `settings_view.rs`: Backup section, `restore_confirmation`, `notice_banner`. Tests: `workspace/tests/data.rs` with a recording fake runner. Details in [the M6 app decision](../decisions/2026-11-06-m6-data-app.md).
+- `settings_view.rs`: Backup page and `notice_banner` (info tint at 10 %, 13 px, bottom border). The restore question is the Restore from backup dialog in `workspace/dialogs.rs` (ids `restore-confirmation`, `restore-confirm`, `restore-cancel`). Tests: `workspace/tests/data.rs` with a recording fake runner. Details in [the M6 app decision](../decisions/2026-11-06-m6-data-app.md).
 
 ## Single instance
 

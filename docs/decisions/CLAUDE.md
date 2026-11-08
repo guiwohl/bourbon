@@ -19,3 +19,4 @@
 | [2026-11-06-m4-editor.md](2026-11-06-m4-editor.md) | M4: view modes, task checkboxes, `[[` note links, find/replace, focus mode, word count |
 | [2026-11-06-m6-data-app.md](2026-11-06-m6-data-app.md) | M6 app: backup settings, token file, menu, scheduler, restore, export |
 | [2026-11-07-ui-rebuild.md](2026-11-07-ui-rebuild.md) | Rebuild the UI Inkdrop-identical with no pre-made components; crates and phases |
+| [2026-11-08-overlays.md](2026-11-08-overlays.md) | Overlays on `bourbon-ui`: palette, settings screen, dialogs, new primitives, what still needs `gpui-kit` |

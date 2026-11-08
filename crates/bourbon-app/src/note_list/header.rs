@@ -81,8 +81,8 @@ pub(crate) fn render(data: HeaderData, cx: &mut Context<Workspace>) -> impl Into
             IconButton::new("empty-trash-button", IconName::Trash)
                 .tooltip("Empty trash")
                 .disabled(data.note_count == 0)
-                .on_click(cx.listener(|workspace, _, window, cx| {
-                    workspace.confirm_empty_trash(window, cx);
+                .on_click(cx.listener(|workspace, _, _, cx| {
+                    workspace.confirm_empty_trash(cx);
                 })),
         ),
         ListView::Notes | ListView::Templates => div().id("new-note").test_support().child(

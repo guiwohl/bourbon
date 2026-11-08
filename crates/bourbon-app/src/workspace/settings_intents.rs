@@ -1,12 +1,18 @@
 use bourbon_core::{Appearance, BackupAuth, GitHubRepository, ThemeSource};
-use gpui_kit::Context;
+use gpui::Context;
 
 use super::Workspace;
+use crate::settings_view::SettingsPage;
 use crate::theme;
 
 impl Workspace {
     pub(crate) fn open_settings(&mut self, cx: &mut Context<Self>) {
         self.settings_open = true;
+        cx.notify();
+    }
+
+    pub(crate) fn show_settings_page(&mut self, page: SettingsPage, cx: &mut Context<Self>) {
+        self.settings_page = page;
         cx.notify();
     }
 
@@ -38,7 +44,7 @@ impl Workspace {
     }
 
     pub(super) fn repository_changed(&mut self, cx: &mut Context<Self>) {
-        let text = self.repository_input.read(cx).value().trim().to_owned();
+        let text = self.repository_input.read(cx).text().trim().to_owned();
         if text.is_empty() {
             self.settings.backup_repository = None;
             self.data.repository_error = None;
@@ -55,7 +61,7 @@ impl Workspace {
     }
 
     pub(super) fn token_changed(&mut self, cx: &mut Context<Self>) {
-        let token = self.token_input.read(cx).unmask_value();
+        let token = self.token_input.read(cx).text();
         if let Err(error) = self.locations.backup_token.save(&token) {
             self.error_message = Some(format!("cannot save the token: {error}").into());
             cx.notify();

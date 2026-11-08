@@ -1,80 +1,79 @@
-use bourbon_ui::{Button, ButtonVariant, ThemeExt as _};
-use gpui_kit::{
-    Context, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Styled as _,
-    TestSupportExt as _, div, px,
-};
+use bourbon_ui::{Button, ButtonVariant, Dialog};
+use gpui::{AnyElement, Context, FocusHandle};
 
-use super::state::Prompt;
+use super::state::{DeletionTarget, Prompt};
+use crate::overlay::{layer, tagged};
 use crate::workspace::Workspace;
 
-const PANEL_MARGIN: f32 = 6.;
-const PANEL_PADDING: f32 = 8.;
-const PANEL_GAP: f32 = 8.;
-
-pub(super) fn render(prompt: &Prompt, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
-    let tokens = cx.theme().tokens.clone();
-    let panel = div()
-        .id("sidebar-prompt")
-        .test_support()
-        .flex()
-        .flex_col()
-        .gap(px(PANEL_GAP))
-        .m(px(PANEL_MARGIN))
-        .p(px(PANEL_PADDING))
-        .rounded(tokens.scale.radius_default)
-        .border_1()
-        .border_color(tokens.colors.internal_border)
-        .bg(tokens.colors.input_background)
-        .text_color(tokens.colors.text)
-        .text_size(tokens.scale.medium)
-        .font_family(tokens.fonts.ui_family.clone());
-    match prompt {
-        Prompt::Name { target, input, .. } => panel
-            .child(target.title())
-            .child(
-                div()
-                    .id("sidebar-prompt-name")
-                    .test_support()
-                    .child(input.clone()),
-            )
-            .child(buttons("Save", ButtonVariant::Primary, cx)),
-        Prompt::Deletion { question, .. } => {
-            panel
-                .child(question.clone())
-                .child(buttons("Delete", ButtonVariant::Primary, cx))
-        }
+pub(super) fn deletion_title(target: &DeletionTarget) -> &'static str {
+    match target {
+        DeletionTarget::Notebook(_) => "Delete notebook",
+        DeletionTarget::Tag(_) => "Delete tag",
     }
 }
 
-fn buttons(
-    confirm_label: &'static str,
+pub(crate) fn prompt_dialog(
+    prompt: &Prompt,
+    focus: &FocusHandle,
+    cx: &mut Context<Workspace>,
+) -> AnyElement {
+    let (submitting, dismissing) = (cx.entity(), cx.entity());
+    let dialog = match prompt {
+        Prompt::Name { target, input, .. } => Dialog::new("sidebar-prompt-dialog", target.title())
+            .child(tagged("sidebar-prompt-name", input.clone()))
+            .action(cancel_button(cx))
+            .action(confirm_button("Save", ButtonVariant::Primary, cx)),
+        Prompt::Deletion { target, question } => {
+            Dialog::new("sidebar-prompt-dialog", deletion_title(target))
+                .track_focus(focus)
+                .child(question.clone())
+                .action(cancel_button(cx))
+                .action(confirm_button("Delete", ButtonVariant::Danger, cx))
+        }
+    }
+    .on_submit(move |_, cx| submitting.update(cx, Workspace::confirm_prompt))
+    .on_dismiss(move |_, cx| dismissing.update(cx, Workspace::cancel_prompt));
+    layer("sidebar-prompt", dialog)
+}
+
+fn confirm_button(
+    label: &'static str,
     variant: ButtonVariant,
     cx: &mut Context<Workspace>,
-) -> impl IntoElement + use<> {
-    div()
-        .flex()
-        .gap(px(PANEL_GAP))
-        .child(
-            div()
-                .id("sidebar-prompt-confirm")
-                .test_support()
-                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(
-                    Button::new("sidebar-prompt-confirm-button")
-                        .label(confirm_label)
-                        .variant(variant)
-                        .on_click(cx.listener(|workspace, _, _, cx| workspace.confirm_prompt(cx))),
-                ),
-        )
-        .child(
-            div()
-                .id("sidebar-prompt-cancel")
-                .test_support()
-                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(
-                    Button::new("sidebar-prompt-cancel-button")
-                        .label("Cancel")
-                        .on_click(cx.listener(|workspace, _, _, cx| workspace.cancel_prompt(cx))),
-                ),
-        )
+) -> AnyElement {
+    tagged(
+        "sidebar-prompt-confirm",
+        Button::new("sidebar-prompt-confirm-button")
+            .label(label)
+            .variant(variant)
+            .on_click(cx.listener(|workspace, _, _, cx| workspace.confirm_prompt(cx))),
+    )
+}
+
+fn cancel_button(cx: &mut Context<Workspace>) -> AnyElement {
+    tagged(
+        "sidebar-prompt-cancel",
+        Button::new("sidebar-prompt-cancel-button")
+            .label("Cancel")
+            .on_click(cx.listener(|workspace, _, _, cx| workspace.cancel_prompt(cx))),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use bourbon_core::{NotebookId, TagId};
+
+    use super::*;
+
+    #[test]
+    fn the_deletion_title_names_what_is_deleted() {
+        assert_eq!(
+            deletion_title(&DeletionTarget::Notebook(NotebookId::generate())),
+            "Delete notebook"
+        );
+        assert_eq!(
+            deletion_title(&DeletionTarget::Tag(TagId::generate())),
+            "Delete tag"
+        );
+    }
 }
