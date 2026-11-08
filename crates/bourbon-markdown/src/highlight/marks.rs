@@ -45,7 +45,7 @@ pub fn list_marker(source: &str, range: &Range<usize>) -> Range<usize> {
 }
 
 pub fn math_marks(source: &str, range: &Range<usize>) -> Vec<Range<usize>> {
-    let delimiter = run_length(source, range.start, b'$');
+    let delimiter = run_length(&source[..range.end], range.start, b'$');
     let inner = range.start + delimiter..range.end - delimiter;
     let mut marks = Vec::new();
     marks.push(range.start..inner.start);
