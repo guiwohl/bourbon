@@ -22,7 +22,7 @@ pub(crate) fn status_label(status: NoteStatus) -> &'static str {
 pub(crate) fn status_icon(status: NoteStatus, colors: &Colors) -> Option<(IconName, Hsla)> {
     match status {
         NoteStatus::None => None,
-        NoteStatus::Active => Some((IconName::CirclePlay, colors.primary)),
+        NoteStatus::Active => Some((IconName::CirclePlay, colors.status_active)),
         NoteStatus::OnHold => Some((IconName::CirclePause, colors.status_on_hold)),
         NoteStatus::Completed => Some((IconName::CircleCheck, colors.status_completed)),
         NoteStatus::Dropped => Some((IconName::CircleX, colors.status_dropped)),
@@ -90,7 +90,7 @@ mod tests {
         assert!(status_icon(NoteStatus::None, &colors).is_none());
         assert_eq!(
             status_icon(NoteStatus::Active, &colors),
-            Some((IconName::CirclePlay, colors.primary))
+            Some((IconName::CirclePlay, colors.status_active))
         );
         assert_eq!(
             status_icon(NoteStatus::Completed, &colors),
