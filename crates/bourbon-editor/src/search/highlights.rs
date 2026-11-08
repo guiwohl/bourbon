@@ -32,17 +32,14 @@ impl Editor {
         origin: Point<Pixels>,
     ) -> Vec<MatchRect> {
         let current = current_match(&self.search_matches, self.state.selection.main());
-        let first = self
-            .search_matches
-            .partition_point(|found| found.end <= line.start);
-        self.search_matches[first..]
+        self.search_matches
             .iter()
             .enumerate()
             .take_while(|(_, found)| found.start <= line.end)
-            .flat_map(|(offset, found)| {
-                let local =
-                    found.start.max(line.start) - line.start..found.end.min(line.end) - line.start;
-                let is_current = current == Some(first + offset);
+            .flat_map(|(index, found)| {
+                let local = found.start.saturating_sub(line.start)
+                    ..found.end.min(line.end).saturating_sub(line.start);
+                let is_current = current == Some(index);
                 layout
                     .selection_rects(&local, found.end > line.end, self.theme.font_size * 0.5)
                     .into_iter()
@@ -129,6 +126,24 @@ mod tests {
         let rects = frame_matches(&editor, cx, vec![1..4, 7..8], 0..0);
         assert_eq!(rects.len(), 3);
         assert!(rects.iter().all(|rect| !rect.current));
+        assert!(near(rects[0].bounds.size.width, CHAR + 6.5));
+        assert!(near(rects[1].bounds.size.width, CHAR));
+    }
+
+    #[gpui::test]
+    fn a_match_of_only_the_line_break_marks_the_end_of_its_line(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "ab\ncd");
+        let rects = frame_matches(&editor, cx, vec![2..3, 4..5], 4..5);
+        assert_eq!(rects.len(), 2);
+        assert!(near(
+            rects[0].bounds.left(),
+            f32::from(rects[1].bounds.left()) + CHAR
+        ));
+        assert!(near(rects[0].bounds.size.width, 6.5));
+        assert_eq!(
+            rects.iter().map(|rect| rect.current).collect::<Vec<_>>(),
+            vec![false, true]
+        );
     }
 
     #[gpui::test]

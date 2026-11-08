@@ -224,7 +224,7 @@ fn the_selected_word_prefills_the_find_field(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn a_multi_line_selection_does_not_prefill(cx: &mut TestAppContext) {
-    let mut opened = open(cx, "a\nb");
+    let mut opened = open(cx, "a\nb ab");
     opened
         .editor
         .update(opened.cx, |editor, cx| editor.set_selection(0, 3, cx));
@@ -298,6 +298,9 @@ fn editing_the_body_refreshes_the_matches(cx: &mut TestAppContext) {
 #[gpui::test]
 fn refreshing_a_closed_panel_finds_nothing(cx: &mut TestAppContext) {
     let mut opened = open(cx, "ab");
+    opened.show(false);
+    opened.type_text("ab");
+    opened.keys("escape");
     opened.panel.update(opened.cx, SearchPanel::refresh);
     assert_eq!(opened.matches(), Vec::<std::ops::Range<usize>>::new());
 }
