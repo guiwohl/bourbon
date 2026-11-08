@@ -13,8 +13,9 @@ use gpui::{
 use crate::inline::{LinkTarget, flatten_inlines};
 use crate::preview_style::{
     alert_title, alert_vertical_padding, cell_alignment, checkbox_size, checkbox_tick_size,
-    checkbox_top_margin, child_gap, footnote_size, heading_style, highlight_style, item_gap,
-    list_indent, list_marker, quote_bar_width, row_is_striped, rule_height, stack_gap,
+    checkbox_top_margin, child_gap, footnote_size, heading_style, highlight_ranges, item_gap,
+    item_is_struck, item_number, list_indent, list_marker, quote_bar_width, row_is_striped,
+    rule_height, stack_gap,
 };
 use crate::preview_theme::PreviewTheme;
 
@@ -230,12 +231,12 @@ impl Renderer {
             .flex()
             .flex_col()
             .children(items.iter().enumerate().map(|(index, item)| {
-                let marker = self.marker(ordered, start + index as u64, item, depth);
+                let marker = self.marker(ordered, item_number(start, index), item, depth);
                 let content = div()
                     .flex_1()
                     .min_w_0()
                     .children(self.list_item_children(item, tight, depth));
-                let content = if item.task == Some(true) {
+                let content = if item_is_struck(item.task) {
                     content.line_through().text_color(self.theme.muted)
                 } else {
                     content
@@ -414,15 +415,8 @@ impl Renderer {
         let flat = flatten_inlines(inlines);
         let index = self.next_text.get();
         self.next_text.set(index + 1);
-        let mut offset = 0;
-        let mut highlights = Vec::new();
-        for (len, flags) in flat.flag_runs() {
-            if flags != 0 {
-                highlights.push((offset..offset + len, highlight_style(flags, &self.theme)));
-            }
-            offset += len;
-        }
-        let styled = StyledText::new(flat.text.clone()).with_highlights(highlights);
+        let styled = StyledText::new(flat.text.clone())
+            .with_highlights(highlight_ranges(&flat, &self.theme));
         let text: AnyElement = if flat.links.is_empty() {
             styled.into_any_element()
         } else {

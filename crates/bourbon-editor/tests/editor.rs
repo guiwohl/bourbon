@@ -748,3 +748,37 @@ fn the_input_handler_converts_points_and_lengths_to_utf16(cx: &mut TestAppContex
     });
     assert_eq!(selection(&editor, cx), 1..5);
 }
+
+#[gpui::test]
+fn link_text_is_painted_underlined_after_the_hanging_indent(cx: &mut TestAppContext) {
+    let (_editor, cx) = open(cx, "- [a](b)");
+    let (underlines, scale) =
+        cx.update(|window, _| (window.painted_underlines(), window.scale_factor()));
+    assert!(!underlines.is_empty());
+    let x = underlines
+        .iter()
+        .map(|underline| underline.bounds.origin.x.0)
+        .fold(f32::MAX, f32::min)
+        / scale;
+    assert!((x - (TEXT_LEFT + 3.0 * CHAR_WIDTH)).abs() < 0.2, "{x}");
+}
+
+#[gpui::test]
+fn input_bounds_account_for_scrolling_and_the_element_origin(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, &long_document());
+    cx.simulate_event(ScrollEvent {
+        position: point(px(100.), px(100.)),
+        delta: ScrollDelta::Pixels(point(px(0.), px(-100.))),
+        modifiers: Modifiers::none(),
+        touch_phase: gpui::TouchPhase::Moved,
+        source: ScrollSource::Pointer,
+    });
+    cx.run_until_parked();
+    let element = gpui::Bounds::new(point(px(0.0), px(50.0)), gpui::size(px(500.0), px(300.0)));
+    let found = editor
+        .update_in(cx, |editor, window, cx| {
+            editor.bounds_for_range(50..51, element, window, cx)
+        })
+        .expect("bounds");
+    assert!((f32::from(found.origin.y) - (50.0 + 10.0 * LINE_HEIGHT - 100.0)).abs() < 0.1);
+}

@@ -1,7 +1,9 @@
 use bourbon_markdown::{AlertKind, Alignment, BlockKind};
+use std::ops::Range;
+
 use gpui::{FontStyle, FontWeight, HighlightStyle, Pixels, StrikethroughStyle, TextAlign, px};
 
-use crate::inline::{BOLD, CODE, ITALIC, LINK, STRIKE};
+use crate::inline::{BOLD, CODE, FlatText, ITALIC, LINK, STRIKE};
 use crate::preview_theme::PreviewTheme;
 
 const MARKERS: [&str; 3] = ["\u{2022}", "\u{25E6}", "\u{25AA}"];
@@ -114,6 +116,29 @@ pub fn cell_alignment(alignment: Option<&Alignment>) -> TextAlign {
         Some(Alignment::Center) => TextAlign::Center,
         _ => TextAlign::Left,
     }
+}
+
+pub fn item_number(start: u64, index: usize) -> u64 {
+    start + u64::try_from(index).unwrap_or(u64::MAX)
+}
+
+pub fn item_is_struck(task: Option<bool>) -> bool {
+    task == Some(true)
+}
+
+pub fn highlight_ranges(
+    flat: &FlatText,
+    theme: &PreviewTheme,
+) -> Vec<(Range<usize>, HighlightStyle)> {
+    let mut offset = 0;
+    let mut ranges = Vec::new();
+    for (len, flags) in flat.flag_runs() {
+        if flags != 0 {
+            ranges.push((offset..offset + len, highlight_style(flags, theme)));
+        }
+        offset += len;
+    }
+    ranges
 }
 
 pub fn highlight_style(flags: u8, theme: &PreviewTheme) -> HighlightStyle {
@@ -252,6 +277,37 @@ mod tests {
         assert_eq!(cell_alignment(Some(&Alignment::Left)), TextAlign::Left);
         assert_eq!(cell_alignment(Some(&Alignment::None)), TextAlign::Left);
         assert_eq!(cell_alignment(None), TextAlign::Left);
+    }
+
+    #[test]
+    fn items_are_numbered_from_the_start() {
+        assert_eq!(item_number(1, 0), 1);
+        assert_eq!(item_number(4, 3), 7);
+    }
+
+    #[test]
+    fn only_checked_tasks_are_struck() {
+        assert!(item_is_struck(Some(true)));
+        assert!(!item_is_struck(Some(false)));
+        assert!(!item_is_struck(None));
+    }
+
+    #[test]
+    fn highlight_ranges_skip_plain_text_and_follow_offsets() {
+        use bourbon_markdown::Inline;
+        let theme = theme();
+        let flat = crate::inline::flatten_inlines(&[
+            Inline::Text("ab".to_owned()),
+            Inline::Strong(vec![Inline::Text("cde".to_owned())]),
+            Inline::Text("f".to_owned()),
+            Inline::Code("gh".to_owned()),
+        ]);
+        let ranges = highlight_ranges(&flat, &theme);
+        assert_eq!(ranges.len(), 2);
+        assert_eq!(ranges[0].0, 2..5);
+        assert_eq!(ranges[0].1, highlight_style(BOLD, &theme));
+        assert_eq!(ranges[1].0, 6..8);
+        assert_eq!(ranges[1].1, highlight_style(CODE, &theme));
     }
 
     #[test]
