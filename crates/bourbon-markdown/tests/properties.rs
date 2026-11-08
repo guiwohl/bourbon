@@ -1,5 +1,5 @@
 use bourbon_markdown::{
-    Anchor, PreviewDoc, highlight, line_for_preview_offset, preview_offset_for_line, task_lines,
+    Anchor, PreviewDoc, highlight, line_decorations, line_for_preview_offset, preview_offset_for_line, task_lines,
 };
 use proptest::prelude::*;
 
@@ -33,6 +33,15 @@ fn anchors() -> impl Strategy<Value = Vec<Anchor>> {
 }
 
 proptest! {
+    #[test]
+    fn decorations_cover_existing_lines_in_order(source in markdown_like()) {
+        let line_count = source.split('\n').count();
+        for decoration in line_decorations(&source) {
+            prop_assert!(decoration.lines.start() <= decoration.lines.end());
+            prop_assert!(*decoration.lines.end() < line_count);
+        }
+    }
+
     #[test]
     fn highlight_spans_are_sorted_disjoint_and_on_char_boundaries(source in markdown_like()) {
         let spans = highlight(&source);

@@ -25,12 +25,8 @@ pub fn line_decorations(source: &str) -> Vec<LineDecoration> {
             Event::Start(Tag::BlockQuote(_)) => DecorationKind::QuoteBar,
             _ => continue,
         };
-        let last_byte = source[..range.end]
-            .trim_end_matches(['\n', '\r'])
-            .len()
-            .max(range.start + 1)
-            - 1;
-        let lines = index.line_of(range.start)..=index.line_of(last_byte);
+        let content_end = source[..range.end].trim_end_matches(['\n', '\r']).len();
+        let lines = index.line_of(range.start)..=index.line_of(content_end);
         let nested = decorations
             .iter()
             .any(|outer| outer.kind == kind && outer.lines.contains(lines.start()));

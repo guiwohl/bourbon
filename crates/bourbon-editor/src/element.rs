@@ -1,6 +1,6 @@
 use gpui::{
     App, BorderStyle, Bounds, ContentMask, Element, ElementId, ElementInputHandler, Entity,
-    GlobalElementId, InspectorElementId, IntoElement, LayoutId, Pixels, Style, Window, fill, point,
+    GlobalElementId, InspectorElementId, IntoElement, LayoutId, PaintQuad, Pixels, Style, Window, fill, point,
     px, quad, relative, size,
 };
 
@@ -27,31 +27,30 @@ pub fn gutter_border_bounds(
     })
 }
 
-fn paint_decorations(line: &FrameLine, theme: &EditorTheme, window: &mut Window) {
-    if let Some(card) = &line.card {
-        window.paint_quad(quad(
+pub fn decoration_quads(line: &FrameLine, theme: &EditorTheme) -> Vec<PaintQuad> {
+    let card = line.card.as_ref().map(|card| {
+        quad(
             card.bounds,
             card.radii,
             theme.code_background,
             card.borders,
             theme.code_border,
             BorderStyle::default(),
-        ));
-    }
-    if let Some(bar) = line.quote_bar {
-        window.paint_quad(fill(bar, theme.quote_bar));
-    }
+        )
+    });
+    let bar = line.quote_bar.map(|bar| fill(bar, theme.quote_bar));
     let radius = theme.font_size * theme.card_radius_em;
-    for code_box in &line.code_boxes {
-        window.paint_quad(quad(
+    let code_boxes = line.code_boxes.iter().map(|code_box| {
+        quad(
             *code_box,
             radius,
             theme.code_background,
             px(1.0),
             theme.code_border,
             BorderStyle::default(),
-        ));
-    }
+        )
+    });
+    card.into_iter().chain(bar).chain(code_boxes).collect()
 }
 
 pub struct EditorElement {
@@ -145,8 +144,12 @@ impl Element for EditorElement {
             for line in frame.lines.iter().filter(|line| line.active) {
                 window.paint_quad(fill(active_line_bounds(bounds, line), theme.active_line));
             }
-            for line in &frame.lines {
-                paint_decorations(line, &theme, window);
+            for decoration in frame
+                .lines
+                .iter()
+                .flat_map(|line| decoration_quads(line, &theme))
+            {
+                window.paint_quad(decoration);
             }
             if let Some(border) = gutter_border_bounds(bounds, frame.gutter_width) {
                 window.paint_quad(fill(border, theme.gutter_border));
@@ -212,6 +215,66 @@ mod tests {
     #[test]
     fn there_is_no_border_without_a_gutter() {
         assert_eq!(gutter_border_bounds(bounds(), px(0.0)), None);
+    }
+
+    #[gpui::test]
+    fn decorations_become_card_bar_and_code_box_quads(cx: &mut gpui::TestAppContext) {
+        let window = cx.add_empty_window();
+        let theme = crate::theme::EditorTheme::light();
+        let layout = window.update(|window, _| {
+            LineLayout::shape(
+                &crate::layout::ShapeRequest {
+                    text: "",
+                    segments: &[],
+                    prefix_len: 0,
+                    font_size: px(14.5),
+                    line_height: px(16.82),
+                    wrap_width: None,
+                    bold: false,
+                    box_model: crate::layout::LineBox::default(),
+                    theme: &theme,
+                },
+                window,
+            )
+        });
+        let line_box = Bounds::new(point(px(47.0), px(80.0)), size(px(300.0), px(20.0)));
+        let code_box = Bounds::new(point(px(60.0), px(80.0)), size(px(40.0), px(20.0)));
+        let card = crate::line_decor::card_shape(
+            line_box,
+            crate::line_decor::CardEdges {
+                first: true,
+                last: false,
+            },
+            &theme,
+        );
+        let line = FrameLine {
+            origin: point(px(55.0), px(80.0)),
+            height: px(20.0),
+            layout: Rc::new(layout),
+            active: false,
+            selections: Vec::new(),
+            number: None,
+            card: Some(card),
+            quote_bar: Some(crate::line_decor::quote_bar(line_box, &theme)),
+            code_boxes: vec![code_box],
+        };
+        let quads = decoration_quads(&line, &theme);
+        assert_eq!(quads.len(), 3);
+        assert_eq!(quads[0].bounds.origin, point(px(50.0), px(80.0)));
+        assert_eq!(quads[0].border_widths.top, px(1.0));
+        assert_eq!(quads[0].border_color, theme.code_border);
+        assert_eq!(quads[1].bounds.size.width, px(14.5 * 0.3));
+        assert_eq!(quads[1].border_widths.left, px(0.0));
+        assert_eq!(quads[2].bounds, code_box);
+        assert_eq!(quads[2].corner_radii.top_left, px(14.5 * 0.4));
+        assert_eq!(quads[2].border_widths.right, px(1.0));
+        let plain = FrameLine {
+            card: None,
+            quote_bar: None,
+            code_boxes: Vec::new(),
+            ..line
+        };
+        assert!(decoration_quads(&plain, &theme).is_empty());
     }
 
     #[gpui::test]
