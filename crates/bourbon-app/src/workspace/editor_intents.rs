@@ -6,13 +6,12 @@ use gpui::{Context, Window};
 use super::Workspace;
 use super::load_note;
 use crate::dragged_note::DraggedNote;
-use crate::editor::History;
+use crate::editor::{self, History};
 
 type HistoryStep = fn(&mut History, &dyn Fn(&NoteId) -> bool) -> Option<NoteId>;
 
 impl Workspace {
     pub(crate) fn move_selected_to(&mut self, notebook: &NotebookId, cx: &mut Context<Self>) {
-        self.editor.set_notebook_selector_open(false);
         if let Some(id) = self.selected.clone() {
             self.move_note_to(&id, notebook, cx);
         }
@@ -53,23 +52,18 @@ impl Workspace {
         });
     }
 
-    pub(crate) fn add_tag_to_selected(
-        &mut self,
-        tag: &TagId,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub(crate) fn add_tag_to_selected(&mut self, tag: &TagId, cx: &mut Context<Self>) {
         let added =
             self.edit_selected(cx, |store, note, now| store.add_tag_to_note(note, tag, now));
         if added {
-            self.editor.clear_tag_input(window, cx);
+            self.editor.clear_tag_input(cx);
         }
     }
 
-    pub(crate) fn commit_tag_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn commit_tag_input(&mut self, cx: &mut Context<Self>) {
         let typed = self.editor.tag_input_text(cx);
         if let Some(tag) = self.editor.chosen_tag(&typed, &self.tags) {
-            self.add_tag_to_selected(&tag.id, window, cx);
+            self.add_tag_to_selected(&tag.id, cx);
         } else if !typed.trim().is_empty() {
             let created = self.edit_selected(cx, |store, note, now| {
                 store
@@ -77,7 +71,7 @@ impl Workspace {
                     .map(drop)
             });
             if created {
-                self.editor.clear_tag_input(window, cx);
+                self.editor.clear_tag_input(cx);
             }
         }
     }
@@ -98,33 +92,53 @@ impl Workspace {
         cx.notify();
     }
 
-    pub(crate) fn set_notebook_selector_open(&mut self, open: bool, cx: &mut Context<Self>) {
-        self.editor.set_notebook_selector_open(open);
-        cx.notify();
+    pub(crate) fn open_notebook_selector(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(header) = self.editor.header() else {
+            return;
+        };
+        let menu = editor::notebook_menu(&self.notebooks, &header.notebook);
+        let position = self.editor.anchors.notebook.below();
+        self.open_menu(position, menu, window, cx);
     }
 
-    pub(crate) fn open_notebook_selector(&mut self, cx: &mut Context<Self>) {
-        if self.selected.is_some() {
-            self.set_notebook_selector_open(true, cx);
-        }
+    pub(crate) fn open_status_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(header) = self.editor.header() else {
+            return;
+        };
+        let menu = editor::status_menu(header.status);
+        let position = self.editor.anchors.status.below();
+        self.open_menu(position, menu, window, cx);
     }
 
-    pub(crate) fn history_back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.walk_history(History::back, window, cx);
+    pub(crate) fn open_note_actions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(id) = self.selected.clone() else {
+            return;
+        };
+        let note = match load_note(&self.store, &id) {
+            Ok(note) => note,
+            Err(error) => return self.report(&error, cx),
+        };
+        let menu = editor::note_actions_menu(self.editor.show_header(&note));
+        let position = self.editor.anchors.more.below();
+        self.open_menu(position, menu, window, cx);
     }
 
-    pub(crate) fn history_forward(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.walk_history(History::forward, window, cx);
+    pub(crate) fn history_back(&mut self, cx: &mut Context<Self>) {
+        self.walk_history(History::back, cx);
     }
 
-    fn walk_history(&mut self, step: HistoryStep, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn history_forward(&mut self, cx: &mut Context<Self>) {
+        self.walk_history(History::forward, cx);
+    }
+
+    fn walk_history(&mut self, step: HistoryStep, cx: &mut Context<Self>) {
         self.flush_then(cx, |this, cx| {
             let store = &this.store;
             let Some(id) = step(&mut this.history, &|id| is_openable(store, id)) else {
                 return;
             };
             match load_note(&this.store, &id) {
-                Ok(note) => this.show(note, window, cx),
+                Ok(note) => this.show(note, cx),
                 Err(error) => this.report(&error, cx),
             }
         });

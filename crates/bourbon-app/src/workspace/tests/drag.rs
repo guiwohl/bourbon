@@ -1,6 +1,5 @@
 use bourbon_core::{NoteId, NoteStore, NotebookId, Timestamp};
-use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
-use gpui_kit::test::TestWindowExt as _;
+use gpui::{AnyWindowHandle, Entity, TestAppContext};
 
 use super::{at, click, drag, listed_titles, note_in, open_view, type_into_title};
 use crate::workspace::Workspace;
@@ -76,13 +75,7 @@ fn dropping_the_open_note_refreshes_its_notebook_in_the_header(cx: &mut TestAppC
     assert_eq!(notebook_of(cx, &view, &second), work);
     cx.read(|cx| assert_eq!(view.read(cx).selected, Some(second.clone())));
     click(cx, handle, "notebook-selector");
-    let marked = cx
-        .update_window(handle, |_, window, cx| {
-            window.render_frame(cx);
-            window.find(format!("notebook-option-{work}")).selected()
-        })
-        .unwrap();
-    assert_eq!(marked, Some(true));
+    assert_eq!(super::checked_menu_labels(cx, &view), ["Work"]);
 }
 
 #[gpui::test]

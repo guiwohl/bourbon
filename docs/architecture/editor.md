@@ -1,6 +1,6 @@
 # bourbon-editor
 
-GPUI views of the Markdown editor, the preview and the single-line text field (Phase 1, view half, of [the UI rebuild](../decisions/2026-11-07-ui-rebuild.md); research [sections 2, 5, 6.4, 6.5](../research/inkdrop-markdown-editor-preview.md)). Depends only on `gpui-pre` (lib `gpui`), `bourbon-text`, `bourbon-markdown` and `bourbon-ui` (tokens and icons for the text field); no pre-made input or editor component. The app uses the text field for the note-list filter and the sidebar name prompt; the editor column is not migrated yet. Dev deps: `gpui` with `test-support`, `gpui-pre-platform` (demo window), `proptest`.
+GPUI views of the Markdown editor, the preview and the single-line text field (Phase 1, view half, of [the UI rebuild](../decisions/2026-11-07-ui-rebuild.md); research [sections 2, 5, 6.4, 6.5](../research/inkdrop-markdown-editor-preview.md)). Depends only on `gpui-pre` (lib `gpui`), `bourbon-text`, `bourbon-markdown` and `bourbon-ui` (tokens and icons for the text field); no pre-made input or editor component. The app uses the text field for the note-list filter and the sidebar name prompt; and `bourbon-app` renders its editor column with it (see [app](app.md#editor-column)). Dev deps: `gpui` with `test-support`, `gpui-pre-platform` (demo window), `proptest`.
 
 Run the demo: `cargo run -p bourbon-editor --example editor_demo` (app id `bourbon-editor-demo`; `ctrl-shift-l` light/dark, `ctrl-shift-n` line numbers). Editor and preview side by side on the research fixture note; the preview follows the editor live and its checkboxes toggle the editor text.
 
@@ -8,15 +8,16 @@ Run the demo: `cargo run -p bourbon-editor --example editor_demo` (app id `bourb
 
 | Item | Role |
 |---|---|
-| `Editor::new(text, theme, cx)`, `text()`, `set_text()` (resets history and scroll, no event), `set_theme()`, `set_line_numbers()` (off by default), `set_selection(anchor, head)`, `selected_range()`, `scroll_top()`, `toggle_task_at_line(line)` | The entity. `EventEmitter<EditorEvent>`, `Focusable`, `Render`, `EntityInputHandler` |
-| `EditorEvent::Changed(String)`, `TaskToggled { line }` | `Changed` fires on every text change (typing, commands, undo, task toggles), not on `set_text` |
+| `Editor::new(text, theme, cx)`, `text()`, `set_text()` (resets history and scroll, no `Changed`), `set_theme()`, `set_line_numbers()` (off by default), `set_selection(anchor, head)`, `selected_range()`, `replace_range(range, text)` (one undo step, caret after the text), `scroll_top()`, `top_line()` (fractional line at the top), `scroll_to_line(line)` (clamped), `toggle_task_at_line(line)` | The entity. `EventEmitter<EditorEvent>`, `Focusable`, `Render`, `EntityInputHandler` |
+| `EditorEvent::Changed(String)`, `TaskToggled { line }`, `Scrolled` | `Changed` fires on every text change (typing, commands, undo, task toggles), not on `set_text`. `Scrolled` fires from prepaint whenever `scroll_top` differs from the last reported value (wheel, caret, `scroll_to_line`, `set_text`) |
 | `EditorTheme::light()/dark()` | Plain data: font family and fallbacks, 13 px, line height 1.5, heading scales 2/1.5/1.17/1/.83/.67, colours and `token_style(TokenClass)`. Phase 2 swaps the source for `bourbon-ui` tokens |
 | `bind_editor_keys(cx)`, `KEY_CONTEXT` | Key bindings for context `BourbonEditor` |
-| `TextField::new(cx)`, `.placeholder(text)`, `.leading_icon(IconName)`, `text()`, `set_text()` (drops line breaks, caret at the end, resets history, no event), `selected_range()`, `focus(window, cx)` | Single-line field. `EventEmitter<TextFieldEvent>`, `Focusable`, `Render`, `EntityInputHandler` |
+| `TextField::new(cx)`, `.placeholder(text)`, `.leading_icon(IconName)`, `.borderless(Borderless { font_size, height, inset })`, `text()`, `set_text()` (drops line breaks, caret at the end, resets history, no event), `selected_range()`, `focus(window, cx)` | Single-line field. `EventEmitter<TextFieldEvent>`, `Focusable`, `Render`, `EntityInputHandler` |
 | `TextFieldEvent::Changed(String)`, `Submit`, `Cancel` | `Changed` on every text change; Enter emits `Submit`, Esc emits `Cancel`; neither edits the text |
 | `bind_text_field_keys(cx)`, `TEXT_FIELD_CONTEXT` | Key bindings for context `BourbonTextField` |
-| `PreviewView::new(source, theme, cx)`, `set_source()`, `set_theme()`, `block_layouts()` | Preview entity |
-| `PreviewEvent::ToggleTask { source_line }`, `OpenLink(href)`, `OpenNote(id)` | Never mutates the document; the owner applies the toggle to the editor |
+| `PreviewView::new(source, theme, cx)`, `set_source()`, `set_theme()`, `doc()`, `block_layouts()`, `scroll_top()`, `set_scroll_top(px)`, `scroll_anchors()` | Preview entity; scrolling goes through its own `ScrollHandle` |
+| `PreviewEvent::ToggleTask { source_line }`, `OpenLink(href)`, `OpenNote(id)`, `Scrolled` | Never mutates the document; the owner applies the toggle to the editor. `Scrolled` fires from prepaint when the scroll offset changed |
+| `scroll_anchors(&[BlockLayout])` | Top-level blocks as `bourbon_markdown::Anchor`s, tops shifted by the 10 px padding so they are in scroll-content coordinates |
 | `PreviewTheme::light()/dark()` | Preview typography and colours |
 | `BlockLayout { source_lines, top, height }` | Top-level block geometry after layout, relative to the first block, for scroll sync |
 
@@ -25,7 +26,7 @@ Run the demo: `cargo run -p bourbon-editor --example editor_demo` (app id `bourb
 - State is `bourbon_text::EditorState` plus `History`. Every key maps to a `bourbon_text` command (`run_command`); movement uses `bourbon_text::movement` through `motion::move_range`. The element never edits text.
 - Highlight spans are recomputed with `bourbon_markdown::highlight` after each change. A line is split into `Segment`s (class, marked flag) by `segments::line_segments`; the segments become `TextRun`s (colour, weight, italic, underline, strike, inline-code background). Heading lines use the heading scale for font size and line height.
 - `LineLayout` shapes one logical line: an optional prefix (`segments::hanging_prefix_len`: indentation, quote marks, list marker, task box) as a `ShapedLine`, and the rest as a GPUI `WrappedLine` with width `wrap - prefix width`, painted at the prefix width, so wrapped list and quote lines hang. Row ranges, caret position, hit testing and selection rectangles are computed per row.
-- Per-line heights live in `LineHeights` (prefix sums, measured flag, `replace_lines` and `apply_changes(before, changeset)` invalidate only edited lines, `reset` on width or theme change). Unmeasured lines are measured progressively (400 per frame, then another frame is requested), visible lines are always measured. Only visible lines are painted.
+- Per-line heights live in `LineHeights` (prefix sums, measured flag, `line_position(y)` / `offset_of_line(line)` for fractional lines, `replace_lines` and `apply_changes(before, changeset)` invalidate only edited lines, `reset` on width or theme change). Unmeasured lines are measured progressively (400 per frame, then another frame is requested), visible lines are always measured. Only visible lines are painted.
 - The frame (`Editor::build_frame`, called from `EditorElement::prepaint`) clamps scroll, keeps the caret in view when a movement or edit asked for it (up to 3 passes), and returns the lines with origins, selection quads, caret quad and gutter numbers. Paint order: active line, gutter border, selection, text, numbers, caret (2 px, 1 px radius, blink 530 ms restarted on every edit or move).
 - Gutter (opt-in): numbers at 0.7 of the font size, width max(3em, digits + 1em) in that size, 1 px border.
 - Mouse: click, shift-click, drag (clamped to the viewport), double-click word, triple-click line (with its break). A click on a `TaskMarker` span toggles that line (`task_click::toggle_task_at`, selection mapped through the change) and emits `TaskToggled`, without moving the caret. The wheel scrolls vertically.
@@ -51,8 +52,8 @@ Blocks become `div` trees; inlines are flattened (`inline::flatten_inlines`: tex
 
 ## Known gaps
 
-- Editor: no code-block card, quote bar, folding, search, completion, multi-cursor, horizontal scroll, drag auto-scroll, Home/End by visual row, mouse selection by words after a double-click drag.
-- Preview: inline code uses a background only (highlights cannot switch the font family), tables use equal column widths, no images, math or footnotes layout, code blocks do not scroll horizontally, list markers of nested ordered lists are numbers, no virtualisation, no scroll sync wiring (only the block geometry).
+- Editor: no search panel (the app's `Ctrl+F` only focuses the body), no code-block card, quote bar, folding, search, completion, multi-cursor, horizontal scroll, drag auto-scroll, Home/End by visual row, mouse selection by words after a double-click drag.
+- Preview: inline code uses a background only (highlights cannot switch the font family), tables use equal column widths, no images, math or footnotes layout, code blocks do not scroll horizontally, list markers of nested ordered lists are numbers, no virtualisation; scroll anchors are top-level blocks only (no list items).
 - Hit testing and geometry tests run on GPUI's test text system (fixed 0.6 em advance), not on real fonts.
 
 ## Tests

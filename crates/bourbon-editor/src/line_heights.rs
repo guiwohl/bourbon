@@ -1,5 +1,10 @@
 use bourbon_text::{ChangeSet, Text};
 
+#[allow(clippy::cast_precision_loss)]
+fn lossy(line: usize) -> f32 {
+    line as f32
+}
+
 pub struct LineHeights {
     heights: Vec<f32>,
     measured: Vec<bool>,
@@ -63,6 +68,25 @@ impl LineHeights {
             .min(last)
     }
 
+    pub fn line_position(&self, y: f32) -> f32 {
+        let line = self.line_at(y);
+        let height = self.top(line + 1) - self.top(line);
+        let within = if height > 0.0 {
+            ((y - self.top(line)) / height).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        lossy(line) + within
+    }
+
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    pub fn offset_of_line(&self, line: f32) -> f32 {
+        let whole = line.max(0.0).floor();
+        let index = whole as usize;
+        let height = self.top(index + 1) - self.top(index);
+        self.top(index) + (line.max(0.0) - whole) * height
+    }
+
     pub fn replace_lines(&mut self, first: usize, removed: usize, inserted: usize) {
         let first = first.min(self.heights.len());
         let end = (first + removed).min(self.heights.len());
@@ -95,6 +119,41 @@ mod tests {
 
     fn heights(count: usize) -> LineHeights {
         LineHeights::new(count, 20.0)
+    }
+
+    #[test]
+    fn a_pixel_offset_becomes_a_fractional_line() {
+        let mut heights = heights(3);
+        heights.set_measured(1, 40.0);
+        heights.refresh();
+        assert!((heights.line_position(0.0) - 0.0).abs() < 1e-4);
+        assert!((heights.line_position(10.0) - 0.5).abs() < 1e-4);
+        assert!((heights.line_position(30.0) - 1.25).abs() < 1e-4);
+        assert!((heights.line_position(70.0) - 2.5).abs() < 1e-4);
+    }
+
+    #[test]
+    fn a_fractional_line_becomes_a_pixel_offset() {
+        let mut heights = heights(3);
+        heights.set_measured(1, 40.0);
+        heights.refresh();
+        assert!((heights.offset_of_line(1.25) - 30.0).abs() < 1e-4);
+        assert!((heights.offset_of_line(2.5) - 70.0).abs() < 1e-4);
+        assert!((heights.offset_of_line(-3.0) - 0.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn past_the_last_line_the_offset_stays_inside_the_document() {
+        let heights = heights(2);
+        assert!((heights.line_position(500.0) - 2.0).abs() < 1e-4);
+        assert!((heights.offset_of_line(1.5) - 30.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn an_empty_document_maps_everything_to_the_start() {
+        let heights = heights(0);
+        assert!((heights.line_position(25.0) - 0.0).abs() < 1e-4);
+        assert!((heights.offset_of_line(3.0) - 0.0).abs() < 1e-4);
     }
 
     #[test]

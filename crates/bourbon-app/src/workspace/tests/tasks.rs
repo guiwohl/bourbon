@@ -1,10 +1,12 @@
 use std::time::Duration;
 
 use bourbon_core::{NoteId, NoteStore};
-use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
+use gpui::{
+    AnyWindowHandle, AppContext as _, Entity, Modifiers, TestAppContext, VisualTestContext,
+};
 
-use super::view_modes::focus_body;
-use super::{at, click, open_view, press, seeded_store};
+use super::view_modes::{focus_body, press};
+use super::{at, open_view, seeded_store};
 use crate::workspace::Workspace;
 
 const BODY: &str = "intro\n- [ ] first\n- [x] second\n- plain\nclosing";
@@ -32,21 +34,41 @@ fn place_cursor_on_line(
     line: usize,
 ) {
     focus_body(cx, handle, view);
-    cx.update_window(handle, |_, window, cx| {
+    cx.update_window(handle, |_, _, cx| {
         view.update(cx, |view, cx| {
-            view.editor.place_cursor_on_line(line, window, cx);
+            view.editor.place_cursor_on_line(line, cx);
         });
     })
     .unwrap();
+}
+
+fn click_preview_task(cx: &mut TestAppContext, handle: AnyWindowHandle, selector: &'static str) {
+    let cx = &mut VisualTestContext::from_window(handle, cx);
+    cx.run_until_parked();
+    let bounds = cx
+        .debug_bounds(selector)
+        .expect("the checkbox of that line is laid out");
+    cx.simulate_click(bounds.center(), Modifiers::none());
+    cx.run_until_parked();
+}
+
+fn has_preview_task(
+    cx: &mut TestAppContext,
+    handle: AnyWindowHandle,
+    selector: &'static str,
+) -> bool {
+    let cx = &mut VisualTestContext::from_window(handle, cx);
+    cx.run_until_parked();
+    cx.debug_bounds(selector).is_some()
 }
 
 #[gpui::test]
 fn clicking_an_open_task_in_the_preview_checks_that_exact_line(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
-    click(cx, handle, "view-mode-preview");
+    super::choose_view_mode(cx, handle, bourbon_core::ViewMode::Preview);
 
-    click(cx, handle, "preview-task-1");
+    click_preview_task(cx, handle, "task-line-1");
 
     assert_eq!(
         editor_body(cx, &view),
@@ -58,9 +80,9 @@ fn clicking_an_open_task_in_the_preview_checks_that_exact_line(cx: &mut TestAppC
 fn clicking_a_done_task_in_the_preview_reopens_it(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
-    click(cx, handle, "view-mode-preview");
+    super::choose_view_mode(cx, handle, bourbon_core::ViewMode::Preview);
 
-    click(cx, handle, "preview-task-2");
+    click_preview_task(cx, handle, "task-line-2");
 
     assert_eq!(
         editor_body(cx, &view),
@@ -72,8 +94,8 @@ fn clicking_a_done_task_in_the_preview_reopens_it(cx: &mut TestAppContext) {
 fn a_task_toggled_in_the_preview_is_autosaved_like_typing(cx: &mut TestAppContext) {
     let (store, id) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
-    click(cx, handle, "view-mode-preview");
-    click(cx, handle, "preview-task-1");
+    super::choose_view_mode(cx, handle, bourbon_core::ViewMode::Preview);
+    click_preview_task(cx, handle, "task-line-1");
 
     cx.executor().advance_clock(Duration::from_millis(499));
     cx.run_until_parked();
@@ -91,14 +113,10 @@ fn a_task_toggled_in_the_preview_is_autosaved_like_typing(cx: &mut TestAppContex
 fn tasks_inside_a_code_fence_get_no_checkbox(cx: &mut TestAppContext) {
     let (store, _) = store_with_body("```\n- [ ] code\n```\n- [ ] real");
     let (handle, _) = open_view(cx, store);
-    click(cx, handle, "view-mode-preview");
+    super::choose_view_mode(cx, handle, bourbon_core::ViewMode::Preview);
 
-    assert!(!super::view_modes::is_rendered(
-        cx,
-        handle,
-        "preview-task-1"
-    ));
-    assert!(super::view_modes::is_rendered(cx, handle, "preview-task-3"));
+    assert!(!has_preview_task(cx, handle, "task-line-1"));
+    assert!(has_preview_task(cx, handle, "task-line-3"));
 }
 
 #[gpui::test]
@@ -130,14 +148,17 @@ fn ctrl_enter_turns_a_plain_list_line_into_a_task(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
-fn ctrl_enter_on_any_other_line_changes_nothing(cx: &mut TestAppContext) {
+fn ctrl_enter_on_a_plain_line_makes_it_a_task(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
     place_cursor_on_line(cx, handle, &view, 0);
 
     press(cx, handle, "ctrl-enter");
 
-    assert_eq!(editor_body(cx, &view), BODY);
+    assert_eq!(
+        editor_body(cx, &view),
+        "- [ ] intro\n- [ ] first\n- [x] second\n- plain\nclosing"
+    );
 }
 
 #[gpui::test]

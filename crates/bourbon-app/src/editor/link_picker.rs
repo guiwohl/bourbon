@@ -1,15 +1,17 @@
 use bourbon_core::{NoteSummary, SearchHit};
-use gpui_kit::component::ActiveTheme as _;
-use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::{
+use bourbon_ui::ThemeExt as _;
+use gpui::prelude::FluentBuilder as _;
+use gpui::{
     Context, InteractiveElement as _, IntoElement, ParentElement as _,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div,
+    StatefulInteractiveElement as _, Styled as _, div, px,
 };
 
 use crate::presentation::display_title;
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::Workspace;
 
 pub(crate) const MAX_SUGGESTIONS: usize = 8;
+const PICKER_OFFSET: f32 = 16.;
 
 pub(crate) struct LinkPicker {
     pub(crate) start: usize,
@@ -41,20 +43,24 @@ impl LinkPicker {
 }
 
 pub(super) fn render(picker: &LinkPicker, cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
-    let (background, foreground) = (cx.theme().accent, cx.theme().accent_foreground);
+    let tokens = cx.theme().tokens.clone();
     let rows = picker.candidates.iter().enumerate().map(|(index, note)| {
         let is_highlighted = index == picker.highlight;
         div()
             .id(format!("link-suggestion-{}", note.id))
+            .relative()
             .aria_selected(is_highlighted)
             .test_support()
-            .px_2()
-            .py_1()
-            .rounded_md()
+            .px(tokens.scale.menu_item_padding_horizontal)
+            .py(tokens.scale.menu_item_padding_vertical)
             .cursor_pointer()
             .child(display_title(&note.title).to_owned())
             .when(is_highlighted, |row| {
-                row.bg(background).text_color(foreground)
+                row.bg(tokens.colors.menu_hover)
+                    .child(super::header::highlight_marker(format!(
+                        "link-suggestion-{}-highlight",
+                        note.id
+                    )))
             })
             .on_click(cx.listener(move |workspace, _, window, cx| {
                 workspace.pick_link_suggestion(index, window, cx);
@@ -63,13 +69,21 @@ pub(super) fn render(picker: &LinkPicker, cx: &mut Context<Workspace>) -> impl I
     div()
         .id("link-suggestions")
         .test_support()
+        .occlude()
+        .absolute()
+        .top(px(PICKER_OFFSET))
+        .left(px(PICKER_OFFSET))
+        .min_w(tokens.scale.menu_min_width)
         .flex()
         .flex_col()
-        .p_1()
-        .rounded_md()
+        .rounded(tokens.scale.radius_large)
         .border_1()
-        .border_color(cx.theme().border)
-        .bg(cx.theme().popover)
+        .border_color(tokens.colors.border)
+        .bg(tokens.colors.menu_background)
+        .shadow(tokens.shadows.raised.clone())
+        .font_family(tokens.fonts.ui_family.clone())
+        .text_size(tokens.scale.medium)
+        .text_color(tokens.colors.text)
         .children(rows)
 }
 

@@ -37,6 +37,29 @@ impl MenuBuilder {
             .collect()
     }
 
+    #[cfg(test)]
+    pub(crate) fn checked_labels(&self) -> Vec<String> {
+        self.items()
+            .filter(|item| item.checked)
+            .map(|item| item.label.to_string())
+            .collect()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn shortcuts(&self) -> Vec<String> {
+        self.items()
+            .filter_map(|item| item.shortcut.as_ref().map(ToString::to_string))
+            .collect()
+    }
+
+    #[cfg(test)]
+    fn items(&self) -> impl Iterator<Item = &MenuItem> {
+        self.entries.iter().filter_map(|entry| match entry {
+            MenuEntry::Item(item) => Some(item),
+            MenuEntry::Separator => None,
+        })
+    }
+
     pub(crate) fn separator(mut self) -> Self {
         self.entries.push(MenuEntry::Separator);
         self.actions.push(None);

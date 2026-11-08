@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use bourbon_core::NoteId;
 use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
-use gpui_kit::test::TestWindowExt as _;
 
 use super::view_modes::{is_rendered, type_into_body};
 use super::{at, banner_is_shown, click, open_view, press, seeded_store, type_text};
@@ -27,8 +26,8 @@ fn open_link(
     view: &Entity<Workspace>,
     url: &str,
 ) {
-    cx.update_window(handle, |_, window, cx| {
-        view.update(cx, |view, cx| view.open_link(url, window, cx));
+    cx.update_window(handle, |_, _, cx| {
+        view.update(cx, |view, cx| view.open_link(url, cx));
     })
     .unwrap();
 }
@@ -346,18 +345,15 @@ fn store_with_link_to_older() -> (bourbon_core::NoteStore, NoteId, NoteId) {
 fn clicking_a_note_link_in_the_preview_opens_that_note(cx: &mut TestAppContext) {
     let (store, _, older) = store_with_link_to_older();
     let (handle, view) = open_view(cx, store);
-    click(cx, handle, "view-mode-preview");
+    super::choose_view_mode(cx, handle, bourbon_core::ViewMode::Preview);
     cx.run_until_parked();
 
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.click_at(
-            "preview".to_owned(),
-            gpui::point(gpui::px(14.), gpui::px(16.)),
-            cx,
-        );
-    })
-    .unwrap();
+    super::click_at(
+        cx,
+        handle,
+        "preview",
+        gpui::point(gpui::px(14.), gpui::px(16.)),
+    );
 
     assert_eq!(selected(cx, &view), Some(older));
 }
@@ -366,12 +362,8 @@ fn highlighted_suggestions(
     cx: &mut TestAppContext,
     handle: AnyWindowHandle,
     ids: [&NoteId; 2],
-) -> [Option<bool>; 2] {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        ids.map(|id| window.find(suggestion(id)).selected())
-    })
-    .unwrap()
+) -> [bool; 2] {
+    ids.map(|id| is_rendered(cx, handle, &format!("{}-highlight", suggestion(id))))
 }
 
 #[gpui::test]
@@ -381,15 +373,9 @@ fn only_the_highlighted_suggestion_is_marked_selected(cx: &mut TestAppContext) {
     type_into_body(cx, handle, &view, "[[");
     let ids = [&seeded.newer, &seeded.older];
 
-    assert_eq!(
-        highlighted_suggestions(cx, handle, ids),
-        [Some(true), Some(false)]
-    );
+    assert_eq!(highlighted_suggestions(cx, handle, ids), [true, false]);
     press(cx, handle, "down");
-    assert_eq!(
-        highlighted_suggestions(cx, handle, ids),
-        [Some(false), Some(true)]
-    );
+    assert_eq!(highlighted_suggestions(cx, handle, ids), [false, true]);
 }
 
 #[gpui::test]

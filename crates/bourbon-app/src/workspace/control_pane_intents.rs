@@ -91,17 +91,17 @@ impl Workspace {
         };
         self.close_control_pane(window, cx);
         match row {
-            ActivatedRow::Note(id) => self.open_found_note(&id, window, cx),
+            ActivatedRow::Note(id) => self.open_found_note(&id, cx),
             ActivatedRow::Action(action) => self.run_pane_action(action, window, cx),
         }
     }
 
-    fn open_found_note(&mut self, id: &NoteId, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_found_note(&mut self, id: &NoteId, cx: &mut Context<Self>) {
         self.flush_then(cx, |this, cx| {
             if !this.notes.iter().any(|note| note.id == *id) {
                 this.navigate(Navigation::AllNotes, cx);
             }
-            this.select(id, window, cx);
+            this.select(id, cx);
         });
     }
 
@@ -130,18 +130,17 @@ impl Workspace {
                 self.navigate(Navigation::Trash, cx);
                 self.confirm_empty_trash(cx);
             }
-            (PaneAction::HistoryBack, _) => self.history_back(window, cx),
-            (PaneAction::HistoryForward, _) => self.history_forward(window, cx),
+            (PaneAction::HistoryBack, _) => self.history_back(cx),
+            (PaneAction::HistoryForward, _) => self.history_forward(cx),
             (PaneAction::CycleViewMode, _) => self.cycle_view_mode(window, cx),
-            (PaneAction::Find, _) => self.find_in_note(false, window, cx),
-            (PaneAction::Replace, _) => self.find_in_note(true, window, cx),
+            (PaneAction::Find | PaneAction::Replace, _) => self.find_in_note(window, cx),
             (PaneAction::ToggleFocusMode, _) => self.toggle_focus_mode(window, cx),
             (PaneAction::SetStatus(status), Some(_)) => self.set_selected_status(status, cx),
-            (PaneAction::MoveToNotebook, Some(_)) => self.open_notebook_selector(cx),
-            (PaneAction::DuplicateNote, Some(id)) => self.duplicate(&id, window, cx),
+            (PaneAction::MoveToNotebook, Some(_)) => self.open_notebook_selector(window, cx),
+            (PaneAction::DuplicateNote, Some(id)) => self.duplicate(&id, cx),
             (PaneAction::TogglePin, Some(id)) => self.toggle_pin(&id, cx),
             (PaneAction::CopyCliCommand, Some(id)) => copy_cli_command(&id, cx),
-            (PaneAction::MoveToTrash, Some(id)) => self.move_to_trash(&id, window, cx),
+            (PaneAction::MoveToTrash, Some(id)) => self.move_to_trash(&id, cx),
             (_, None) => {}
         }
     }

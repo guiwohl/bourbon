@@ -1,12 +1,8 @@
 use bourbon_core::{Note, NoteId, NoteStore, NotebookId, TagColor};
 use gpui::VisualTestContext;
 use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
-use gpui_kit::test::TestWindowExt as _;
 
-use super::{
-    at, choose_menu_entry, choose_popup_item, click, is_listed, listed_titles, menu_labels,
-    note_in, open_view, popup_labels, type_text,
-};
+use super::{at, choose_menu_entry, click, listed_titles, menu_labels, note_in, open_view};
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
 
@@ -49,13 +45,17 @@ fn navigation(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Navigation {
 }
 
 fn is_present(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> bool {
-    is_listed(cx, handle, id)
+    super::is_listed(cx, handle, id)
 }
 
-fn title_is_focused(cx: &mut TestAppContext, handle: AnyWindowHandle) -> bool {
+fn title_is_focused(
+    cx: &mut TestAppContext,
+    handle: AnyWindowHandle,
+    view: &Entity<Workspace>,
+) -> bool {
+    super::render(cx, handle);
     cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.find("title").focused() == Some(true)
+        view.read(cx).editor.title_is_focused(window, cx)
     })
     .unwrap()
 }
@@ -96,7 +96,7 @@ fn new_template_creates_selects_and_focuses_a_template(cx: &mut TestAppContext) 
     assert_eq!(created.notebook, fixture.inbox);
     assert_eq!(navigation(cx, &view), Navigation::Templates);
     assert_eq!(listed_titles(cx, &view).len(), 1);
-    assert!(title_is_focused(cx, handle));
+    assert!(title_is_focused(cx, handle, &view));
 }
 
 #[gpui::test]
@@ -180,7 +180,7 @@ fn picking_a_template_in_a_notebook_creates_the_note_there(cx: &mut TestAppConte
     assert!(!created.is_template);
     assert_eq!(created.notebook, fixture.work);
     assert!(listed_titles(cx, &view).contains(&"Meeting".to_owned()));
-    assert!(title_is_focused(cx, handle));
+    assert!(title_is_focused(cx, handle, &view));
 }
 
 #[gpui::test]
@@ -251,7 +251,7 @@ fn picking_a_template_saves_the_pending_edit_first(cx: &mut TestAppContext) {
     template_in(&fixture.store, &fixture.inbox, "Meeting", 3);
     let (handle, view) = open_view(cx, fixture.store);
     click(cx, handle, "title");
-    type_text(cx, handle, "!");
+    super::type_text(cx, handle, "!");
 
     new_from_template(cx, handle, 0);
 
@@ -262,17 +262,37 @@ fn open_note_actions(cx: &mut TestAppContext, handle: AnyWindowHandle) {
     click(cx, handle, "note-actions");
 }
 
+fn choose_note_action(
+    cx: &mut TestAppContext,
+    handle: AnyWindowHandle,
+    view: &Entity<Workspace>,
+    label: &str,
+) {
+    open_note_actions(cx, handle);
+    let position = menu_labels(cx, view)
+        .iter()
+        .position(|candidate| candidate == label)
+        .unwrap();
+    choose_menu_entry(cx, handle, position);
+}
+
 #[gpui::test]
 fn the_note_actions_menu_offers_mark_as_template_for_a_plain_note(cx: &mut TestAppContext) {
     let fixture = fixture();
     note_in(&fixture.store, &fixture.inbox, "Plain", 2);
-    let (handle, _) = open_view(cx, fixture.store);
+    let (handle, view) = open_view(cx, fixture.store);
 
     open_note_actions(cx, handle);
 
     assert_eq!(
-        popup_labels(cx, handle),
-        ["Mark as template", "Copy CLI command"]
+        menu_labels(cx, &view),
+        [
+            "Pin",
+            "Duplicate",
+            "Move to Trash",
+            "Mark as template",
+            "Copy CLI command"
+        ]
     );
 }
 
@@ -280,15 +300,21 @@ fn the_note_actions_menu_offers_mark_as_template_for_a_plain_note(cx: &mut TestA
 fn the_note_actions_menu_offers_unmark_for_a_template(cx: &mut TestAppContext) {
     let fixture = fixture();
     template_in(&fixture.store, &fixture.inbox, "Meeting", 3);
-    let (handle, _) = open_view(cx, fixture.store);
+    let (handle, view) = open_view(cx, fixture.store);
     click(cx, handle, "nav-templates");
     click(cx, handle, "new-note");
 
     open_note_actions(cx, handle);
 
     assert_eq!(
-        popup_labels(cx, handle),
-        ["Unmark template", "Copy CLI command"]
+        menu_labels(cx, &view),
+        [
+            "Pin",
+            "Duplicate",
+            "Move to Trash",
+            "Unmark template",
+            "Copy CLI command"
+        ]
     );
 }
 
@@ -298,8 +324,7 @@ fn marking_the_open_note_keeps_it_open_and_moves_it_to_templates(cx: &mut TestAp
     let plain = note_in(&fixture.store, &fixture.inbox, "Plain", 2);
     let (handle, view) = open_view(cx, fixture.store);
 
-    open_note_actions(cx, handle);
-    choose_popup_item(cx, handle, 0);
+    choose_note_action(cx, handle, &view, "Mark as template");
 
     assert!(stored(cx, &view, &plain).is_template);
     assert_eq!(selected(cx, &view), plain);
@@ -308,10 +333,7 @@ fn marking_the_open_note_keeps_it_open_and_moves_it_to_templates(cx: &mut TestAp
     click(cx, handle, "nav-templates");
     assert_eq!(listed_titles(cx, &view), ["Plain"]);
     open_note_actions(cx, handle);
-    assert_eq!(
-        popup_labels(cx, handle),
-        ["Unmark template", "Copy CLI command"]
-    );
+    assert!(menu_labels(cx, &view).contains(&"Unmark template".to_owned()));
 }
 
 #[gpui::test]
@@ -322,8 +344,7 @@ fn unmarking_the_open_template_keeps_it_open_and_returns_it_to_all_notes(cx: &mu
     click(cx, handle, "nav-templates");
     click(cx, handle, &format!("note-{template}"));
 
-    open_note_actions(cx, handle);
-    choose_popup_item(cx, handle, 0);
+    choose_note_action(cx, handle, &view, "Unmark template");
 
     assert!(!stored(cx, &view, &template).is_template);
     assert_eq!(selected(cx, &view), template);
@@ -338,10 +359,9 @@ fn marking_saves_the_pending_edit_first(cx: &mut TestAppContext) {
     let plain = note_in(&fixture.store, &fixture.inbox, "Plain", 2);
     let (handle, view) = open_view(cx, fixture.store);
     click(cx, handle, "title");
-    type_text(cx, handle, "!");
+    super::type_text(cx, handle, "!");
 
-    open_note_actions(cx, handle);
-    choose_popup_item(cx, handle, 0);
+    choose_note_action(cx, handle, &view, "Mark as template");
 
     assert_eq!(stored(cx, &view, &plain).title, "Plain!");
 }
@@ -354,13 +374,25 @@ fn no_titles() -> Vec<String> {
 fn the_note_actions_menu_copies_the_cli_command_of_the_open_note(cx: &mut TestAppContext) {
     let fixture = fixture();
     let plain = note_in(&fixture.store, &fixture.inbox, "Plain", 2);
-    let (handle, _) = open_view(cx, fixture.store);
+    let (handle, view) = open_view(cx, fixture.store);
 
-    open_note_actions(cx, handle);
-    choose_popup_item(cx, handle, 1);
+    choose_note_action(cx, handle, &view, "Copy CLI command");
 
     assert_eq!(
         cx.read_from_clipboard().and_then(|item| item.text()),
         Some(format!("bourbon get {plain}"))
     );
+}
+
+#[gpui::test]
+fn the_note_actions_menu_pins_the_open_note(cx: &mut TestAppContext) {
+    let fixture = fixture();
+    let plain = note_in(&fixture.store, &fixture.inbox, "Plain", 2);
+    let (handle, view) = open_view(cx, fixture.store);
+
+    choose_note_action(cx, handle, &view, "Pin");
+
+    assert!(stored(cx, &view, &plain).pinned);
+    open_note_actions(cx, handle);
+    assert_eq!(menu_labels(cx, &view)[0], "Unpin");
 }

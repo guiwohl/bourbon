@@ -1,9 +1,9 @@
 use bourbon_core::NoteStatus;
-use gpui_kit::{Context, Div, InteractiveElement as _};
+use gpui::{Context, Div, InteractiveElement as _};
 
 use crate::workspace::Workspace;
 
-gpui_kit::actions!(
+gpui::actions!(
     bourbon,
     [
         SetStatusNone,
@@ -15,7 +15,6 @@ gpui_kit::actions!(
         HistoryBack,
         HistoryForward,
         CycleViewMode,
-        ToggleTaskAtCursor,
         FindInNote,
         ReplaceInNote,
         ToggleFocusMode,
@@ -24,6 +23,8 @@ gpui_kit::actions!(
         LinkPickPrevious,
         LinkPickConfirm,
         LinkPickCancel,
+        TagSuggestionNext,
+        TagSuggestionPrevious,
     ]
 );
 
@@ -43,14 +44,16 @@ pub(crate) fn register(root: Div, cx: &mut Context<Workspace>) -> Div {
     .on_action(cx.listener(|workspace, _: &SetStatusDropped, _, cx| {
         workspace.set_selected_status(NoteStatus::Dropped, cx);
     }))
-    .on_action(cx.listener(|workspace, _: &OpenNotebookSelector, _, cx| {
-        workspace.open_notebook_selector(cx);
+    .on_action(
+        cx.listener(|workspace, _: &OpenNotebookSelector, window, cx| {
+            workspace.open_notebook_selector(window, cx);
+        }),
+    )
+    .on_action(cx.listener(|workspace, _: &HistoryBack, _, cx| {
+        workspace.history_back(cx);
     }))
-    .on_action(cx.listener(|workspace, _: &HistoryBack, window, cx| {
-        workspace.history_back(window, cx);
-    }))
-    .on_action(cx.listener(|workspace, _: &HistoryForward, window, cx| {
-        workspace.history_forward(window, cx);
+    .on_action(cx.listener(|workspace, _: &HistoryForward, _, cx| {
+        workspace.history_forward(cx);
     }))
 }
 
@@ -58,16 +61,11 @@ pub(crate) fn register_writing(root: Div, cx: &mut Context<Workspace>) -> Div {
     root.on_action(cx.listener(|workspace, _: &CycleViewMode, window, cx| {
         workspace.cycle_view_mode(window, cx);
     }))
-    .on_action(
-        cx.listener(|workspace, _: &ToggleTaskAtCursor, window, cx| {
-            workspace.toggle_task_at_cursor(window, cx);
-        }),
-    )
     .on_action(cx.listener(|workspace, _: &FindInNote, window, cx| {
-        workspace.find_in_note(false, window, cx);
+        workspace.find_in_note(window, cx);
     }))
     .on_action(cx.listener(|workspace, _: &ReplaceInNote, window, cx| {
-        workspace.find_in_note(true, window, cx);
+        workspace.find_in_note(window, cx);
     }))
     .on_action(cx.listener(|workspace, _: &ToggleFocusMode, window, cx| {
         workspace.toggle_focus_mode(window, cx);

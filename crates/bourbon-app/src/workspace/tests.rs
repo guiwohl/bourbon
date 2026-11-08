@@ -7,7 +7,6 @@ use gpui::{
     AnyWindowHandle, AppContext as _, Bounds, Entity, Point, TestAppContext, WindowBounds,
     WindowOptions, px, size,
 };
-use gpui_kit::test::TestWindowExt as _;
 
 use super::Workspace;
 use crate::backup_runner::BackupRunner;
@@ -112,26 +111,6 @@ fn type_into_title(cx: &mut TestAppContext, handle: AnyWindowHandle, text: &str)
     type_text(cx, handle, text);
 }
 
-fn choose_popup_item(cx: &mut TestAppContext, handle: AnyWindowHandle, index: usize) {
-    cx.update_window(handle, |_, window, cx| {
-        window.within("popup-menu").click(index, cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-}
-
-fn popup_labels(cx: &mut TestAppContext, handle: AnyWindowHandle) -> Vec<String> {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        let menu = window.within("popup-menu");
-        (0usize..)
-            .map_while(|index| menu.try_find(index))
-            .map(|item| item.label().unwrap_or_default().to_string())
-            .collect()
-    })
-    .unwrap()
-}
-
 fn menu_labels(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Vec<String> {
     cx.read(|cx| {
         view.read(cx)
@@ -150,6 +129,43 @@ fn menu_labels(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Vec<String>
             })
             .unwrap_or_default()
     })
+}
+
+fn checked_menu_labels(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Vec<String> {
+    cx.read(|cx| {
+        view.read(cx)
+            .open_menu
+            .as_ref()
+            .map(|open| {
+                open.menu()
+                    .read(cx)
+                    .entries()
+                    .iter()
+                    .filter_map(|entry| match entry {
+                        bourbon_ui::MenuEntry::Item(item) if item.checked => {
+                            Some(item.label.to_string())
+                        }
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    })
+}
+
+fn shows_label(cx: &mut TestAppContext, handle: AnyWindowHandle, label: &str) -> bool {
+    is_listed(cx, handle, &format!("picker-label: {label}"))
+}
+
+fn choose_view_mode(
+    cx: &mut TestAppContext,
+    handle: AnyWindowHandle,
+    mode: bourbon_core::ViewMode,
+) {
+    let index = crate::editor::mode_index(mode);
+    let segment = 44.;
+    let x = 1. + segment * f32::from(u8::try_from(index).unwrap()) + segment / 2.;
+    click_at(cx, handle, "view-mode", Point::new(px(x), px(14.)));
 }
 
 fn choose_menu_entry(cx: &mut TestAppContext, handle: AnyWindowHandle, position: usize) {
@@ -244,9 +260,9 @@ fn creating_a_note_selects_it_on_top_of_the_list_and_focuses_the_title(cx: &mut 
         assert_eq!(view.notes[0].id, created);
         assert_eq!(view.editor.title(cx), "");
     });
+    render(cx, handle);
     cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        assert_eq!(window.find("title").focused(), Some(true));
+        assert!(view.read(cx).editor.title_is_focused(window, cx));
     })
     .unwrap();
 }

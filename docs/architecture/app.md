@@ -1,6 +1,6 @@
 # bourbon-app
 
-GPUI window over `bourbon-core`. Holds no business rule: it presents state and forwards intent. Built on `gpui-kit` 0.9 with `tree-sitter-markdown` (re-exports GPUI and gpui-component).
+GPUI window over `bourbon-core`. Holds no business rule: it presents state and forwards intent. Built on `gpui-kit` 0.9 (re-exports GPUI and gpui-component, still used by the control pane and settings), `bourbon-ui`, `bourbon-editor` and `bourbon-markdown`.
 
 ## Behaviour
 
@@ -11,7 +11,7 @@ GPUI window over `bourbon-core`. Holds no business rule: it presents state and f
 | Layout | Three columns: sidebar (200 px) \| note list (260 px) \| editor (flex), separated by `bourbon_ui::Splitter` (1 px border, invisible 10 px handle). Limits 170..500 and 220..500 (`Settings` clamps to the same range), saved when the drag ends |
 | Sidebar | See the Sidebar section. Clicking a row sets the navigation and reloads the list |
 | Note list | See the Note list section |
-| Editor | Title input and Markdown editor (soft wrap, no line numbers). Empty state: "No notes yet" with a "New note" button |
+| Editor | See Editor column. Empty state: "No notes yet" with a `bourbon_ui` primary "New note" button |
 | Navigation | `Navigation { AllNotes, Notebook, Status, Tags, Templates, Trash }` plus the current sort form a `Listing`; `Listing::query()` maps it to a core `NoteQuery` (table below) |
 | New note | Button or `Ctrl+N`: flush, then create so the note is visible in the current list: `Notebook(id, _)` creates in that notebook; `AllNotes` in `default_notebook()`; `Tags(ids)` in `default_notebook()` seeded with every tag; `Status(s)` in `default_notebook()` seeded with status `s` (both through `create_note_with` and a `NoteSeed`, one transaction); `Trash` switches to `AllNotes` first, then as `AllNotes`. Then reload the list and the sidebar, select, focus the title. The root view tracks its own focus handle, focused at startup when no note is selected, so `Ctrl+N` works with nothing else focused |
 | Autosave | Any title or body change restarts one pending 500 ms task; when it fires: `save_note`, then reload the list only. No manual save |
@@ -53,14 +53,14 @@ Each column is a module owned by one concern. Columns render from data the works
 | `navigation.rs` | `Navigation`, `Listing`, the pure mapping to `NoteQuery` |
 | `workspace.rs` | Root view: owns `NoteStore`, listing, selection, autosave and flush, trash purge, error banner state; lays out the three columns |
 | `dragged_note.rs` | `DraggedNote` drag payload and preview, built from a `NoteSummary` |
-| `presentation.rs` | Labels and colours shared by the columns (pill text shade now comes from `bourbon_ui::pill_text_color`): `UNTITLED`, `display_title`, `status_label`, `chip_color` (`TagColor` to `ColorName`, note list and editor header chips), `dot_color`, `color_label`, `is_current_color` (sidebar) |
+| `presentation.rs` | Labels and colours shared by the columns (pill text shade comes from `bourbon_ui::pill_text_color`): `UNTITLED`, `display_title`, `status_label`, `status_icon`, `dot_color` (tag pills and dots everywhere), `color_label`, `is_current_color` (sidebar) |
 | `sidebar/mod.rs` | `render(SidebarData, cx)`: control strip, `ScrollArea` with `ListRow` / `SectionHeader` rows from `bourbon-ui`, notebook tree flattening, selection rule |
 | `note_list/mod.rs` | `render(NoteListData, cx)`: header, filter, virtualised `list` of note rows, `adjacent_note` for arrow keys |
-| `assets.rs` | `AppAssets`: `bourbon_ui::IconAssets` first, the component assets as fallback for the editor column |
+| `assets.rs` | `AppAssets`: `bourbon_ui::IconAssets` first, the component assets as fallback for the control pane and settings |
 | `workspace/menus.rs` | `MenuBuilder`, `Workspace::open_menu` / `close_menu`: every popup menu of the left columns is a `bourbon_ui::Menu` in a `Popover` at the pointer; Enter/click runs the entry after closing and restoring focus |
-| `editor/mod.rs` | `EditorPane` (title input, Markdown editor, load/read/focus, change subscriptions), empty state, error banner element |
-| `editor/{tasks,preview_blocks,link_trigger,link_picker,word_count}.rs` | Pure, unit-tested editor logic: task toggling, preview block splitting, `[[` detection, suggestion matching, counts, mode cycle |
-| `editor/{preview,toolbar}.rs` | Preview pane and the mode switch |
+| `editor/mod.rs` | `EditorPane`: title field, `bourbon_editor::Editor` body, `PreviewView`, tag field, header state, menu anchors, scroll sync, theme sync; event forwarding; empty state, error banner |
+| `editor/{toolbar,header,body}.rs` | Toolbar, meta row (notebook/status pickers, tag pills, Add Tags, suggestions), body panes |
+| `editor/{scroll_sync,themes,menu_anchor,history,link_trigger,link_picker,word_count}.rs` | Pure, unit-tested logic: sync guard wiring, `EditorTheme`/`PreviewTheme` from the `bourbon-ui` theme, menu position under a trigger, history ends, `[[` detection, suggestions, counts |
 | `workspace/writing_intents.rs` | View mode, tasks, link picker and link opening, find, focus mode intents |
 
 ## Tests
@@ -125,17 +125,32 @@ Tests (`workspace/tests/sidebar.rs`) drive real elements: row clicks (wrapper id
 
 `workspace/tests/note_list.rs`: the context menu and the sort menu are driven through our `Menu` (right click or click on `note-list-title`, then `down`/`enter`; labels come from the open menu), arrow keys with the list focus, which pane holds the focus, the dialog through `enter` and `escape`, chips through `chip-<note>-<tag>`, pins through `pin-<note>`. Dates (including the 37-day switch), titles, `adjacent_note` and prompt text are pure unit tests.
 
-## Editor header
+## Editor column
 
-Rows 3, 8, 10, 13, 15 and 19 of the [M2 decisions](../decisions/2026-11-06-m2-organization.md). Rendered above the Markdown editor, under the title, only while a note is open. All logic is in `workspace/editor_intents.rs`; `editor/` only draws and keeps view state.
+Built on `bourbon-ui`, `bourbon-editor` and `bourbon-markdown` (research [3.4-3.6](../research/inkdrop-ui-shell.md), [4.5-4.6](../research/inkdrop-markdown-editor-preview.md)). Top to bottom:
 
 | Part | Behaviour |
 |---|---|
-| Notebook selector | Button (id `notebook-selector`) labelled with the note's notebook; opens a popover listing every notebook, depth-first, indented by depth (rows `notebook-option-<id>`, the note's notebook has `aria_selected`). Choosing one calls `move_note` and closes the popover. The open state is the editor's own (`Popover::open` controlled), so `Ctrl+Alt+M` can open it |
-| Status button | Button (id `status-button`) labelled with the current status; dropdown menu None, Active, On Hold, Completed, Dropped, current one checked. Each item dispatches its `SetStatus*` action, the same actions the shortcuts use, so button and keys share one path to `set_status` |
-| Tags field | One removable chip per tag, coloured like the note list chips (`tag-chip-<id>`, × is `remove-tag-<id>` → `remove_tag_from_note`), then an "Add tags" input (`tag-input`) |
-| Autocomplete | While typing, rows `tag-suggestion-<id>` (the highlighted one has `aria_selected`) list existing tags, not already on the note, whose name contains the typed text (case-insensitive). `Down`/`Up` move the highlight (captured before the single-line input swallows them); clicking a row adds it |
-| `Enter` | Highlighted suggestion if any; else the existing tag named exactly as typed (case-insensitive, trimmed); else `add_new_tag_to_note(name, TagColor::Default)` (create and attach in one transaction). Blank input does nothing. The input is cleared on success |
+| Toolbar | Min height 40, padding-left 4: distraction-free toggle (`toggle-focus-mode`, maximize-2 / minimize-2, `Ctrl+Shift+F`), back / forward (`history-back`, `history-forward`, disabled at the ends of `History`), spacer, `SegmentedControl` (`view-mode`: pencil Show Editor, columns Show Side by Side, eye Show Preview), spacer, ⋮ (`note-actions`). Tooltips show the live binding |
+| Title | `bourbon_editor::TextField` (`title`), `borderless()`, `text_size(21 px)`, in a 36 px row with a 10.5 px inset, no gpui-component left in the column; placeholder "Untitled"; Enter moves focus to the body |
+| Meta row | Padding 0 12, 12.6 px: notebook picker (`notebook-selector`: notebook icon, bold name, chevron), status picker (`status-button`: status icon, name or "Status", chevron), one `Pill` per tag (`tag-chip-<id>`, × `remove-tag-<id>` at 40 % opacity, full on hover), inline "Add Tags" `TextField` (`tag-input`, borderless, 12.6 px, in a 24 px row with a 4 px inset, min 84 px; `up`/`down` bound in `TagInput > BourbonTextField` move the suggestion highlight) |
+| Body | Edit: `Editor` (`body-editor`, line numbers on, wrapped rows unnumbered, active line across the gutter; no fold chevrons, folding is not built). Preview: `PreviewView` (`preview`, 10 px padding). Side by side: both `flex_1` (50/50) with a 1 px internal-border divider |
+| Status bar | 24 px, muted 11 px word count on the right (`word-count`) |
+
+Pickers and suggestion panels `occlude`, so a click on them never reaches the editor behind.
+
+Menus (notebook list indented by depth with the current one checked; statuses with `Shift+Alt+N` hints and the current one checked; ⋮ = the note-row menu (Pin/Unpin, Duplicate, Move to Trash) + Mark/Unmark template + Copy CLI command) are `bourbon_ui::Menu`s opened through `Workspace::open_menu` 4 px under their trigger, whose bounds `MenuAnchor` records every prepaint, so `Ctrl+Alt+M` opens the notebook menu at the same place. The ⋮ menu reloads the note first so Pin/Unpin is current.
+
+Themes: `themes::pane_themes` picks `EditorTheme`/`PreviewTheme` light or dark from the `bourbon-ui` appearance and paints the tokens' editor background; `EditorPane::sync_theme` reapplies them in `Workspace::render` when appearance or background change (settings, Omarchy).
+
+Scroll sync (side by side only): `Editor` emits `EditorEvent::Scrolled`, `PreviewView` `PreviewEvent::Scrolled`. `ScrollSync` asks `SyncGuard::accept` which pane drives, then maps the editor's fractional `top_line` through `preview_offset_for_line` over `PreviewView::scroll_anchors`, or the preview `scroll_top` back through `line_for_preview_offset` into `Editor::scroll_to_line`. The echo of the driven pane is dropped for 100 ms. Loading a note resets both panes to the top instead of disabling the guard, so the first user scroll after a switch is never swallowed.
+
+Preview events: `ToggleTask` toggles the line in the editor (autosave follows from its `Changed`), `OpenLink` opens the URL or `bourbon://note/<id>`, `OpenNote` opens the note.
+
+| Part | Behaviour |
+|---|---|
+| Autocomplete | A deferred panel under the meta row (dot plus name). While typing, rows `tag-suggestion-<id>` (the highlighted one has `aria_selected`) list existing tags, not already on the note, whose name contains the typed text (case-insensitive). `Down`/`Up` move the highlight (captured before the single-line input swallows them); clicking a row adds it |
+| Tag `Enter` | Highlighted suggestion if any; else the existing tag named exactly as typed (case-insensitive, trimmed); else `add_new_tag_to_note(name, TagColor::Default)` (create and attach in one transaction). Blank input does nothing. The input is cleared on success |
 | Every header action | Flush the pending save, call core, reload the note into the header, then reload the sidebar data and the list. The note may leave the current list; it stays open. A failure goes to the banner and the input keeps its text |
 
 ### Shortcuts
@@ -158,7 +173,7 @@ On Linux `gpui-base` binds word movement to `Ctrl+Left/Right`, so `Alt+Left/Righ
 
 ### Tests
 
-`workspace/tests/editor.rs`: moving through the real selector, status through the real menu (`popup-menu` items) and `Shift+Alt+1`…`5`, `Ctrl+Alt+M`, chips, suggestions, keyboard and click picking, create-on-Enter, chip removal, flush before each action, banner on failure, history across three notes including a trashed and a purged one, and `History` itself (forward entries dropped).
+`workspace/tests/editor.rs`: moving through the real notebook menu (labels from the open `Menu`, `down`/`enter`), the menu position under its button, status through the real menu and `Shift+Alt+1`…`5`, picker texts (`test_text`), `Ctrl+Alt+M`, chips, suggestions, keyboard and click picking, create-on-Enter, chip removal, flush before each action, banner on failure, history across three notes including a trashed and a purged one, and `History` itself (forward entries dropped).
 
 ## Templates
 
@@ -202,7 +217,7 @@ Tests: pure unit tests next to each file; `workspace/tests/control_pane.rs` driv
 ## Settings, themes and panes (M5)
 
 - `locations.rs`: `Locations` (settings file, Omarchy colors path) is injected into `Workspace::new`; tests pass temp paths.
-- `theme/`: `palette.rs` holds the Bourbon palettes as data, the Omarchy mapping and `resolve`; `tokens.rs` resolves the `bourbon_ui::Tokens` (Inkdrop light/dark, or `omarchy_tokens` for Omarchy) and `apply` installs them next to gpui-component's `Theme`, which still paints the editor column; `watch.rs` is the mtime watch. `Workspace` polls the watch every 2 s.
+- `theme/`: `palette.rs` holds the Bourbon palettes as data, the Omarchy mapping and `resolve`; `tokens.rs` resolves the `bourbon_ui::Tokens` (Inkdrop light/dark, or `omarchy_tokens` for Omarchy) and `apply` installs them next to gpui-component's `Theme`, which still paints what is left on gpui-kit; `watch.rs` is the mtime watch. `Workspace` polls the watch every 2 s.
 - `settings_view.rs` is the Inkdrop preferences layout and replaces the three columns while open (Inkdrop uses a separate window): a 160 px page menu (`settings-page-general`, `settings-page-backup`; inactive items at 60 %, active one tinted with a 3 px primary bar) and a scrolling content pane (12 px padding, max 640 px, close button `settings-close`). General: Theme and Appearance `bourbon_ui::Select`s (ids `settings-theme`, `settings-appearance`; Appearance disabled with a hint while following Omarchy) opening our `Menu` under the trigger with the current choice checked. Backup: repository and (token login only, masked) token `TextField`s, Sign in with select (`settings-backup-auth`), "Back up automatically" `Checkbox` (`settings-backup-enabled`), Back up now / Restore buttons right-aligned. `workspace/settings_intents.rs` holds the intents (`open_settings`, `show_settings_page`, `set_theme_source`, `set_appearance`, `resize_*`, `finish_resizing`). Each change applies the theme and saves.
 - Column widths come from `Settings` and flow into `SidebarData` and `NoteListData`; `bourbon_ui::Splitter` reports them through `resize_sidebar` / `resize_note_list` and `finish_resizing` saves on release.
 - Keys: `Ctrl+,` opens settings; control pane action "Open settings".
@@ -223,18 +238,20 @@ Decisions in [M4 editor](../decisions/2026-11-06-m4-editor.md). Pure logic is in
 
 | Feature | Keys / ids | Notes |
 |---|---|---|
-| View modes | `Ctrl+E`, `view-mode-edit`, `view-mode-side-by-side`, `view-mode-preview`, panes `body-editor` and `preview` | One mode on `Workspace`, not per note |
-| Preview tasks | `preview-task-<line>` | Own checkbox rows split out of the Markdown by `preview_blocks`; a click runs `toggle_task_on_line` and the normal autosave |
-| Task shortcut | `Ctrl+Enter` in the body | `toggle_task_at_cursor` |
-| Note links | `[[`, `link-suggestions`, `link-suggestion-<id>`; `Up`/`Down`/`Enter`/`Esc` while open | `LinkPicker` lives on `EditorPane`; keys are scoped by the `LinkPicker` key context on the editor wrapper |
-| Find and replace | `Ctrl+F`, `Ctrl+H` | The editor's built-in search panel; app actions cover other focus |
-| Focus mode | `Ctrl+Shift+F`, `Esc` | `Workspace::focus_mode` hides the two columns at render time |
+| View modes | `Ctrl+E`, segments of `view-mode`, panes `body-editor` and `preview` | One mode on `Workspace`, not per note, saved in `Settings::editor_view_mode` |
+| Preview tasks | `task-line-<line>` (debug selector of `PreviewView`) | `PreviewEvent::ToggleTask` → `Editor::toggle_task_at_line`, then the normal autosave |
+| Task shortcut | `Ctrl+Enter` in the body | `bourbon-editor` `toggle_task` (any line becomes a task, a task flips) |
+| Note links | `[[`, `link-suggestions`, `link-suggestion-<id>`; `Up`/`Down`/`Enter`/`Esc` while open | `LinkPicker` lives on `EditorPane`, drawn over the body; keys are bound in `LinkPicker > BourbonEditor` after `bind_editor_keys`, so they win over the editor's own; the link goes in with `Editor::replace_range` |
+| Find and replace | `Ctrl+F`, `Ctrl+H` | `bourbon-editor` has no search panel yet: both switch to the editor (from Preview) and focus the body |
+| Focus mode | `Ctrl+Shift+F`, `Esc`, toolbar toggle | `Workspace::focus_mode` hides the two columns at render time (Inkdrop's distraction free); the column keeps its full width |
 | Word count | `word-count` | Computed from the body on every render |
 
-Tests: `workspace/tests/{view_modes,tasks,links,find,focus}.rs` (real key bindings, real clicks, painted text) plus unit tests next to each pure module and in `bourbon-core/src/note_link.rs`. The preview link test clicks inside the `preview` pane at the first character of the link.
+Tests: `workspace/tests/{view_modes,tasks,links,find,focus}.rs` (real key bindings, real clicks on the segments by offset and on preview checkboxes by debug bounds, `PreviewView::doc`, scroll sync both ways and per mode, reset on note switch) plus unit tests next to each pure module and in `bourbon-core/src/note_link.rs`. The preview link test clicks inside the `preview` pane at the first character of the link.
 
 ## Test harness
 
 `workspace/tests/harness.rs`, on GPUI only: `render` (refresh + draw), `bounds(id)` (`VisualTestContext::debug_bounds` of the id set by `test_support()`), `is_listed`, `click`, `click_at(id, offset)`, `click_with(id, Press { button, modifiers, count })`, `right_click`, `hover`, `drag(from, to)` and `drag_by(id, distance)` (8 pointer steps, so GPUI starts the drag), `press(keys)` (`simulate_keystrokes`), `type_text` (`simulate_input`), `RenderFrame` for closures that need a fresh frame. State a test asserts on is marked with its own debug selector: `pane-row-<n>-highlight` on the highlighted palette row, `settings-page-<page>-active` on the active settings page.
 
-Transitional until the editor column (PR #38) leaves `gpui-kit`: `bounds` falls back to the gpui-kit observation registry for ids the editor column registers with gpui-kit's `test_support`; the editor tests still read gpui-kit snapshots (`selected`, `label`, `focused`, `popup-menu`, `texts`); the window is still opened through `gpui_kit::open_window` (its `Root` resets that registry each frame) after `gpui_kit::init` (gpui-component setup); `assets.rs` still serves gpui-component icons; `presentation::chip_color` maps to gpui-component `ColorName` for the editor header; `theme/` still paints gpui-component's `Theme`. The app is started with `gpui_platform::application()` and the root background and text use the `bourbon-ui` tokens.
+Editor-column observation without gpui-kit: element ids through `test_id`; highlighted suggestions add a `<id>-highlight` marker child; picker texts and the word count carry `picker-label: <text>` / `word-count: <label>` debug selectors; focus is read from the entity focus handles (`EditorPane::title_is_focused`, the body's `focus_handle`); menus are read from the open `bourbon_ui::Menu`.
+
+Still on `gpui-kit` (follow-up): the window is opened through `gpui_kit::open_window` after `gpui_kit::init` (gpui-component setup), `assets.rs` still serves gpui-component icons, `theme/` still paints gpui-component's `Theme`, and `tests/settings.rs` reads that `Theme`. The editor column itself uses no gpui-kit item. The app is started with `gpui_platform::application()` and the root background and text use the `bourbon-ui` tokens.

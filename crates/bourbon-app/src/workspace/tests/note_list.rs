@@ -516,7 +516,7 @@ fn opening_a_note_below_the_fold_scrolls_it_into_view(cx: &mut TestAppContext) {
     assert_eq!(before, 0);
 
     cx.update_window(handle, |_, window, cx| {
-        view.update(cx, |view, cx| view.select(&oldest, window, cx));
+        view.update(cx, |view, cx| view.select(&oldest, cx));
         window.render_frame(cx);
         window.render_frame(cx);
     })

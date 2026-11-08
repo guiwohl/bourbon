@@ -1,13 +1,12 @@
 use bourbon_core::{NoteId, NoteStatus, NoteStore, NotebookId, TagColor};
-use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext, VisualTestContext};
-use gpui_kit::test::TestWindowExt as _;
+use gpui::{AnyWindowHandle, Entity, TestAppContext};
 
 use super::{at, click, note_in, open_view, seeded_store, type_text};
 use crate::editor::History;
 use crate::workspace::Workspace;
 
 fn press(cx: &mut TestAppContext, handle: AnyWindowHandle, keystrokes: &str) {
-    VisualTestContext::from_window(handle, cx).simulate_keystrokes(keystrokes);
+    super::press(cx, handle, keystrokes);
 }
 
 fn type_into_tag_input(cx: &mut TestAppContext, handle: AnyWindowHandle, text: &str) {
@@ -20,11 +19,7 @@ fn press_in_window(cx: &mut TestAppContext, handle: AnyWindowHandle, key: &str) 
 }
 
 fn is_rendered(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> bool {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.try_find(id.to_owned()).is_some()
-    })
-    .unwrap()
+    super::is_listed(cx, handle, id)
 }
 
 fn stored_note(
@@ -46,18 +41,31 @@ fn note_ids_after_opening(cx: &mut TestAppContext, view: &Entity<Workspace>) -> 
     cx.read(|cx| view.read(cx).notes.iter().map(|n| n.id.clone()).collect())
 }
 
+fn choose_notebook(
+    cx: &mut TestAppContext,
+    handle: AnyWindowHandle,
+    view: &Entity<Workspace>,
+    name: &str,
+) {
+    click(cx, handle, "notebook-selector");
+    let position = super::menu_labels(cx, view)
+        .iter()
+        .position(|label| label.trim() == name)
+        .unwrap();
+    super::choose_menu_entry(cx, handle, position);
+}
+
 #[gpui::test]
 fn choosing_a_notebook_in_the_selector_moves_the_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let work = work_notebook(&store);
     let (handle, view) = open_view(cx, store);
 
-    click(cx, handle, "notebook-selector");
-    click(cx, handle, &format!("notebook-option-{work}"));
+    choose_notebook(cx, handle, &view, "Work");
 
     assert_eq!(stored_note(cx, &view, &seeded.newer).notebook, work);
     cx.read(|cx| assert_eq!(view.read(cx).selected, Some(seeded.newer.clone())));
-    assert!(!is_rendered(cx, handle, &format!("notebook-option-{work}")));
+    assert_eq!(super::menu_labels(cx, &view), Vec::<String>::new());
 }
 
 #[gpui::test]
@@ -67,8 +75,7 @@ fn moving_a_note_flushes_the_pending_edit_first(cx: &mut TestAppContext) {
     let (handle, view) = open_view(cx, store);
     super::type_into_title(cx, handle, "!");
 
-    click(cx, handle, "notebook-selector");
-    click(cx, handle, &format!("notebook-option-{work}"));
+    choose_notebook(cx, handle, &view, "Work");
 
     let note = stored_note(cx, &view, &seeded.newer);
     assert_eq!(note.title, "Newer!");
@@ -78,11 +85,10 @@ fn moving_a_note_flushes_the_pending_edit_first(cx: &mut TestAppContext) {
 #[gpui::test]
 fn moving_a_note_refreshes_the_sidebar_counts(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
-    let work = work_notebook(&store);
+    work_notebook(&store);
     let (handle, view) = open_view(cx, store);
 
-    click(cx, handle, "notebook-selector");
-    click(cx, handle, &format!("notebook-option-{work}"));
+    choose_notebook(cx, handle, &view, "Work");
 
     cx.read(|cx| {
         let inbox = &view.read(cx).notebooks[0];
@@ -92,29 +98,40 @@ fn moving_a_note_refreshes_the_sidebar_counts(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
-fn the_selector_lists_every_notebook(cx: &mut TestAppContext) {
+fn the_selector_lists_every_notebook_indented_by_depth(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
-    let work = work_notebook(&store);
-    let inbox = store.default_notebook().unwrap();
-    let (handle, _) = open_view(cx, store);
+    work_notebook(&store);
+    let (handle, view) = open_view(cx, store);
 
-    assert!(!is_rendered(cx, handle, &format!("notebook-option-{work}")));
+    assert_eq!(super::menu_labels(cx, &view), Vec::<String>::new());
     click(cx, handle, "notebook-selector");
 
-    assert!(is_rendered(cx, handle, &format!("notebook-option-{inbox}")));
-    assert!(is_rendered(cx, handle, &format!("notebook-option-{work}")));
+    assert_eq!(super::menu_labels(cx, &view), ["Inbox", "    Work"]);
+}
+
+#[gpui::test]
+fn the_selector_opens_just_below_its_button(cx: &mut TestAppContext) {
+    let (store, _) = seeded_store();
+    let (handle, view) = open_view(cx, store);
+
+    click(cx, handle, "notebook-selector");
+
+    let button = super::bounds(cx, handle, "notebook-selector").unwrap();
+    let origin = cx.read(|cx| view.read(cx).last_menu_position());
+    assert_eq!(origin.x, button.left());
+    assert_eq!(origin.y, button.bottom() + gpui::px(4.));
 }
 
 #[gpui::test]
 fn ctrl_alt_m_opens_the_notebook_selector(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
-    let work = work_notebook(&store);
-    let (handle, _) = open_view(cx, store);
+    work_notebook(&store);
+    let (handle, view) = open_view(cx, store);
     click(cx, handle, "title");
 
     press(cx, handle, "ctrl-alt-m");
 
-    assert!(is_rendered(cx, handle, &format!("notebook-option-{work}")));
+    assert_eq!(super::menu_labels(cx, &view), ["Inbox", "    Work"]);
 }
 
 #[gpui::test]
@@ -123,16 +140,18 @@ fn ctrl_alt_m_without_an_open_note_does_nothing(cx: &mut TestAppContext) {
 
     press(cx, handle, "ctrl-alt-m");
 
-    cx.read(|cx| assert!(!view.read(cx).editor.notebook_selector_is_open()));
+    assert_eq!(super::menu_labels(cx, &view), Vec::<String>::new());
 }
 
-fn choose_status(cx: &mut TestAppContext, handle: AnyWindowHandle, index: usize) {
+fn choose_status(
+    cx: &mut TestAppContext,
+    handle: AnyWindowHandle,
+    view: &Entity<Workspace>,
+    index: usize,
+) {
     click(cx, handle, "status-button");
-    cx.update_window(handle, |_, window, cx| {
-        window.within("popup-menu").click(index, cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
+    assert_eq!(super::menu_labels(cx, view).len(), 5);
+    super::choose_menu_entry(cx, handle, index);
 }
 
 #[gpui::test]
@@ -140,7 +159,7 @@ fn choosing_a_status_in_the_status_button_sets_it(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
 
-    choose_status(cx, handle, 1);
+    choose_status(cx, handle, &view, 1);
 
     assert_eq!(
         stored_note(cx, &view, &seeded.newer).status,
@@ -154,7 +173,7 @@ fn every_status_option_sets_its_status(cx: &mut TestAppContext) {
     let (handle, view) = open_view(cx, store);
 
     for (index, status) in NoteStatus::ALL.into_iter().enumerate().rev() {
-        choose_status(cx, handle, index);
+        choose_status(cx, handle, &view, index);
         assert_eq!(stored_note(cx, &view, &seeded.newer).status, status);
     }
 }
@@ -614,16 +633,8 @@ fn walking_skips_unusable_entries_in_both_directions() {
     assert_eq!(history.back(&not_second), Some(first));
 }
 
-fn label_of(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> Option<String> {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.find(id.to_owned()).label().map(str::to_owned)
-    })
-    .unwrap()
-}
-
 #[gpui::test]
-fn the_buttons_show_the_notebook_name_and_the_status_label(cx: &mut TestAppContext) {
+fn the_pickers_show_the_notebook_name_and_the_status_label(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let work = work_notebook(&store);
     store.move_note(&seeded.newer, &work, at(9)).unwrap();
@@ -632,41 +643,17 @@ fn the_buttons_show_the_notebook_name_and_the_status_label(cx: &mut TestAppConte
         .unwrap();
     let (handle, _) = open_view(cx, store);
 
-    assert_eq!(
-        label_of(cx, handle, "notebook-selector").as_deref(),
-        Some("Work")
-    );
-    assert_eq!(
-        label_of(cx, handle, "status-button").as_deref(),
-        Some("On Hold")
-    );
+    assert!(super::shows_label(cx, handle, "Work"));
+    assert!(super::shows_label(cx, handle, "On Hold"));
+    assert!(!super::shows_label(cx, handle, "Inbox"));
 }
 
 #[gpui::test]
-fn nested_notebooks_are_indented_in_the_selector(cx: &mut TestAppContext) {
+fn a_note_without_status_reads_status(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
-    let work = work_notebook(&store);
-    let inbox = store.default_notebook().unwrap();
     let (handle, _) = open_view(cx, store);
 
-    click(cx, handle, "notebook-selector");
-    let (root_x, child_x) = cx
-        .update_window(handle, |_, window, _| {
-            (
-                window
-                    .find(format!("notebook-option-{inbox}"))
-                    .bounds()
-                    .origin
-                    .x,
-                window
-                    .find(format!("notebook-option-{work}"))
-                    .bounds()
-                    .origin
-                    .x,
-            )
-        })
-        .unwrap();
-    assert_eq!(child_x - root_x, gpui::px(12.));
+    assert!(super::shows_label(cx, handle, "Status"));
 }
 
 #[gpui::test]
@@ -689,54 +676,26 @@ fn the_status_menu_checks_the_current_status(cx: &mut TestAppContext) {
     store
         .set_status(&seeded.newer, NoteStatus::OnHold, at(9))
         .unwrap();
-    let (handle, _) = open_view(cx, store);
+    let (handle, view) = open_view(cx, store);
 
     click(cx, handle, "status-button");
 
-    let checks: Vec<Option<bool>> = cx
-        .update_window(handle, |_, window, _| {
-            (0..5usize)
-                .map(|index| window.within("popup-menu").find(index).checked())
-                .collect()
-        })
-        .unwrap();
-    assert_eq!(
-        checks,
-        [
-            Some(false),
-            Some(false),
-            Some(true),
-            Some(false),
-            Some(false)
-        ]
-    );
+    assert_eq!(super::checked_menu_labels(cx, &view), ["On Hold"]);
 }
 
-fn selected_of(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> Option<bool> {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.find(id.to_owned()).selected()
-    })
-    .unwrap()
+fn is_highlighted(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> bool {
+    is_rendered(cx, handle, &format!("{id}-highlight"))
 }
 
 #[gpui::test]
-fn the_selector_marks_only_the_notebook_of_the_note_as_selected(cx: &mut TestAppContext) {
+fn the_selector_checks_only_the_notebook_of_the_note(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
-    let work = work_notebook(&store);
-    let inbox = store.default_notebook().unwrap();
-    let (handle, _) = open_view(cx, store);
+    work_notebook(&store);
+    let (handle, view) = open_view(cx, store);
 
     click(cx, handle, "notebook-selector");
 
-    assert_eq!(
-        selected_of(cx, handle, &format!("notebook-option-{inbox}")),
-        Some(true)
-    );
-    assert_eq!(
-        selected_of(cx, handle, &format!("notebook-option-{work}")),
-        Some(false)
-    );
+    assert_eq!(super::checked_menu_labels(cx, &view), ["Inbox"]);
 }
 
 #[gpui::test]
@@ -750,12 +709,27 @@ fn only_the_highlighted_suggestion_is_marked_as_selected(cx: &mut TestAppContext
     type_into_tag_input(cx, handle, "rust");
     press_in_window(cx, handle, "down");
 
-    assert_eq!(
-        selected_of(cx, handle, &format!("tag-suggestion-{}", rust.id)),
-        Some(true)
-    );
-    assert_eq!(
-        selected_of(cx, handle, &format!("tag-suggestion-{}", rustacean.id)),
-        Some(false)
-    );
+    assert!(is_highlighted(
+        cx,
+        handle,
+        &format!("tag-suggestion-{}", rust.id)
+    ));
+    assert!(!is_highlighted(
+        cx,
+        handle,
+        &format!("tag-suggestion-{}", rustacean.id)
+    ));
+}
+
+#[gpui::test]
+fn the_toolbar_arrows_walk_the_viewed_notes(cx: &mut TestAppContext) {
+    let (store, notes) = three_notes();
+    let (handle, view) = open_view(cx, store);
+    visit_middle_then_oldest(cx, handle, &notes);
+
+    click(cx, handle, "history-back");
+    assert_eq!(selected(cx, &view), notes.middle);
+
+    click(cx, handle, "history-forward");
+    assert_eq!(selected(cx, &view), notes.oldest);
 }

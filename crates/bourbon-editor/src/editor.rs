@@ -23,6 +23,7 @@ const LAYOUT_CACHE_LIMIT: usize = 512;
 pub enum EditorEvent {
     Changed(String),
     TaskToggled { line: usize },
+    Scrolled,
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -47,6 +48,7 @@ pub struct Editor {
     pub(crate) wrap_width: Option<Pixels>,
     pub(crate) dragging: bool,
     pub(crate) scroll_to_caret: bool,
+    reported_scroll: Pixels,
 }
 
 impl EventEmitter<EditorEvent> for Editor {}
@@ -82,6 +84,7 @@ impl Editor {
             wrap_width: None,
             dragging: false,
             scroll_to_caret: false,
+            reported_scroll: px(0.0),
         };
         editor.restart_blink(cx);
         editor
@@ -126,6 +129,24 @@ impl Editor {
 
     pub fn scroll_top(&self) -> Pixels {
         self.scroll_top
+    }
+
+    pub fn top_line(&self) -> f32 {
+        self.heights.line_position(f32::from(self.scroll_top))
+    }
+
+    pub fn scroll_to_line(&mut self, line: f32, cx: &mut Context<Self>) {
+        self.scroll_top = px(self.heights.offset_of_line(line))
+            .min(self.max_scroll())
+            .max(px(0.0));
+        cx.notify();
+    }
+
+    pub(crate) fn report_scroll(&mut self, cx: &mut Context<Self>) {
+        if self.scroll_top != self.reported_scroll {
+            self.reported_scroll = self.scroll_top;
+            cx.emit(EditorEvent::Scrolled);
+        }
     }
 
     pub fn selected_range(&self) -> Range<usize> {

@@ -795,3 +795,72 @@ fn input_bounds_on_a_wrapped_row_sit_below_the_first_row(cx: &mut TestAppContext
         .expect("bounds");
     assert!((f32::from(found.origin.y) - 4.0 * LINE_HEIGHT).abs() < 0.1);
 }
+
+fn record_events(
+    editor: &Entity<Editor>,
+    cx: &mut VisualTestContext,
+) -> Rc<RefCell<Vec<EditorEvent>>> {
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let sink = seen.clone();
+    cx.update(|_, cx| {
+        cx.subscribe(editor, move |_, event: &EditorEvent, _| {
+            sink.borrow_mut().push(event.clone());
+        })
+        .detach();
+    });
+    seen
+}
+
+#[gpui::test]
+fn scrolling_reports_the_new_top_line(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, &long_document());
+    let seen = record_events(&editor, cx);
+    cx.simulate_event(ScrollEvent {
+        position: point(px(100.), px(100.)),
+        delta: ScrollDelta::Pixels(point(px(0.), px(-(LINE_HEIGHT * 4.5)))),
+        modifiers: Modifiers::none(),
+        touch_phase: gpui::TouchPhase::Moved,
+        source: ScrollSource::Pointer,
+    });
+    cx.run_until_parked();
+    assert_eq!(seen.borrow().as_slice(), [EditorEvent::Scrolled]);
+    let line = editor.read_with(cx, |editor, _| editor.top_line());
+    assert!((line - 4.5).abs() < 1e-3, "{line}");
+}
+
+#[gpui::test]
+fn scrolling_to_a_line_puts_it_at_the_top(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, &long_document());
+    let seen = record_events(&editor, cx);
+    editor.update(cx, |editor, cx| editor.scroll_to_line(10.25, cx));
+    cx.run_until_parked();
+    assert_eq!(
+        editor.read_with(cx, |editor, _| editor.scroll_top()),
+        px(LINE_HEIGHT * 10.25)
+    );
+    assert_eq!(seen.borrow().as_slice(), [EditorEvent::Scrolled]);
+}
+
+#[gpui::test]
+fn scrolling_to_a_line_never_passes_the_end(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "a\nb\n");
+    editor.update(cx, |editor, cx| editor.scroll_to_line(50.0, cx));
+    cx.run_until_parked();
+    assert_eq!(
+        editor.read_with(cx, |editor, _| editor.scroll_top()),
+        px(0.)
+    );
+}
+
+#[gpui::test]
+fn replacing_a_range_puts_the_caret_after_the_text_and_reports_it(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "see [[no");
+    let seen = record_events(&editor, cx);
+    editor.update(cx, |editor, cx| editor.replace_range(4..8, "[[Note]]", cx));
+    assert_eq!(text(&editor, cx), "see [[Note]]");
+    assert_eq!(selection(&editor, cx), 12..12);
+    assert_eq!(
+        seen.borrow().as_slice(),
+        [EditorEvent::Changed("see [[Note]]".to_owned())]
+    );
+}

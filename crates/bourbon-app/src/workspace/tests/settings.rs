@@ -343,8 +343,8 @@ fn opening_a_note_leaves_the_settings_view(cx: &mut TestAppContext) {
     let (handle, view) = open_view(cx, store);
     press(cx, handle, "ctrl-,");
 
-    cx.update_window(handle, |_, window, cx| {
-        view.update(cx, |view, cx| view.select(&seeded.older, window, cx));
+    cx.update_window(handle, |_, _, cx| {
+        view.update(cx, |view, cx| view.select(&seeded.older, cx));
     })
     .unwrap();
 
@@ -357,7 +357,7 @@ fn the_view_mode_is_saved_when_it_changes(cx: &mut TestAppContext) {
     let (store, _) = super::seeded_store();
     let (handle, _view) = open_view_with(cx, store, copy_of(&locations));
 
-    click(cx, handle, "view-mode-preview");
+    super::choose_view_mode(cx, handle, bourbon_core::ViewMode::Preview);
 
     assert_eq!(
         saved(&locations).editor_view_mode,

@@ -25,26 +25,13 @@ fn selector(id: &str) -> &'static str {
     Box::leak(id.to_owned().into_boxed_str())
 }
 
-fn editor_column_bounds(
-    cx: &mut TestAppContext,
-    handle: AnyWindowHandle,
-    id: &str,
-) -> Option<Bounds<Pixels>> {
-    cx.update_window(handle, |_, window, _| {
-        gpui_kit::test::TestWindowExt::try_find(window, id.to_owned()).map(|found| found.bounds())
-    })
-    .unwrap()
-}
-
 pub(crate) fn bounds(
     cx: &mut TestAppContext,
     handle: AnyWindowHandle,
     id: &str,
 ) -> Option<Bounds<Pixels>> {
     render(cx, handle);
-    VisualTestContext::from_window(handle, cx)
-        .debug_bounds(selector(id))
-        .or_else(|| editor_column_bounds(cx, handle, id))
+    VisualTestContext::from_window(handle, cx).debug_bounds(selector(id))
 }
 
 pub(crate) fn is_listed(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> bool {

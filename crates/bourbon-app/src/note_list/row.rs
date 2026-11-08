@@ -120,9 +120,9 @@ pub(crate) fn render(data: &RowData, view: &Entity<Workspace>, cx: &mut App) -> 
                     .child(summary.excerpt.clone()),
             )
         })
-        .on_click(move |_, window, cx| {
+        .on_click(move |_, _, cx| {
             let (id, view) = &clicking;
-            view.update(cx, |workspace, cx| workspace.select(id, window, cx));
+            view.update(cx, |workspace, cx| workspace.select(id, cx));
         })
         .on_mouse_down(
             MouseButton::Right,
@@ -293,15 +293,12 @@ pub(crate) fn note_menu(id: &NoteId, pinned: bool, in_trash: bool) -> MenuBuilde
             MenuItem::new(if pinned { "Unpin" } else { "Pin" }),
             move |workspace, _, cx| workspace.toggle_pin(&pinning, cx),
         )
-        .item(MenuItem::new("Duplicate"), move |workspace, window, cx| {
-            workspace.duplicate(&duplicating, window, cx);
+        .item(MenuItem::new("Duplicate"), move |workspace, _, cx| {
+            workspace.duplicate(&duplicating, cx);
         })
-        .item(
-            MenuItem::new("Move to Trash"),
-            move |workspace, window, cx| {
-                workspace.move_to_trash(&trashing, window, cx);
-            },
-        )
+        .item(MenuItem::new("Move to Trash"), move |workspace, _, cx| {
+            workspace.move_to_trash(&trashing, cx);
+        })
 }
 
 #[cfg(test)]

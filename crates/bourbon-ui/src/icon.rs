@@ -55,6 +55,8 @@ icons! {
     Inbox => "inbox",
     ListChecks => "list-checks",
     Maximize => "maximize",
+    Maximize2 => "maximize-2",
+    Minimize2 => "minimize-2",
     Notebook => "notebook",
     PanelLeft => "panel-left",
     Pencil => "pencil",
@@ -242,7 +244,7 @@ mod tests {
         let listed = IconAssets.list("icons").unwrap();
         assert!(listed.iter().any(|path| path == "icons/file-text.svg"));
         assert_eq!(listed.len(), IconName::ALL.len());
-        assert_eq!(listed.len(), 32);
+        assert_eq!(listed.len(), 34);
     }
 
     #[test]

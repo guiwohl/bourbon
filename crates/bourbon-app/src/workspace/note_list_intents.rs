@@ -43,14 +43,9 @@ impl Workspace {
         }
     }
 
-    pub(crate) fn select_adjacent_note(
-        &mut self,
-        step: Step,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub(crate) fn select_adjacent_note(&mut self, step: Step, cx: &mut Context<Self>) {
         if let Some(target) = adjacent_note(&self.notes, self.selected.as_ref(), step) {
-            self.select(&target, window, cx);
+            self.select(&target, cx);
         }
     }
 
@@ -64,20 +59,15 @@ impl Workspace {
         self.change_notes(cx, |store| store.toggle_pin(id));
     }
 
-    pub(crate) fn duplicate(&mut self, id: &NoteId, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn duplicate(&mut self, id: &NoteId, cx: &mut Context<Self>) {
         if let Some(copy) =
             self.change_notes(cx, |store| store.duplicate_note(id, Timestamp::now()))
         {
-            self.show(copy, window, cx);
+            self.show(copy, cx);
         }
     }
 
-    pub(crate) fn move_to_trash(
-        &mut self,
-        id: &NoteId,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub(crate) fn move_to_trash(&mut self, id: &NoteId, cx: &mut Context<Self>) {
         let Some(successor) = self.flush_then(cx, |this, _| this.neighbour_of(id)) else {
             return;
         };
@@ -92,7 +82,7 @@ impl Workspace {
         }
         self.selected = None;
         if let Some(next) = successor {
-            self.select(&next, window, cx);
+            self.select(&next, cx);
         }
         cx.notify();
     }
