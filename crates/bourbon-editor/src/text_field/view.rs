@@ -62,7 +62,7 @@ pub(super) fn render(
                 .min_w_0()
                 .child(TextFieldElement::new(cx.entity())),
         )
-        .children((framed && focused).then(|| {
+        .children(shows_focus_ring(framed, focused).then(|| {
             div()
                 .absolute()
                 .top(ring_inset)
@@ -73,6 +73,10 @@ pub(super) fn render(
                 .border(tokens.scale.focus_ring_width)
                 .border_color(colors.focus_outline)
         }))
+}
+
+fn shows_focus_ring(framed: bool, focused: bool) -> bool {
+    framed && focused
 }
 
 fn border_color(focused: bool, colors: &Colors) -> Hsla {
@@ -151,6 +155,14 @@ mod tests {
     use bourbon_ui::Tokens;
 
     use super::*;
+
+    #[test]
+    fn only_a_focused_framed_field_shows_the_ring() {
+        assert!(shows_focus_ring(true, true));
+        assert!(!shows_focus_ring(true, false));
+        assert!(!shows_focus_ring(false, true));
+        assert!(!shows_focus_ring(false, false));
+    }
 
     #[test]
     fn the_resting_border_gives_way_to_the_focus_ring() {

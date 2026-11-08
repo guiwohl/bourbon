@@ -86,9 +86,7 @@ impl ControlPane {
     }
 
     pub(crate) fn highlight(&mut self, row: usize) {
-        if row < self.row_count() {
-            self.highlighted = row;
-        }
+        self.highlighted = row;
     }
 
     pub(crate) fn input(&self) -> &Entity<TextField> {

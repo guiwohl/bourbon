@@ -111,6 +111,15 @@ fn appearance_is_editable(settings: &Settings) -> bool {
     settings.theme_source == ThemeSource::Bourbon
 }
 
+fn appearance_hint(settings: &Settings) -> Option<&'static str> {
+    (!appearance_is_editable(settings))
+        .then_some("Omarchy decides the appearance while you follow its theme.")
+}
+
+fn menu_item_opacity(active: bool) -> f32 {
+    if active { 1. } else { INACTIVE_ITEM_OPACITY }
+}
+
 fn current_label(choices: &[Choice; 2]) -> &'static str {
     choices
         .iter()
@@ -215,7 +224,8 @@ fn page_menu(
                 .h(px(MENU_ITEM_HEIGHT))
                 .px(px(MENU_ITEM_PADDING))
                 .cursor_pointer()
-                .when(!active, |item| item.opacity(INACTIVE_ITEM_OPACITY))
+                .aria_selected(active)
+                .opacity(menu_item_opacity(active))
                 .when(active, |item| {
                     item.bg(colors.selection_inactive).child(
                         div()
@@ -307,7 +317,7 @@ fn general_page(settings: &Settings, tokens: &Tokens, cx: &mut Context<Workspace
                 editable,
                 cx,
             ),
-            (!editable).then_some("Omarchy decides the appearance while you follow its theme."),
+            appearance_hint(settings),
             tokens,
         ))
         .into_any_element()
@@ -451,6 +461,20 @@ mod tests {
         assert!(appearance_is_editable(&settings));
         settings.theme_source = ThemeSource::Omarchy;
         assert!(!appearance_is_editable(&settings));
+    }
+
+    #[test]
+    fn the_appearance_hint_shows_only_while_following_omarchy() {
+        let mut settings = Settings::default();
+        assert_eq!(appearance_hint(&settings), None);
+        settings.theme_source = ThemeSource::Omarchy;
+        assert!(appearance_hint(&settings).is_some());
+    }
+
+    #[test]
+    fn inactive_pages_are_dimmed() {
+        assert!((menu_item_opacity(true) - 1.).abs() < f32::EPSILON);
+        assert!((menu_item_opacity(false) - INACTIVE_ITEM_OPACITY).abs() < f32::EPSILON);
     }
 
     #[test]
