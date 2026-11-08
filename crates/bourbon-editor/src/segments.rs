@@ -41,9 +41,6 @@ fn classed_pieces(
     {
         let start = span.range.start.max(cursor);
         let end = span.range.end.min(line.end);
-        if start >= end {
-            continue;
-        }
         if start > cursor {
             pieces.push((cursor..start, None));
         }
@@ -119,7 +116,10 @@ pub fn hanging_prefix_len(line: &str) -> usize {
     let bytes = line.as_bytes();
     let mut index = skip_blanks(bytes, 0);
     let mut quoted_end = None;
-    while bytes.get(index) == Some(&b'>') {
+    for _ in 0..bytes.len() {
+        if bytes.get(index) != Some(&b'>') {
+            break;
+        }
         index += 1;
         if is_blank(bytes.get(index)) {
             index += 1;
@@ -370,5 +370,39 @@ mod tests {
     #[test]
     fn a_bare_marker_is_all_prefix() {
         assert_eq!(hanging_prefix_len("- "), 2);
+    }
+
+    #[test]
+    fn a_span_starting_at_the_line_end_adds_no_empty_segment() {
+        let spans = [
+            span(0..3, TokenClass::Strong),
+            span(5..8, TokenClass::Emphasis),
+        ];
+        assert_eq!(
+            line_segments(0..5, &spans, None),
+            vec![segment(3, Some(TokenClass::Strong)), segment(2, None)]
+        );
+    }
+
+    #[test]
+    fn marked_ranges_on_piece_edges_add_no_empty_segments() {
+        let spans = [span(0..2, TokenClass::Strong)];
+        let segments = line_segments(0..4, &spans, Some(&(2..4)));
+        assert!(segments.iter().all(|segment| segment.len > 0));
+        assert_eq!(segments.len(), 2);
+    }
+
+    #[test]
+    fn heading_level_ignores_a_heading_that_starts_at_the_line_end() {
+        let spans = [span(4..8, TokenClass::Heading(2))];
+        assert_eq!(heading_level(0..4, &spans), None);
+    }
+
+    #[test]
+    fn broken_task_boxes_are_not_part_of_the_prefix() {
+        assert_eq!(hanging_prefix_len("- [y] t"), 2);
+        assert_eq!(hanging_prefix_len("- [ x t"), 2);
+        assert_eq!(hanging_prefix_len("- ax] t"), 2);
+        assert_eq!(hanging_prefix_len("- [x]t"), 5);
     }
 }

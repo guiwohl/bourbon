@@ -3,8 +3,9 @@ use std::rc::Rc;
 
 use bourbon_editor::{Editor, EditorEvent, EditorTheme, bind_editor_keys};
 use gpui::{
-    Entity, EntityInputHandler, Modifiers, MouseButton, MouseDownEvent, MouseUpEvent, ScrollDelta,
-    ScrollEvent, ScrollSource, TestAppContext, VisualTestContext, point, px,
+    AppContext as _, Entity, EntityInputHandler, Modifiers, MouseButton, MouseDownEvent,
+    MouseUpEvent, ScrollDelta, ScrollEvent, ScrollSource, TestAppContext, VisualTestContext, point,
+    px,
 };
 
 const CHAR_WIDTH: f32 = 7.8;
@@ -471,4 +472,237 @@ fn toggling_a_task_past_the_last_line_is_ignored(cx: &mut TestAppContext) {
     let (editor, cx) = open(cx, "- [ ] a");
     editor.update(cx, |editor, cx| editor.toggle_task_at_line(9, cx));
     assert_eq!(text(&editor, cx), "- [ ] a");
+}
+
+struct Offset {
+    editor: Entity<Editor>,
+}
+
+impl gpui::Render for Offset {
+    fn render(
+        &mut self,
+        _: &mut gpui::Window,
+        _: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{ParentElement, Styled};
+        gpui::div()
+            .size_full()
+            .pl(px(50.0))
+            .pt(px(30.0))
+            .child(self.editor.clone())
+    }
+}
+
+fn open_offset<'a>(
+    cx: &'a mut TestAppContext,
+    text: &str,
+) -> (Entity<Editor>, &'a mut VisualTestContext) {
+    cx.update(bind_editor_keys);
+    let text = text.to_owned();
+    let (root, cx) = cx.add_window_view(move |_, cx| {
+        let editor = cx.new(|cx| Editor::new(&text, EditorTheme::light(), cx));
+        Offset { editor }
+    });
+    let editor = root.read_with(cx, |root, _| root.editor.clone());
+    cx.update(|window, cx| {
+        let handle = editor.read(cx).focus_handle().clone();
+        window.focus(&handle, cx);
+    });
+    cx.run_until_parked();
+    (editor, cx)
+}
+
+#[gpui::test]
+fn clicks_are_relative_to_the_editor_origin(cx: &mut TestAppContext) {
+    let (editor, cx) = open_offset(cx, "hello world\nsecond line\nthird");
+    cx.simulate_click(
+        point(px(50.0 + column_x(3.0)), px(30.0 + row_y(1.0))),
+        Modifiers::none(),
+    );
+    assert_eq!(selection(&editor, cx), 15..15);
+    cx.simulate_click(
+        point(px(50.0 + column_x(2.0)), px(30.0 + row_y(2.0))),
+        Modifiers::none(),
+    );
+    assert_eq!(selection(&editor, cx), 26..26);
+}
+
+#[gpui::test]
+fn clicks_after_scrolling_hit_the_scrolled_line(cx: &mut TestAppContext) {
+    let (editor, cx) = open_offset(cx, &"line\n".repeat(200));
+    cx.simulate_event(ScrollEvent {
+        position: point(px(100.), px(100.)),
+        delta: ScrollDelta::Pixels(point(px(0.), px(-195.))),
+        modifiers: Modifiers::none(),
+        touch_phase: gpui::TouchPhase::Moved,
+        source: ScrollSource::Pointer,
+    });
+    cx.run_until_parked();
+    cx.simulate_click(
+        point(px(50.0 + column_x(1.0)), px(30.0 + row_y(0.0))),
+        Modifiers::none(),
+    );
+    assert_eq!(selection(&editor, cx), 51..51);
+}
+
+#[gpui::test]
+fn moving_the_mouse_without_pressing_does_not_select(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "hello world");
+    cx.simulate_mouse_move(
+        point(px(column_x(5.0)), px(row_y(0.0))),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    assert_eq!(selection(&editor, cx), 0..0);
+}
+
+#[gpui::test]
+fn releasing_the_mouse_ends_the_drag(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "hello world");
+    cx.simulate_click(point(px(column_x(1.0)), px(row_y(0.0))), Modifiers::none());
+    cx.simulate_mouse_move(
+        point(px(column_x(6.0)), px(row_y(0.0))),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    assert_eq!(selection(&editor, cx), 1..1);
+}
+
+#[gpui::test]
+fn scrolling_by_lines_moves_by_the_line_height(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, &long_document());
+    cx.simulate_event(ScrollEvent {
+        position: point(px(100.), px(100.)),
+        delta: ScrollDelta::Lines(point(0.0, -3.0)),
+        modifiers: Modifiers::none(),
+        touch_phase: gpui::TouchPhase::Moved,
+        source: ScrollSource::Pointer,
+    });
+    assert_eq!(
+        editor.read_with(cx, |editor, _| editor.scroll_top()),
+        px(58.5)
+    );
+}
+
+#[gpui::test]
+fn pasting_is_its_own_undo_step(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "");
+    cx.simulate_input("a");
+    cx.write_to_clipboard(gpui::ClipboardItem::new_string("b".to_owned()));
+    cx.simulate_keystrokes("ctrl-v");
+    assert_eq!(text(&editor, cx), "ab");
+    cx.simulate_keystrokes("ctrl-z");
+    assert_eq!(text(&editor, cx), "a");
+}
+
+#[gpui::test]
+fn up_on_the_first_line_goes_to_the_start_and_down_on_the_last_to_the_end(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "abc\ndef");
+    set_selection(&editor, cx, 1, 1);
+    cx.simulate_keystrokes("up");
+    assert_eq!(selection(&editor, cx), 0..0);
+    set_selection(&editor, cx, 5, 5);
+    cx.simulate_keystrokes("down");
+    assert_eq!(selection(&editor, cx), 7..7);
+}
+
+#[gpui::test]
+fn vertical_movement_from_a_later_line_uses_the_column(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "abcdef\nxy\nabcdef");
+    set_selection(&editor, cx, 11, 11);
+    cx.simulate_keystrokes("up up");
+    assert_eq!(selection(&editor, cx), 1..1);
+}
+
+#[gpui::test]
+fn down_inside_a_wrapped_line_advances_one_row_at_a_time(cx: &mut TestAppContext) {
+    let words = "word ".repeat(100);
+    let (editor, cx) = open(cx, &words);
+    cx.simulate_resize(gpui::size(px(200.0), px(400.0)));
+    cx.run_until_parked();
+    set_selection(&editor, cx, 0, 0);
+    cx.simulate_keystrokes("down");
+    let first = selection(&editor, cx).start;
+    cx.simulate_keystrokes("down");
+    let second = selection(&editor, cx).start;
+    assert_eq!(first, 20);
+    assert_eq!(second, 40);
+}
+
+#[gpui::test]
+fn page_down_and_up_move_by_the_visible_rows(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, &long_document());
+    let height = cx.update(|window, _| window.viewport_size().height);
+    let page = (f32::from(height) / LINE_HEIGHT).floor() as usize - 1;
+    cx.simulate_keystrokes("pagedown");
+    assert_eq!(selection(&editor, cx).start, page * 5);
+    cx.simulate_keystrokes("pageup");
+    assert_eq!(selection(&editor, cx).start, 0);
+    cx.simulate_keystrokes("shift-pagedown");
+    assert_eq!(selection(&editor, cx), 0..page * 5);
+    cx.simulate_keystrokes("shift-pageup");
+    assert_eq!(selection(&editor, cx), 0..0);
+}
+
+#[gpui::test]
+fn unmarking_ends_the_composition(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "ab");
+    editor.update_in(cx, |editor, window, cx| {
+        editor.replace_and_mark_text_in_range(None, "ni", None, window, cx);
+        editor.unmark_text(window, cx);
+    });
+    let marked = editor.update_in(cx, |editor, window, cx| {
+        editor.marked_text_range(window, cx)
+    });
+    assert_eq!(marked, None);
+}
+
+#[gpui::test]
+fn the_new_selection_of_a_composition_is_relative_to_the_inserted_text(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "ab");
+    set_selection(&editor, cx, 1, 1);
+    editor.update_in(cx, |editor, window, cx| {
+        editor.replace_and_mark_text_in_range(None, "ni", Some(1..1), window, cx);
+    });
+    assert_eq!(selection(&editor, cx), 2..2);
+    editor.update_in(cx, |editor, window, cx| {
+        editor.replace_and_mark_text_in_range(None, "ni", Some(0..2), window, cx);
+    });
+    assert_eq!(selection(&editor, cx), 1..3);
+}
+
+#[gpui::test]
+fn only_a_plain_typed_character_auto_pairs(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "ab");
+    editor.update_in(cx, |editor, window, cx| {
+        editor.replace_text_in_range(Some(0..1), "(", window, cx);
+    });
+    assert_eq!(text(&editor, cx), "(b");
+    editor.update_in(cx, |editor, window, cx| {
+        editor.replace_and_mark_text_in_range(None, "x", None, window, cx);
+        editor.replace_text_in_range(None, "(", window, cx);
+    });
+    assert_eq!(text(&editor, cx), "((b");
+}
+
+#[gpui::test]
+fn input_bounds_follow_the_text_position(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "hello\nworld");
+    let element = gpui::Bounds::new(point(px(0.0), px(0.0)), gpui::size(px(500.0), px(300.0)));
+    let first = editor
+        .update_in(cx, |editor, window, cx| {
+            editor.bounds_for_range(1..3, element, window, cx)
+        })
+        .expect("bounds for the first line");
+    assert!((f32::from(first.origin.x) - (TEXT_LEFT + CHAR_WIDTH)).abs() < 0.1);
+    assert!((f32::from(first.size.width) - 2.0 * CHAR_WIDTH).abs() < 0.1);
+    assert!(f32::from(first.origin.y).abs() < 0.1);
+    let second = editor
+        .update_in(cx, |editor, window, cx| {
+            editor.bounds_for_range(8..10, element, window, cx)
+        })
+        .expect("bounds for the second line");
+    assert!((f32::from(second.origin.x) - (TEXT_LEFT + 2.0 * CHAR_WIDTH)).abs() < 0.1);
+    assert!((f32::from(second.origin.y) - LINE_HEIGHT).abs() < 0.1);
+    assert!((f32::from(second.size.width) - 2.0 * CHAR_WIDTH).abs() < 0.1);
 }

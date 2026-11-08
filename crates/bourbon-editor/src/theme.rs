@@ -291,4 +291,48 @@ mod tests {
         let theme = EditorTheme::dark();
         assert!(theme.selection.a > theme.selection_unfocused.a);
     }
+
+    fn colours(theme: &EditorTheme) -> Vec<Hsla> {
+        vec![
+            theme.foreground,
+            theme.background,
+            theme.caret,
+            theme.selection,
+            theme.selection_unfocused,
+            theme.active_line,
+            theme.gutter_text,
+            theme.gutter_border,
+            theme.heading,
+            theme.mark,
+            theme.list_mark,
+            theme.quote,
+            theme.link,
+            theme.comment,
+            theme.math,
+            theme.inline_code_background,
+        ]
+    }
+
+    #[test]
+    fn every_colour_of_both_themes_is_set() {
+        let unset = hsla(0.0, 0.0, 0.5, 1.0);
+        for theme in [EditorTheme::light(), EditorTheme::dark()] {
+            assert!(colours(&theme).iter().all(|colour| *colour != unset));
+        }
+    }
+
+    #[test]
+    fn colours_are_converted_from_hsl_degrees_and_percent() {
+        let light = EditorTheme::light();
+        assert_eq!(light.foreground, hsla(215.0 / 360.0, 0.28, 0.17, 1.0));
+        assert_eq!(light.selection, hsla(262.0 / 360.0, 0.83, 0.58, 0.30));
+    }
+
+    #[test]
+    fn dark_colours_differ_from_light_ones_field_by_field() {
+        let light = colours(&EditorTheme::light());
+        let dark = colours(&EditorTheme::dark());
+        let same = light.iter().zip(&dark).filter(|(a, b)| a == b).count();
+        assert!(same <= 1);
+    }
 }

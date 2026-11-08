@@ -171,4 +171,29 @@ mod tests {
         assert_eq!(flat.flags.len(), flat.text.len());
         assert_eq!(flat.flag_runs(), vec![(6, BOLD)]);
     }
+
+    #[test]
+    fn repeating_a_style_does_not_cancel_it() {
+        let flat = flatten_inlines(&[Inline::Strong(vec![Inline::Strong(vec![text("a")])])]);
+        assert_eq!(flat.flag_runs(), vec![(1, BOLD)]);
+        let flat = flatten_inlines(&[Inline::Emphasis(vec![Inline::Emphasis(vec![text("a")])])]);
+        assert_eq!(flat.flag_runs(), vec![(1, ITALIC)]);
+        let flat = flatten_inlines(&[Inline::Strikethrough(vec![Inline::Strikethrough(vec![
+            text("a"),
+        ])])]);
+        assert_eq!(flat.flag_runs(), vec![(1, STRIKE)]);
+    }
+
+    #[test]
+    fn a_link_inside_a_link_keeps_the_link_flag() {
+        let inner = Inline::Link {
+            href: "b".to_owned(),
+            children: vec![text("a")],
+        };
+        let flat = flatten_inlines(&[Inline::Link {
+            href: "a".to_owned(),
+            children: vec![inner],
+        }]);
+        assert_eq!(flat.flag_runs(), vec![(1, LINK)]);
+    }
 }
