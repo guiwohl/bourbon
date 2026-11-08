@@ -1,6 +1,6 @@
 # bourbon-editor
 
-GPUI views of the Markdown editor and preview (Phase 1, view half, of [the UI rebuild](../decisions/2026-11-07-ui-rebuild.md); research [sections 2, 5, 6.4, 6.5](../research/inkdrop-markdown-editor-preview.md)). Depends only on `gpui-pre` (lib `gpui`), `bourbon-text` and `bourbon-markdown`; no pre-made input or editor component. The app is not migrated yet. Dev deps: `gpui` with `test-support`, `gpui-pre-platform` (demo window), `proptest`.
+GPUI views of the Markdown editor, the preview and the single-line text field (Phase 1, view half, of [the UI rebuild](../decisions/2026-11-07-ui-rebuild.md); research [sections 2, 5, 6.4, 6.5](../research/inkdrop-markdown-editor-preview.md)). Depends only on `gpui-pre` (lib `gpui`), `bourbon-text`, `bourbon-markdown` and `bourbon-ui` (tokens and icons for the text field); no pre-made input or editor component. The app uses the text field for the note-list filter and the sidebar name prompt; the editor column is not migrated yet. Dev deps: `gpui` with `test-support`, `gpui-pre-platform` (demo window), `proptest`.
 
 Run the demo: `cargo run -p bourbon-editor --example editor_demo` (app id `bourbon-editor-demo`; `ctrl-shift-l` light/dark, `ctrl-shift-n` line numbers). Editor and preview side by side on the research fixture note; the preview follows the editor live and its checkboxes toggle the editor text.
 
@@ -12,6 +12,9 @@ Run the demo: `cargo run -p bourbon-editor --example editor_demo` (app id `bourb
 | `EditorEvent::Changed(String)`, `TaskToggled { line }` | `Changed` fires on every text change (typing, commands, undo, task toggles), not on `set_text` |
 | `EditorTheme::light()/dark()` | Plain data: font family and fallbacks, 13 px, line height 1.5, heading scales 2/1.5/1.17/1/.83/.67, colours and `token_style(TokenClass)`. Phase 2 swaps the source for `bourbon-ui` tokens |
 | `bind_editor_keys(cx)`, `KEY_CONTEXT` | Key bindings for context `BourbonEditor` |
+| `TextField::new(cx)`, `.placeholder(text)`, `.leading_icon(IconName)`, `text()`, `set_text()` (drops line breaks, caret at the end, resets history, no event), `selected_range()`, `focus(window, cx)` | Single-line field. `EventEmitter<TextFieldEvent>`, `Focusable`, `Render`, `EntityInputHandler` |
+| `TextFieldEvent::Changed(String)`, `Submit`, `Cancel` | `Changed` on every text change; Enter emits `Submit`, Esc emits `Cancel`; neither edits the text |
+| `bind_text_field_keys(cx)`, `TEXT_FIELD_CONTEXT` | Key bindings for context `BourbonTextField` |
 | `PreviewView::new(source, theme, cx)`, `set_source()`, `set_theme()`, `block_layouts()` | Preview entity |
 | `PreviewEvent::ToggleTask { source_line }`, `OpenLink(href)`, `OpenNote(id)` | Never mutates the document; the owner applies the toggle to the editor |
 | `PreviewTheme::light()/dark()` | Preview typography and colours |
@@ -29,6 +32,17 @@ Run the demo: `cargo run -p bourbon-editor --example editor_demo` (app id `bourb
 - Vertical movement keeps a goal x across wrapped rows and lines (`motion::walk_rows`); up on the first row goes to the start, down on the last row to the end.
 - IME: `EntityInputHandler` with UTF-16 conversions in `utf16` (pure, proptested). `replace_and_mark_text_in_range` inserts through `insert_text` and tracks the marked byte range, drawn underlined. A single typed character goes through `type_character` (auto-pair).
 - Keys: arrows (+shift, ctrl word), home/end, ctrl-home/end, pageup/down, backspace/delete (+ctrl word), enter (list continuation, plain newline fallback), tab / shift-tab (list indent / outdent, two spaces fallback), ctrl-z, ctrl-shift-z, ctrl-y, ctrl-a, ctrl-c/x/v (plain text, paste is its own undo step), ctrl-b, ctrl-i, ctrl-shift-x, ctrl-`, ctrl-enter.
+
+## Text field
+
+Run the demo: `cargo run -p bourbon-editor --example text_field_demo` (app id `bourbon-text-field-demo`): filter and rename fields, light (left) and dark (right).
+
+- Same core as the editor: `bourbon_text::EditorState` plus `History`; edits go through `bourbon_text` commands (`insert_text`, `delete_backward`, `delete_forward`, `delete_word_backward`, shared `delete_next_word` and `paste_text`), moves through `motion::move_range`. No auto-pair, no Markdown.
+- Single line: `single_line` drops `\n` and `\r` from `set_text`, paste and IME input (like an HTML input); Enter and Esc are events only.
+- Element (`text_field/element.rs`): one `ShapedLine` in the UI font (`tokens.fonts.ui_family`, Inter) at `scale.medium` (14 px), `scale.line_height` (20 px) tall; placeholder in `input_placeholder` when empty; text in `input_text`; marked IME text underlined; selection in `focus_outline` (only while focused); caret 1 px in `input_text`, blinking 530 ms (`blink::schedule_blink`, shared with the editor). Horizontal scroll keeps the caret visible (`geometry::revealing_scroll`, pure).
+- Box (`text_field/view.rs`): 30 px tall, padding 0 8, gap 8, 7 px radius, 1 px `internal_border`; focused: the border turns transparent and a 2 px `focus_outline` ring is drawn just outside it (inset -3 px). Optional leading icon 16 px at 30% opacity in `text`. No background (the parent's shows through).
+- Keys (`BourbonTextField`): arrows, `shift` and `ctrl` variants, home/end (+shift), backspace/delete (+ctrl word), enter, escape, ctrl-z / ctrl-shift-z / ctrl-y, ctrl-a, ctrl-c/x/v. Mouse: click, shift-click, drag, double-click word, triple-click all.
+- Tests: `tests/text_field.rs` (typing, events, keys, clipboard, IME and UTF-16, mouse, icon offset, scroll), unit tests for `single_line`, blink, scroll and the border/ring.
 
 ## Preview design
 

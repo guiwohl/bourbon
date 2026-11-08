@@ -19,7 +19,8 @@ use bourbon_core::{
     Note, NoteId, NoteQuery, NoteScope, NoteSeed, NoteStore, NoteSummary, NotebookId, NotebookNode,
     Settings, StoreError, TagSummary, TemplateTimeZone, Timestamp, ViewMode,
 };
-use bourbon_ui::{Splitter, ThemeExt as _};
+use bourbon_editor::{TextField, TextFieldEvent};
+use bourbon_ui::{IconName, Splitter, ThemeExt as _};
 use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -72,7 +73,7 @@ pub struct Workspace {
     data: data_intents::DataState,
     repository_input: Entity<InputState>,
     token_input: Entity<InputState>,
-    filter_input: Entity<InputState>,
+    filter_input: Entity<TextField>,
     focus_handle: FocusHandle,
     sidebar_focus: FocusHandle,
     note_list_focus: FocusHandle,
@@ -110,14 +111,20 @@ impl Workspace {
                 .masked(true)
                 .placeholder("Personal access token")
         });
-        let filter_input = cx.new(|cx| InputState::new(window, cx).placeholder("Filter"));
-        subscriptions.push(
-            cx.subscribe(&filter_input, |view, _, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    view.filter_changed(cx);
-                }
-            }),
-        );
+        let filter_input = cx.new(|cx| {
+            TextField::new(cx)
+                .placeholder("Filter")
+                .leading_icon(IconName::Search)
+        });
+        subscriptions.push(cx.subscribe_in(
+            &filter_input,
+            window,
+            |view, _, event: &TextFieldEvent, window, cx| match event {
+                TextFieldEvent::Changed(_) => view.filter_changed(cx),
+                TextFieldEvent::Submit => view.focus_note_list(window, cx),
+                TextFieldEvent::Cancel => view.clear_filter(cx),
+            },
+        ));
         subscriptions.push(
             cx.subscribe(&repository_input, |view, _, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {

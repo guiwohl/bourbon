@@ -14,6 +14,23 @@ use crate::task_click::toggle_task_at;
 
 const INDENT: &str = "  ";
 
+pub(crate) fn delete_next_word(state: &EditorState) -> Option<Transaction> {
+    let head = state.selection.main().head;
+    let end = next_word_boundary(&state.text, head);
+    let probe = EditorState::new(
+        state.text.clone(),
+        Selection::single(SelectionRange::new(head, end)),
+    );
+    delete_forward(&probe)
+}
+
+pub(crate) fn paste_text(state: &EditorState, text: &str) -> Option<Transaction> {
+    insert_text(state, text).map(|transaction| Transaction {
+        kind: TransactionKind::Paste,
+        ..transaction
+    })
+}
+
 impl Editor {
     pub(crate) fn move_horizontal(&mut self, motion: Motion, extend: bool, cx: &mut Context<Self>) {
         let moved = move_range(
@@ -88,18 +105,7 @@ impl Editor {
     }
 
     pub(crate) fn delete_word_forward(&mut self, cx: &mut Context<Self>) {
-        self.run_command(
-            |state| {
-                let head = state.selection.main().head;
-                let end = next_word_boundary(&state.text, head);
-                let probe = EditorState::new(
-                    state.text.clone(),
-                    Selection::single(SelectionRange::new(head, end)),
-                );
-                delete_forward(&probe)
-            },
-            cx,
-        );
+        self.run_command(delete_next_word, cx);
     }
 
     pub(crate) fn enter(&mut self, cx: &mut Context<Self>) {
@@ -169,15 +175,7 @@ impl Editor {
             return;
         };
         let normalized = text.replace("\r\n", "\n");
-        self.run_command(
-            |state| {
-                insert_text(state, &normalized).map(|transaction| Transaction {
-                    kind: TransactionKind::Paste,
-                    ..transaction
-                })
-            },
-            cx,
-        );
+        self.run_command(|state| paste_text(state, &normalized), cx);
     }
 
     pub(crate) fn line_height(&self) -> Pixels {

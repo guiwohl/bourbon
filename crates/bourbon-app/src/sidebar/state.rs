@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use bourbon_core::{
     NoteScope, NoteStatus, NoteStore, NotebookDepth, NotebookId, StoreError, TagId,
 };
-use gpui_kit::component::input::InputState;
+use bourbon_editor::TextField;
 use gpui_kit::{Entity, SharedString, Subscription};
 
 use super::tree;
@@ -33,7 +33,7 @@ pub(crate) enum DeletionTarget {
 pub(crate) enum Prompt {
     Name {
         target: NameTarget,
-        input: Entity<InputState>,
+        input: Entity<TextField>,
         _subscription: Subscription,
     },
     Deletion {

@@ -16,7 +16,7 @@ use crate::editor::actions::{
 };
 use crate::fonts;
 use crate::locations::Locations;
-use crate::note_list::{ClearFilter, SelectNextNote, SelectPreviousNote};
+use crate::note_list::{SelectNextNote, SelectPreviousNote};
 use crate::sidebar::ToggleSidebar;
 use crate::workspace::{NewNote, OpenActionSearch, OpenNoteSearch, OpenSettings, Workspace};
 
@@ -85,6 +85,7 @@ fn forward_focus_requests(window: AnyWindowHandle, focus_requests: Receiver<()>,
 
 pub(crate) fn bind_keys(cx: &mut App) {
     bourbon_ui::init(cx);
+    bourbon_editor::bind_text_field_keys(cx);
     cx.bind_keys([
         KeyBinding::new("ctrl-n", NewNote, None),
         KeyBinding::new("ctrl-/", ToggleSidebar, None),
@@ -115,7 +116,6 @@ pub(crate) fn bind_keys(cx: &mut App) {
         KeyBinding::new("down", LinkPickNext, Some("LinkPicker > Input")),
         KeyBinding::new("enter", LinkPickConfirm, Some("LinkPicker > Input")),
         KeyBinding::new("escape", LinkPickCancel, Some("LinkPicker > Input")),
-        KeyBinding::new("escape", ClearFilter, Some("NoteFilter > Input")),
         KeyBinding::new("up", SelectPreviousNote, Some("NoteList")),
         KeyBinding::new("down", SelectNextNote, Some("NoteList")),
     ]);

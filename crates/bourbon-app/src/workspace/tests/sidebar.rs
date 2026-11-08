@@ -282,6 +282,20 @@ fn an_empty_name_is_refused_with_the_banner_and_keeps_the_prompt(cx: &mut TestAp
 }
 
 #[gpui_kit::test]
+fn escape_in_the_name_field_cancels_the_prompt(cx: &mut TestAppContext) {
+    let tree = tree_store();
+    let (handle, view) = open_view(cx, tree.store);
+
+    click(cx, handle, "new-notebook");
+    type_name(cx, handle, "Ideas");
+    cx.update_window(handle, |_, window, cx| window.press("escape", cx))
+        .unwrap();
+
+    assert!(!is_listed(cx, handle, "sidebar-prompt"));
+    assert_eq!(notebook_names(cx, &view), ["Inbox", "Other", "Work", "Sub"]);
+}
+
+#[gpui_kit::test]
 fn cancelling_the_prompt_changes_nothing(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);

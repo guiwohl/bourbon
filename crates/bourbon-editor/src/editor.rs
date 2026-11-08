@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Range;
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use bourbon_markdown::{HighlightSpan, highlight};
 use bourbon_text::{
@@ -11,12 +11,12 @@ use gpui::{
     Bounds, Context, EventEmitter, FocusHandle, Focusable, IntoElement, Pixels, Render, Window, px,
 };
 
+use crate::blink::schedule_blink;
 use crate::layout::{LineLayout, ShapeRequest};
 use crate::line_heights::LineHeights;
 use crate::segments::{hanging_prefix_len, heading_level, line_segments};
 use crate::theme::EditorTheme;
 
-const BLINK_INTERVAL: Duration = Duration::from_millis(530);
 const LAYOUT_CACHE_LIMIT: usize = 512;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -241,15 +241,7 @@ impl Editor {
     pub(crate) fn restart_blink(&mut self, cx: &mut Context<Self>) {
         self.caret_visible = true;
         self.blink_epoch += 1;
-        Self::schedule_blink(self.blink_epoch, cx);
-    }
-
-    fn schedule_blink(epoch: u64, cx: &mut Context<Self>) {
-        cx.spawn(async move |editor, cx| {
-            cx.background_executor().timer(BLINK_INTERVAL).await;
-            editor.update(cx, |editor, cx| editor.blink(epoch, cx)).ok();
-        })
-        .detach();
+        schedule_blink(self.blink_epoch, cx, Self::blink);
     }
 
     fn blink(&mut self, epoch: u64, cx: &mut Context<Self>) {
@@ -260,7 +252,7 @@ impl Editor {
         if self.focused {
             cx.notify();
         }
-        Self::schedule_blink(epoch, cx);
+        schedule_blink(epoch, cx, Self::blink);
     }
 
     pub(crate) fn shape_line(&self, line: usize, window: &mut Window) -> LineLayout {
@@ -330,7 +322,9 @@ impl Render for Editor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blink::BLINK_INTERVAL;
     use gpui::{TestAppContext, VisualTestContext};
+    use std::time::Duration;
 
     fn open<'a>(
         cx: &'a mut TestAppContext,

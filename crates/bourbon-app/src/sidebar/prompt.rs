@@ -1,5 +1,4 @@
 use bourbon_ui::{Button, ButtonVariant, ThemeExt as _};
-use gpui_kit::component::input::Input;
 use gpui_kit::{
     Context, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Styled as _,
     TestSupportExt as _, div, px,
@@ -32,7 +31,12 @@ pub(super) fn render(prompt: &Prompt, cx: &mut Context<Workspace>) -> impl IntoE
     match prompt {
         Prompt::Name { target, input, .. } => panel
             .child(target.title())
-            .child(Input::new(input).id("sidebar-prompt-name"))
+            .child(
+                div()
+                    .id("sidebar-prompt-name")
+                    .test_support()
+                    .child(input.clone()),
+            )
             .child(buttons("Save", ButtonVariant::Primary, cx)),
         Prompt::Deletion { question, .. } => {
             panel
