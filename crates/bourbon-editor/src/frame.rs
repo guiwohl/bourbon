@@ -21,6 +21,7 @@ pub struct Frame {
     pub gutter_width: Pixels,
     pub lines: Vec<FrameLine>,
     pub caret: Option<Bounds<Pixels>>,
+    pub measuring_pending: bool,
 }
 
 impl Editor {
@@ -65,8 +66,9 @@ impl Editor {
         self.text_left = text_left;
 
         let mut visible = Vec::new();
+        let mut measuring_pending = false;
         for _ in 0..SCROLL_ATTEMPTS {
-            self.measure_unmeasured_lines(window);
+            measuring_pending = self.measure_unmeasured_lines(window);
             self.scroll_top = self.scroll_top.max(px(0.0)).min(self.max_scroll());
             visible = self.layout_visible_lines(bounds.size.height, window);
             if !self.scroll_to_caret || !self.scroll_caret_into_view(bounds.size.height, window) {
@@ -74,14 +76,15 @@ impl Editor {
             }
         }
         self.scroll_to_caret = false;
-        self.assemble_frame(bounds, gutter_width, &visible, window)
+        self.assemble_frame(bounds, gutter_width, &visible, measuring_pending, window)
     }
 
-    fn measure_unmeasured_lines(&mut self, window: &mut Window) {
+    fn measure_unmeasured_lines(&mut self, window: &mut Window) -> bool {
         let mut budget = MEASURE_BUDGET;
+        let mut pending = false;
         for line in 0..self.heights.line_count() {
             if budget == 0 {
-                window.request_animation_frame();
+                pending = true;
                 break;
             }
             if self.heights.is_measured(line) {
@@ -92,6 +95,7 @@ impl Editor {
             budget -= 1;
         }
         self.heights.refresh();
+        pending
     }
 
     fn layout_visible_lines(
@@ -139,6 +143,7 @@ impl Editor {
         bounds: Bounds<Pixels>,
         gutter_width: Pixels,
         visible: &[(usize, Rc<LineLayout>)],
+        measuring_pending: bool,
         window: &mut Window,
     ) -> Frame {
         let main = self.state.selection.main();
@@ -198,6 +203,321 @@ impl Editor {
             gutter_width,
             lines,
             caret,
+            measuring_pending,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::theme::EditorTheme;
+    use gpui::{TestAppContext, VisualTestContext};
+
+    const CHAR: f32 = 7.8;
+    const LINE: f32 = 19.5;
+
+    fn bounds(width: f32, height: f32) -> Bounds<Pixels> {
+        Bounds::new(point(px(100.0), px(50.0)), size(px(width), px(height)))
+    }
+
+    fn open<'a>(
+        cx: &'a mut TestAppContext,
+        text: &str,
+    ) -> (gpui::Entity<Editor>, &'a mut VisualTestContext) {
+        let text = text.to_owned();
+        cx.add_window_view(move |_, cx| Editor::new(&text, EditorTheme::light(), cx))
+    }
+
+    fn near(actual: Pixels, expected: f32) -> bool {
+        (f32::from(actual) - expected).abs() < 0.05
+    }
+
+    #[gpui::test]
+    fn lines_are_placed_below_each_other_inside_the_bounds(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "a\nb\nc");
+        let origins = editor.update_in(cx, |editor, window, _| {
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            frame
+                .lines
+                .iter()
+                .map(|line| (line.origin, line.height, line.active))
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(origins.len(), 3);
+        for (index, (origin, height, active)) in origins.iter().enumerate() {
+            assert!(near(origin.x, 116.0));
+            assert!(near(
+                origin.y,
+                50.0 + LINE * crate::numeric::count_f32(index)
+            ));
+            assert!(near(*height, LINE));
+            assert_eq!(*active, index == 0);
+        }
+    }
+
+    #[gpui::test]
+    fn the_caret_sits_at_the_head_of_the_selection(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "ab\ncd");
+        let caret = editor.update_in(cx, |editor, window, cx| {
+            editor.set_selection(4, 4, cx);
+            editor.build_frame(bounds(400.0, 200.0), window).caret
+        });
+        let caret = caret.expect("caret");
+        assert!(near(caret.origin.x, 116.0 + CHAR));
+        assert!(near(caret.origin.y, 50.0 + LINE));
+        assert!(near(caret.size.width, 2.0));
+        assert!(near(caret.size.height, LINE));
+    }
+
+    #[gpui::test]
+    fn selections_become_one_rectangle_per_line(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "ab\ncd\nef");
+        let rects = editor.update_in(cx, |editor, window, cx| {
+            editor.set_selection(1, 7, cx);
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            frame
+                .lines
+                .iter()
+                .map(|line| line.selections.clone())
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(rects[0].len(), 1);
+        assert!(near(rects[0][0].origin.x, 116.0 + CHAR));
+        assert!(near(rects[0][0].size.width, CHAR + 6.5));
+        assert_eq!(rects[1].len(), 1);
+        assert!(near(rects[1][0].origin.x, 116.0));
+        assert!(near(rects[1][0].origin.y, 50.0 + LINE));
+        assert!(near(rects[1][0].size.width, 2.0 * CHAR + 6.5));
+        assert_eq!(rects[2].len(), 1);
+        assert!(near(rects[2][0].size.width, CHAR));
+    }
+
+    #[gpui::test]
+    fn no_selection_rectangles_without_a_selection_or_outside_it(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "ab\ncd\nef");
+        let counts = editor.update_in(cx, |editor, window, cx| {
+            editor.set_selection(3, 5, cx);
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            frame
+                .lines
+                .iter()
+                .map(|line| line.selections.len())
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(counts, vec![0, 1, 0]);
+        let counts = editor.update_in(cx, |editor, window, cx| {
+            editor.set_selection(3, 3, cx);
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            frame
+                .lines
+                .iter()
+                .map(|line| line.selections.len())
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(counts, vec![0, 0, 0]);
+    }
+
+    #[gpui::test]
+    fn a_selection_ending_at_a_line_start_does_not_touch_that_line(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "ab\ncd");
+        let counts = editor.update_in(cx, |editor, window, cx| {
+            editor.set_selection(0, 3, cx);
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            frame
+                .lines
+                .iter()
+                .map(|line| line.selections.len())
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(counts, vec![1, 0]);
+    }
+
+    #[gpui::test]
+    fn the_gutter_is_off_by_default_and_has_no_numbers(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "a\nb");
+        let (gutter, numbers) = editor.update_in(cx, |editor, window, _| {
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            (
+                frame.gutter_width,
+                frame
+                    .lines
+                    .iter()
+                    .filter(|line| line.number.is_some())
+                    .count(),
+            )
+        });
+        assert_eq!(gutter, px(0.0));
+        assert_eq!(numbers, 0);
+    }
+
+    #[gpui::test]
+    fn line_numbers_get_a_minimum_width_and_are_right_aligned(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "a\nb");
+        let (gutter, line_x, number) = editor.update_in(cx, |editor, window, cx| {
+            editor.set_line_numbers(true, cx);
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            let (shaped, origin) = frame.lines[1].number.as_ref().expect("number");
+            (
+                frame.gutter_width,
+                frame.lines[0].origin.x,
+                (shaped.width, origin.x, origin.y),
+            )
+        });
+        assert!(near(gutter, 9.1 * 3.0 + 1.0));
+        assert!(near(line_x, 100.0 + 9.1 * 3.0 + 1.0 + 16.0));
+        assert!(near(number.0, 9.1 * 0.6));
+        assert!(near(
+            number.1,
+            100.0 + f32::from(gutter) - 9.1 - 9.1 * 0.6 - 1.0
+        ));
+        assert!(near(number.2, 50.0 + LINE));
+    }
+
+    #[gpui::test]
+    fn the_gutter_widens_for_many_digits(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(1500));
+        let gutter = editor.update_in(cx, |editor, window, cx| {
+            editor.set_line_numbers(true, cx);
+            editor
+                .build_frame(bounds(400.0, 200.0), window)
+                .gutter_width
+        });
+        assert!(near(gutter, 4.0 * 9.1 * 0.6 + 9.1 + 1.0));
+    }
+
+    #[gpui::test]
+    fn only_the_lines_in_the_viewport_are_laid_out(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(200));
+        let (first, count, y) = editor.update_in(cx, |editor, window, _| {
+            editor.scroll_top = px(100.0);
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            let first = frame.lines.first().expect("first line");
+            (
+                first.origin.y,
+                frame.lines.len(),
+                frame.lines.last().expect("last").origin.y,
+            )
+        });
+        assert!(near(first, 50.0 + 5.0 * LINE - 100.0));
+        assert_eq!(count, 11);
+        assert!(near(y, 50.0 + 15.0 * LINE - 100.0));
+    }
+
+    #[gpui::test]
+    fn scrolling_past_the_end_is_clamped_to_the_document(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(99));
+        let scroll = editor.update_in(cx, |editor, window, _| {
+            editor.scroll_top = px(100_000.0);
+            editor.build_frame(bounds(400.0, 200.0), window);
+            editor.scroll_top
+        });
+        assert!(near(scroll, 100.0 * LINE - 200.0));
+    }
+
+    #[gpui::test]
+    fn a_caret_below_the_viewport_scrolls_to_its_bottom_edge(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(200));
+        let scroll = editor.update_in(cx, |editor, window, cx| {
+            editor.set_selection(200, 200, cx);
+            editor.build_frame(bounds(400.0, 200.0), window);
+            editor.scroll_top
+        });
+        assert!(near(scroll, 100.0 * LINE + LINE - 200.0));
+    }
+
+    #[gpui::test]
+    fn a_caret_above_the_viewport_scrolls_to_its_top_edge(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(200));
+        let scroll = editor.update_in(cx, |editor, window, cx| {
+            editor.scroll_top = px(1000.0);
+            editor.set_selection(20, 20, cx);
+            editor.build_frame(bounds(400.0, 200.0), window);
+            editor.scroll_top
+        });
+        assert!(near(scroll, 10.0 * LINE));
+    }
+
+    #[gpui::test]
+    fn a_visible_caret_leaves_the_scroll_alone(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(200));
+        let scroll = editor.update_in(cx, |editor, window, cx| {
+            editor.scroll_top = px(100.0);
+            editor.set_selection(12, 12, cx);
+            editor.build_frame(bounds(400.0, 200.0), window);
+            editor.scroll_top
+        });
+        assert!(near(scroll, 100.0));
+    }
+
+    #[gpui::test]
+    fn the_caret_only_scrolls_when_asked_to(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(200));
+        let scroll = editor.update_in(cx, |editor, window, _| {
+            editor.scroll_top = px(1000.0);
+            editor.build_frame(bounds(400.0, 200.0), window);
+            editor.scroll_top
+        });
+        assert!(near(scroll, 1000.0));
+    }
+
+    #[gpui::test]
+    fn measuring_is_spread_over_frames(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(1000));
+        let (early, late, unmeasured_after_two) = editor.update_in(cx, |editor, window, _| {
+            editor.invalidate_all_heights();
+            editor.build_frame(bounds(400.0, 200.0), window);
+            let early = editor.heights.is_measured(399);
+            let late = editor.heights.is_measured(500);
+            editor.build_frame(bounds(400.0, 200.0), window);
+            (early, late, editor.heights.is_measured(500))
+        });
+        assert!(early);
+        assert!(!late);
+        assert!(unmeasured_after_two);
+    }
+
+    #[gpui::test]
+    fn the_frame_reports_pending_measuring_only_when_lines_remain(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(1000));
+        let (busy, idle) = editor.update_in(cx, |editor, window, _| {
+            editor.invalidate_all_heights();
+            let busy = editor
+                .build_frame(bounds(400.0, 200.0), window)
+                .measuring_pending;
+            editor.build_frame(bounds(400.0, 200.0), window);
+            editor.build_frame(bounds(400.0, 200.0), window);
+            (
+                busy,
+                editor
+                    .build_frame(bounds(400.0, 200.0), window)
+                    .measuring_pending,
+            )
+        });
+        assert!(busy);
+        assert!(!idle);
+    }
+
+    #[gpui::test]
+    fn a_new_width_forgets_the_measured_heights(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(50));
+        let measured = editor.update_in(cx, |editor, window, _| {
+            editor.build_frame(bounds(400.0, 200.0), window);
+            let before = editor.heights.is_measured(49);
+            editor.build_frame(bounds(300.0, 200.0), window);
+            (before, editor.wrap_width)
+        });
+        assert!(measured.0);
+        assert!(near(measured.1.expect("wrap width"), 300.0 - 32.0));
+    }
+
+    #[gpui::test]
+    fn the_wrap_width_never_gets_narrower_than_forty_pixels(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "x");
+        let width = editor.update_in(cx, |editor, window, _| {
+            editor.build_frame(bounds(10.0, 200.0), window);
+            editor.wrap_width
+        });
+        assert!(near(width.expect("wrap width"), 40.0));
     }
 }

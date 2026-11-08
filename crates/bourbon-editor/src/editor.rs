@@ -326,3 +326,165 @@ impl Render for Editor {
         crate::view::editor_root(self, cx)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::{TestAppContext, VisualTestContext};
+
+    fn open<'a>(
+        cx: &'a mut TestAppContext,
+        text: &str,
+    ) -> (gpui::Entity<Editor>, &'a mut VisualTestContext) {
+        let text = text.to_owned();
+        cx.add_window_view(move |_, cx| Editor::new(&text, EditorTheme::light(), cx))
+    }
+
+    #[gpui::test]
+    fn the_caret_blinks_and_stops_for_stale_timers(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "x");
+        assert!(editor.read_with(cx, |editor, _| editor.caret_visible));
+        cx.executor().advance_clock(BLINK_INTERVAL);
+        assert!(!editor.read_with(cx, |editor, _| editor.caret_visible));
+        cx.executor().advance_clock(BLINK_INTERVAL);
+        assert!(editor.read_with(cx, |editor, _| editor.caret_visible));
+        cx.executor().advance_clock(BLINK_INTERVAL);
+        assert!(!editor.read_with(cx, |editor, _| editor.caret_visible));
+    }
+
+    #[gpui::test]
+    fn restarting_the_blink_shows_the_caret_and_cancels_the_old_timer(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "x");
+        cx.executor().advance_clock(BLINK_INTERVAL);
+        editor.update(cx, Editor::restart_blink);
+        assert!(editor.read_with(cx, |editor, _| editor.caret_visible));
+        cx.executor().advance_clock(Duration::from_millis(400));
+        assert!(editor.read_with(cx, |editor, _| editor.caret_visible));
+        cx.executor().advance_clock(Duration::from_millis(400));
+        assert!(!editor.read_with(cx, |editor, _| editor.caret_visible));
+    }
+
+    #[gpui::test]
+    fn typing_keeps_the_caret_visible(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "");
+        cx.executor().advance_clock(BLINK_INTERVAL);
+        editor.update(cx, |editor, cx| editor.set_selection(0, 0, cx));
+        assert!(editor.read_with(cx, |editor, _| editor.caret_visible));
+    }
+
+    #[gpui::test]
+    fn layouts_are_cached_until_invalidated(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "a\nb");
+        editor.update_in(cx, |editor, window, _| {
+            editor.clear_layouts();
+            let first = editor.layout_for_line(0, window);
+            let again = editor.layout_for_line(0, window);
+            assert!(Rc::ptr_eq(&first, &again));
+            editor.invalidate_layouts();
+            let fresh = editor.layout_for_line(0, window);
+            assert!(!Rc::ptr_eq(&first, &fresh));
+        });
+    }
+
+    #[gpui::test]
+    fn the_layout_cache_is_bounded(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(LAYOUT_CACHE_LIMIT + 10));
+        let size = editor.update_in(cx, |editor, window, _| {
+            editor.clear_layouts();
+            for line in 0..LAYOUT_CACHE_LIMIT + 5 {
+                editor.layout_for_line(line, window);
+            }
+            editor.layouts.len()
+        });
+        assert!(size <= LAYOUT_CACHE_LIMIT);
+        assert!(size > 0);
+    }
+
+    #[gpui::test]
+    fn heading_lines_are_shaped_larger(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "# Title\nplain");
+        let (heading, plain) = editor.update_in(cx, |editor, window, _| {
+            (
+                f32::from(editor.shape_line(0, window).height()),
+                f32::from(editor.shape_line(1, window).height()),
+            )
+        });
+        assert!((heading - 39.0).abs() < 0.05);
+        assert!((plain - 19.5).abs() < 0.05);
+    }
+
+    #[gpui::test]
+    fn the_scroll_range_ends_where_the_document_ends(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(99));
+        let (max, expected) = editor.update_in(cx, |editor, window, _| {
+            let viewport = f32::from(window.viewport_size().height);
+            (f32::from(editor.max_scroll()), 100.0 * 19.5 - viewport)
+        });
+        assert!((max - expected).abs() < 0.05);
+    }
+
+    #[gpui::test]
+    fn scrolling_clamps_to_both_ends(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(99));
+        editor.update(cx, |editor, cx| editor.scroll_by(px(1.0e6), cx));
+        let bottom = editor.read_with(cx, |editor, _| editor.scroll_top());
+        assert_eq!(
+            bottom,
+            editor.read_with(cx, |editor, _| editor.max_scroll())
+        );
+        editor.update(cx, |editor, cx| editor.scroll_by(px(-1.0e6), cx));
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.scroll_top()),
+            px(0.0)
+        );
+    }
+
+    #[gpui::test]
+    fn replacing_the_text_refreshes_highlights_and_line_heights(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "");
+        editor.update(cx, |editor, cx| editor.set_text("- [ ] a\nb\nc", cx));
+        let (marker, lines) = editor.read_with(cx, |editor, _| {
+            (
+                crate::task_click::task_marker_at(&editor.spans, 3),
+                editor.heights.line_count(),
+            )
+        });
+        assert_eq!(marker, Some(2..5));
+        assert_eq!(lines, 3);
+    }
+
+    #[gpui::test]
+    fn changing_the_theme_remeasures_every_line(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &"x\n".repeat(20));
+        cx.run_until_parked();
+        let mut theme = EditorTheme::light();
+        theme.line_height = 3.0;
+        editor.update(cx, |editor, cx| editor.set_theme(theme.clone(), cx));
+        cx.run_until_parked();
+        let (stored, total) = editor.read_with(cx, |editor, _| {
+            (editor.theme().clone(), f32::from(editor.max_scroll()))
+        });
+        assert_eq!(stored, theme);
+        let viewport = cx.update(|window, _| f32::from(window.viewport_size().height));
+        assert!((total - (21.0 * 39.0 - viewport).max(0.0)).abs() < 0.5);
+    }
+
+    #[gpui::test]
+    fn toggling_line_numbers_is_remembered(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "x");
+        editor.update(cx, |editor, cx| editor.set_line_numbers(true, cx));
+        assert!(editor.read_with(cx, |editor, _| editor.line_numbers()));
+        editor.update(cx, |editor, cx| editor.set_line_numbers(false, cx));
+        assert!(!editor.read_with(cx, |editor, _| editor.line_numbers()));
+    }
+
+    #[gpui::test]
+    fn undo_and_redo_only_run_when_there_is_history(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "abc");
+        editor.update(cx, |editor, cx| {
+            editor.undo(cx);
+            editor.redo(cx);
+        });
+        assert_eq!(editor.read_with(cx, |editor, _| editor.text()), "abc");
+    }
+}

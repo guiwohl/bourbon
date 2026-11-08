@@ -123,3 +123,51 @@ fn changing_the_theme_replaces_it(cx: &mut TestAppContext) {
     let dark = preview.read_with(cx, |preview, _| preview.theme().clone());
     assert_eq!(dark, PreviewTheme::dark());
 }
+
+#[gpui::test]
+fn nested_lists_indent_and_use_the_next_marker(cx: &mut TestAppContext) {
+    let (_preview, cx) = open(cx, "- a\n  - b\n");
+    let outer = cx.debug_bounds("marker-0-0").expect("outer marker");
+    let inner = cx.debug_bounds("marker-1-1").expect("inner marker");
+    assert!(inner.left() > outer.left());
+    let first = cx.debug_bounds("inline-text-0").expect("first text");
+    let second = cx.debug_bounds("inline-text-1").expect("second text");
+    assert!((f32::from(second.left() - first.left()) - 32.0).abs() < 0.5);
+    assert!(second.top() > first.top());
+}
+
+#[gpui::test]
+fn blocks_inside_quotes_alerts_and_footnotes_are_rendered(cx: &mut TestAppContext) {
+    let (_preview, cx) = open(
+        cx,
+        "> quoted\n\n> [!NOTE]\n> alert body\n\nref[^1]\n\n[^1]: footnote text\n",
+    );
+    for selector in [
+        "inline-text-0",
+        "inline-text-1",
+        "inline-text-2",
+        "inline-text-3",
+    ] {
+        assert!(cx.debug_bounds(selector).is_some(), "{selector}");
+    }
+}
+
+#[gpui::test]
+fn the_rule_is_a_thin_block_between_wide_gaps(cx: &mut TestAppContext) {
+    let (preview, cx) = open(cx, "a\n\n---\n\nb\n");
+    let blocks = preview.read_with(cx, |preview, _| preview.block_layouts().to_vec());
+    assert_eq!(blocks.len(), 3);
+    assert!((f32::from(blocks[1].height) - 4.0).abs() < 0.05);
+    let gap_before = blocks[1].top - (blocks[0].top + blocks[0].height);
+    let gap_after = blocks[2].top - (blocks[1].top + blocks[1].height);
+    assert!((f32::from(gap_before) - 24.0).abs() < 0.05);
+    assert!((f32::from(gap_after) - 24.0).abs() < 0.05);
+}
+
+#[gpui::test]
+fn headings_are_sized_by_level(cx: &mut TestAppContext) {
+    let (preview, cx) = open(cx, "# one\n\n### three\n");
+    let blocks = preview.read_with(cx, |preview, _| preview.block_layouts().to_vec());
+    assert!((f32::from(blocks[0].height) - (40.0 + 9.6 + 2.0)).abs() < 0.1);
+    assert!((f32::from(blocks[1].height) - 25.0).abs() < 0.1);
+}

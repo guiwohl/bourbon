@@ -5,13 +5,17 @@ use bourbon_markdown::{
     AlertKind, Alignment, Block, BlockKind, Inline, ListItem, PreviewDoc, SourceLines,
 };
 use gpui::{
-    AnyElement, Bounds, Context, CursorStyle, Entity, EventEmitter, FontStyle, FontWeight,
-    HighlightStyle, InteractiveText, IntoElement, ParentElement, Pixels, Render,
-    StatefulInteractiveElement, StrikethroughStyle, Styled, StyledText, UnderlineStyle, Window,
-    div, prelude::*, px, relative,
+    AnyElement, Bounds, Context, CursorStyle, Entity, EventEmitter, FontWeight, InteractiveText,
+    IntoElement, ParentElement, Pixels, Render, StatefulInteractiveElement, Styled, StyledText,
+    Window, div, prelude::*, px, relative,
 };
 
-use crate::inline::{BOLD, CODE, ITALIC, LINK, LinkTarget, STRIKE, flatten_inlines};
+use crate::inline::{LinkTarget, flatten_inlines};
+use crate::preview_style::{
+    alert_title, alert_vertical_padding, cell_alignment, checkbox_size, checkbox_tick_size,
+    checkbox_top_margin, child_gap, footnote_size, heading_style, highlight_style, item_gap,
+    list_indent, list_marker, quote_bar_width, row_is_striped, rule_height, stack_gap,
+};
 use crate::preview_theme::PreviewTheme;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -145,15 +149,13 @@ impl Render for PreviewView {
 
 impl Renderer {
     fn stack(&self, blocks: &[&Block], loose: bool) -> Vec<AnyElement> {
+        let kinds: Vec<&BlockKind> = blocks.iter().map(|block| &block.kind).collect();
         blocks
             .iter()
             .enumerate()
             .map(|(index, block)| {
-                let gap = match (index, loose) {
-                    (0, _) | (_, false) => px(0.0),
-                    _ => gap_between(&blocks[index - 1].kind, &block.kind, &self.theme),
-                };
-                div().mt(gap).child(self.block(block)).into_any_element()
+                let gap = stack_gap(&kinds, index, loose, &self.theme);
+                div().mt(gap).child(self.block(block, 0)).into_any_element()
             })
             .collect()
     }
@@ -163,7 +165,7 @@ impl Renderer {
         self.stack(&references, loose)
     }
 
-    fn block(&self, block: &Block) -> AnyElement {
+    fn block(&self, block: &Block, depth: usize) -> AnyElement {
         match &block.kind {
             BlockKind::Heading { level, inlines, .. } => self.heading(*level, inlines),
             BlockKind::Paragraph(inlines) => self.inline(inlines),
@@ -172,7 +174,7 @@ impl Renderer {
                 start,
                 tight,
                 items,
-            } => self.list(*ordered, *start, *tight, items, 0),
+            } => self.list(*ordered, *start, *tight, items, depth),
             BlockKind::BlockQuote(children) => self.quote(children),
             BlockKind::Alert { kind, children } => self.alert(*kind, children),
             BlockKind::CodeBlock { text, .. } => self.code_block(text),
@@ -182,14 +184,14 @@ impl Renderer {
                 rows,
             } => self.table(alignments, head, rows),
             BlockKind::ThematicBreak => div()
-                .h(self.theme.font_size * 0.25)
+                .h(rule_height(&self.theme))
                 .bg(self.theme.solid_border)
                 .into_any_element(),
             BlockKind::Html(raw) | BlockKind::Math(raw) => self.code_block(raw),
             BlockKind::Frontmatter(_) => div().into_any_element(),
             BlockKind::FootnoteDefinition { children, .. } => div()
                 .text_color(self.theme.muted)
-                .text_size(self.theme.font_size * 0.75)
+                .text_size(footnote_size(&self.theme))
                 .children(self.owned_stack(children, true))
                 .into_any_element(),
         }
@@ -197,19 +199,18 @@ impl Renderer {
 
     fn heading(&self, level: u8, inlines: &[Inline]) -> AnyElement {
         let theme = &self.theme;
-        let size = theme.font_size * theme.heading_scale(level);
+        let style = heading_style(level, theme);
         let mut heading = div()
-            .text_size(size)
+            .text_size(style.size)
             .font_weight(FontWeight::SEMIBOLD)
             .line_height(relative(theme.heading_line_height))
             .child(self.inline(inlines));
-        if level == 6 {
+        if style.muted {
             heading = heading.text_color(theme.muted);
         }
-        if level <= 2 {
-            let width = if level == 1 { px(2.0) } else { px(1.0) };
+        if let Some(width) = style.rule {
             heading = heading
-                .pb(size * 0.3)
+                .pb(style.padding_bottom)
                 .border_b(width)
                 .border_color(theme.border);
         }
@@ -224,7 +225,7 @@ impl Renderer {
         items: &[ListItem],
         depth: usize,
     ) -> AnyElement {
-        let indent = self.theme.font_size * self.theme.list_indent_em;
+        let indent = list_indent(&self.theme);
         div()
             .flex()
             .flex_col()
@@ -234,18 +235,15 @@ impl Renderer {
                     .flex_1()
                     .min_w_0()
                     .children(self.list_item_children(item, tight, depth));
-                let content = match item.task {
-                    Some(true) => content.line_through().text_color(self.theme.muted),
-                    _ => content,
+                let content = if item.task == Some(true) {
+                    content.line_through().text_color(self.theme.muted)
+                } else {
+                    content
                 };
                 div()
                     .flex()
                     .flex_row()
-                    .mt(if index == 0 {
-                        px(0.0)
-                    } else {
-                        self.theme.font_size * 0.25
-                    })
+                    .mt(item_gap(index, &self.theme))
                     .child(
                         div()
                             .w(indent)
@@ -265,20 +263,11 @@ impl Renderer {
             .iter()
             .enumerate()
             .map(|(index, child)| {
-                let gap = match (index, tight) {
-                    (0, _) | (_, true) => px(0.0),
-                    _ => self.theme.block_gap,
-                };
-                let element = match &child.kind {
-                    BlockKind::List {
-                        ordered,
-                        start,
-                        tight,
-                        items,
-                    } => self.list(*ordered, *start, *tight, items, depth + 1),
-                    _ => self.block(child),
-                };
-                div().mt(gap).child(element).into_any_element()
+                let gap = child_gap(index, tight, &self.theme);
+                div()
+                    .mt(gap)
+                    .child(self.block(child, depth + 1))
+                    .into_any_element()
             })
             .collect()
     }
@@ -287,21 +276,20 @@ impl Renderer {
         if let Some(checked) = item.task {
             return self.checkbox(checked, item.source_lines.0);
         }
-        let text = if ordered {
-            format!("{number}.")
-        } else {
-            ["\u{2022}", "\u{25E6}", "\u{25AA}"][depth.min(2)].to_owned()
-        };
-        div().child(text).into_any_element()
+        let line = item.source_lines.0;
+        div()
+            .debug_selector(move || format!("marker-{depth}-{line}"))
+            .child(list_marker(ordered, number, depth))
+            .into_any_element()
     }
 
     fn checkbox(&self, checked: bool, source_line: usize) -> AnyElement {
-        let size = self.theme.font_size * 0.875;
+        let size = checkbox_size(&self.theme);
         let view = self.view.clone();
         let mut checkbox = div()
             .id(("task", source_line))
             .debug_selector(move || format!("task-line-{source_line}"))
-            .mt(self.theme.font_size * 0.2)
+            .mt(checkbox_top_margin(&self.theme))
             .size(size)
             .flex_none()
             .flex()
@@ -320,7 +308,7 @@ impl Renderer {
             checkbox = checkbox
                 .bg(self.theme.link)
                 .text_color(self.theme.background)
-                .text_size(size * 0.8)
+                .text_size(checkbox_tick_size(&self.theme))
                 .child("\u{2713}");
         }
         checkbox.into_any_element()
@@ -329,7 +317,7 @@ impl Renderer {
     fn quote(&self, children: &[Block]) -> AnyElement {
         div()
             .pl(self.theme.font_size)
-            .border_l(self.theme.font_size * self.theme.quote_bar_em)
+            .border_l(quote_bar_width(&self.theme))
             .border_color(self.theme.solid_border)
             .text_color(self.theme.muted)
             .children(self.owned_stack(children, true))
@@ -338,23 +326,16 @@ impl Renderer {
 
     fn alert(&self, kind: AlertKind, children: &[Block]) -> AnyElement {
         let color = self.theme.alert_color(kind);
-        let title = match kind {
-            AlertKind::Note => "Note",
-            AlertKind::Tip => "Tip",
-            AlertKind::Important => "Important",
-            AlertKind::Warning => "Warning",
-            AlertKind::Caution => "Caution",
-        };
         div()
             .px(self.theme.font_size)
-            .py(self.theme.font_size * 0.5)
-            .border_l(self.theme.font_size * self.theme.quote_bar_em)
+            .py(alert_vertical_padding(&self.theme))
+            .border_l(quote_bar_width(&self.theme))
             .border_color(color)
             .child(
                 div()
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(color)
-                    .child(title),
+                    .child(alert_title(kind)),
             )
             .children(self.owned_stack(children, true))
             .into_any_element()
@@ -388,7 +369,7 @@ impl Renderer {
         let body = rows
             .iter()
             .enumerate()
-            .map(|(index, row)| self.table_row(alignments, row, false, index % 2 == 0));
+            .map(|(index, row)| self.table_row(alignments, row, false, row_is_striped(index)));
         div()
             .flex()
             .flex_col()
@@ -416,19 +397,15 @@ impl Renderer {
             row = row.bg(theme.table_stripe_background);
         }
         row.children(cells.iter().enumerate().map(|(index, cell)| {
-            let aligned = div()
+            div()
                 .flex_1()
                 .min_w_0()
                 .px(px(13.0))
                 .py(px(6.0))
                 .border_1()
                 .border_color(theme.solid_border)
-                .child(self.inline(cell));
-            match alignments.get(index) {
-                Some(Alignment::Right) => aligned.text_right(),
-                Some(Alignment::Center) => aligned.text_center(),
-                _ => aligned,
-            }
+                .text_align(cell_alignment(alignments.get(index)))
+                .child(self.inline(cell))
         }))
         .into_any_element()
     }
@@ -441,7 +418,7 @@ impl Renderer {
         let mut highlights = Vec::new();
         for (len, flags) in flat.flag_runs() {
             if flags != 0 {
-                highlights.push((offset..offset + len, self.highlight(flags)));
+                highlights.push((offset..offset + len, highlight_style(flags, &self.theme)));
             }
             offset += len;
         }
@@ -470,22 +447,6 @@ impl Renderer {
             .debug_selector(move || format!("inline-text-{index}"))
             .child(text)
             .into_any_element()
-    }
-
-    fn highlight(&self, flags: u8) -> HighlightStyle {
-        let theme = &self.theme;
-        HighlightStyle {
-            color: (flags & LINK != 0).then_some(theme.link),
-            font_weight: (flags & BOLD != 0).then_some(FontWeight::SEMIBOLD),
-            font_style: (flags & ITALIC != 0).then_some(FontStyle::Italic),
-            background_color: (flags & CODE != 0).then_some(theme.inline_code_background),
-            strikethrough: (flags & STRIKE != 0).then_some(StrikethroughStyle {
-                thickness: px(1.0),
-                color: None,
-            }),
-            underline: None::<UnderlineStyle>,
-            fade_out: None,
-        }
     }
 }
 

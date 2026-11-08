@@ -12,6 +12,7 @@ mod motion;
 mod mouse;
 mod numeric;
 mod preview;
+mod preview_style;
 mod preview_theme;
 mod segments;
 mod task_click;

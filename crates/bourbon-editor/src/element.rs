@@ -5,7 +5,26 @@ use gpui::{
 };
 
 use crate::editor::Editor;
-use crate::frame::Frame;
+use crate::frame::{Frame, FrameLine};
+
+pub fn active_line_bounds(bounds: Bounds<Pixels>, line: &FrameLine) -> Bounds<Pixels> {
+    Bounds::new(
+        point(bounds.left(), line.origin.y),
+        size(bounds.size.width, line.height),
+    )
+}
+
+pub fn gutter_border_bounds(
+    bounds: Bounds<Pixels>,
+    gutter_width: Pixels,
+) -> Option<Bounds<Pixels>> {
+    (gutter_width > px(0.0)).then(|| {
+        Bounds::new(
+            point(bounds.left() + gutter_width - px(1.0), bounds.top()),
+            size(px(1.0), bounds.size.height),
+        )
+    })
+}
 
 pub struct EditorElement {
     editor: Entity<Editor>,
@@ -59,8 +78,13 @@ impl Element for EditorElement {
         window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
-        self.editor
-            .update(cx, |editor, _| editor.build_frame(bounds, window))
+        let frame = self
+            .editor
+            .update(cx, |editor, _| editor.build_frame(bounds, window));
+        if frame.measuring_pending {
+            window.request_animation_frame();
+        }
+        frame
     }
 
     fn paint(
@@ -89,22 +113,10 @@ impl Element for EditorElement {
         );
         window.with_content_mask(Some(ContentMask { bounds }), |window| {
             for line in frame.lines.iter().filter(|line| line.active) {
-                window.paint_quad(fill(
-                    Bounds::new(
-                        point(bounds.left(), line.origin.y),
-                        size(bounds.size.width, line.height),
-                    ),
-                    theme.active_line,
-                ));
+                window.paint_quad(fill(active_line_bounds(bounds, line), theme.active_line));
             }
-            if frame.gutter_width > px(0.0) {
-                window.paint_quad(fill(
-                    Bounds::new(
-                        point(bounds.left() + frame.gutter_width - px(1.0), bounds.top()),
-                        size(px(1.0), bounds.size.height),
-                    ),
-                    theme.gutter_border,
-                ));
+            if let Some(border) = gutter_border_bounds(bounds, frame.gutter_width) {
+                window.paint_quad(fill(border, theme.gutter_border));
             }
             let selection_color = if focused {
                 theme.selection
@@ -144,5 +156,60 @@ impl Element for EditorElement {
             }
         });
         self.editor.update(cx, |editor, _| editor.focused = focused);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::layout::LineLayout;
+    use std::rc::Rc;
+
+    fn bounds() -> Bounds<Pixels> {
+        Bounds::new(point(px(100.0), px(50.0)), size(px(400.0), px(300.0)))
+    }
+
+    #[test]
+    fn the_gutter_border_is_a_one_pixel_line_at_the_gutter_edge() {
+        let border = gutter_border_bounds(bounds(), px(30.0)).expect("border");
+        assert_eq!(border.origin, point(px(129.0), px(50.0)));
+        assert_eq!(border.size, size(px(1.0), px(300.0)));
+    }
+
+    #[test]
+    fn there_is_no_border_without_a_gutter() {
+        assert_eq!(gutter_border_bounds(bounds(), px(0.0)), None);
+    }
+
+    #[gpui::test]
+    fn the_active_line_spans_the_whole_width(cx: &mut gpui::TestAppContext) {
+        let window = cx.add_empty_window();
+        let layout = window.update(|window, _| {
+            let theme = crate::theme::EditorTheme::light();
+            LineLayout::shape(
+                &crate::layout::ShapeRequest {
+                    text: "",
+                    segments: &[],
+                    prefix_len: 0,
+                    font_size: px(13.0),
+                    line_height: px(19.5),
+                    wrap_width: None,
+                    bold: false,
+                    theme: &theme,
+                },
+                window,
+            )
+        });
+        let line = FrameLine {
+            origin: point(px(116.0), px(80.0)),
+            height: px(39.0),
+            layout: Rc::new(layout),
+            active: true,
+            selections: Vec::new(),
+            number: None,
+        };
+        let active = active_line_bounds(bounds(), &line);
+        assert_eq!(active.origin, point(px(100.0), px(80.0)));
+        assert_eq!(active.size, size(px(400.0), px(39.0)));
     }
 }

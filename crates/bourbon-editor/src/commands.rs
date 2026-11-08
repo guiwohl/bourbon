@@ -44,7 +44,11 @@ impl Editor {
             self.layout_for_line(candidate, window).row_count()
         });
         let offset = if target == (line, row) {
-            if rows < 0 { 0 } else { self.state.text.len() }
+            if rows.is_negative() {
+                0
+            } else {
+                self.state.text.len()
+            }
         } else {
             let target_layout = self.layout_for_line(target.0, window);
             let height = target_layout.line_height();
@@ -169,7 +173,6 @@ impl Editor {
             |state| {
                 insert_text(state, &normalized).map(|transaction| Transaction {
                     kind: TransactionKind::Paste,
-                    isolate: true,
                     ..transaction
                 })
             },

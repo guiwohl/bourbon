@@ -711,3 +711,40 @@ fn input_bounds_follow_the_text_position(cx: &mut TestAppContext) {
     assert!((f32::from(second.origin.y) - LINE_HEIGHT).abs() < 0.1);
     assert!((f32::from(second.size.width) - 2.0 * CHAR_WIDTH).abs() < 0.1);
 }
+
+#[gpui::test]
+fn shift_up_and_down_extend_the_selection_vertically(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "abc\ndef\nghi");
+    set_selection(&editor, cx, 5, 5);
+    cx.simulate_keystrokes("shift-up");
+    assert_eq!(selection(&editor, cx), 1..5);
+    cx.simulate_keystrokes("shift-down shift-down");
+    assert_eq!(selection(&editor, cx), 5..9);
+}
+
+#[gpui::test]
+fn clicking_inside_a_later_wrapped_line_picks_the_clicked_row(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, &format!("x\n{}", "word ".repeat(30)));
+    cx.simulate_resize(gpui::size(px(200.0), px(400.0)));
+    cx.run_until_parked();
+    cx.simulate_click(point(px(column_x(2.0)), px(row_y(3.0))), Modifiers::none());
+    let start = selection(&editor, cx).start;
+    assert!((2 + 40..2 + 60).contains(&start), "{start}");
+}
+
+#[gpui::test]
+fn the_input_handler_converts_points_and_lengths_to_utf16(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, "a🙂b");
+    let index = editor.update_in(cx, |editor, window, cx| {
+        editor.character_index_for_point(point(px(column_x(2.0)), px(row_y(0.0))), window, cx)
+    });
+    assert_eq!(index, Some(3));
+    let length = editor.update_in(cx, |editor, window, cx| {
+        editor.text_length_utf16(window, cx)
+    });
+    assert_eq!(length, Some(4));
+    editor.update_in(cx, |editor, window, cx| {
+        editor.set_selected_text_range(1..3, window, cx);
+    });
+    assert_eq!(selection(&editor, cx), 1..5);
+}

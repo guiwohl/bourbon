@@ -21,7 +21,7 @@ impl Editor {
         window: &mut Window,
     ) -> Option<HitTest> {
         let bounds = self.viewport?;
-        let y = position.y.max(bounds.top()).min(bounds.bottom() - px(1.0));
+        let y = position.y.max(bounds.top()).min(bounds.bottom());
         let document_y = f32::from(y - bounds.top() + self.scroll_top);
         let line = self.heights.line_at(document_y);
         let layout = self.layout_for_line(line, window);
