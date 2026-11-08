@@ -230,6 +230,20 @@ mod tests {
         assert_eq!(theme.tokens.colors.primary, gpui::red());
     }
 
+    #[gpui::test]
+    fn installing_tokens_replaces_the_global_theme(cx: &mut TestAppContext) {
+        cx.update(|cx| Theme::install(Appearance::Light, cx));
+        let mut tokens = Tokens::dark();
+        tokens.colors.primary = gpui::red();
+
+        cx.update(|cx| Theme::install_tokens(tokens, Appearance::Dark, cx));
+
+        cx.update(|cx| {
+            assert_eq!(cx.theme().appearance, Appearance::Dark);
+            assert_eq!(cx.theme().tokens.colors.primary, gpui::red());
+        });
+    }
+
     #[test]
     fn a_new_theme_carries_the_tokens_of_its_appearance() {
         assert!(Theme::new(Appearance::Dark).is_dark());

@@ -12,7 +12,7 @@ use bourbon_ui::list_row::accent;
 use gpui_kit::component::input::InputState;
 use gpui_kit::{
     AnyElement, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement, ListAlignment,
-    ListState, ParentElement as _, Styled as _, TestSupportExt as _, div, list, px,
+    ListOffset, ListState, ParentElement as _, Styled as _, TestSupportExt as _, div, list, px,
 };
 use jiff::tz::TimeZone;
 
@@ -48,10 +48,27 @@ pub(crate) fn new_list_state() -> ListState {
     ListState::new(0, ListAlignment::Top, px(OVERDRAW))
 }
 
+pub(crate) fn reveal(state: &ListState, index: usize) {
+    let viewport = state.viewport_bounds();
+    let is_visible = state.bounds_for_item(index).is_some_and(|bounds| {
+        bounds.top() >= viewport.top() && bounds.bottom() <= viewport.bottom()
+    });
+    if !is_visible {
+        state.scroll_to(ListOffset {
+            item_ix: index,
+            offset_in_item: px(0.),
+        });
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Step {
     Previous,
     Next,
+}
+
+fn is_selected(selected: Option<&NoteId>, id: &NoteId) -> bool {
+    selected == Some(id)
 }
 
 pub(crate) fn adjacent_note(
@@ -89,7 +106,7 @@ pub(crate) fn render(data: &NoteListData, cx: &mut Context<Workspace>) -> impl I
     let body: AnyElement = if data.notes.is_empty() {
         empty_state(cx).into_any_element()
     } else {
-        rows(data, in_trash, view_kind != ListView::Templates, cx)
+        rows(data, in_trash, view_kind.shows_dates(), cx)
     };
     div()
         .w(px(data.width))
@@ -136,7 +153,7 @@ fn rows(
         row::render(
             &row::RowData {
                 summary,
-                shown: accent(selected.as_ref() == Some(&summary.id), is_focused),
+                shown: accent(is_selected(selected.as_ref(), &summary.id), is_focused),
                 in_trash,
                 shows_date,
                 sort,
@@ -189,6 +206,14 @@ mod tests {
                 task_progress: None,
             })
             .collect()
+    }
+
+    #[test]
+    fn only_the_selected_note_is_highlighted() {
+        let selected = NoteId::generate();
+        assert!(is_selected(Some(&selected), &selected));
+        assert!(!is_selected(Some(&selected), &NoteId::generate()));
+        assert!(!is_selected(None, &selected));
     }
 
     #[test]

@@ -521,3 +521,33 @@ fn arrow_keys_outside_the_list_do_not_change_the_open_note(cx: &mut TestAppConte
 
     assert_eq!(cx.read(|cx| view.read(cx).selected.clone()), Some(mango));
 }
+
+#[gpui_kit::test]
+fn opening_a_note_below_the_fold_scrolls_it_into_view(cx: &mut TestAppContext) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    let oldest = note_in(&store, &inbox, "Note 0", 0);
+    for index in 1..60 {
+        note_in(&store, &inbox, &format!("Note {index}"), index);
+    }
+    let (handle, view) = open_view(cx, store);
+    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
+        .unwrap();
+    let before = view.read_with(cx, |view, _| {
+        view.note_list_state.logical_scroll_top().item_ix
+    });
+    assert_eq!(before, 0);
+
+    cx.update_window(handle, |_, window, cx| {
+        view.update(cx, |view, cx| view.select(&oldest, window, cx));
+        window.render_frame(cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+
+    let after = view.read_with(cx, |view, _| {
+        view.note_list_state.logical_scroll_top().item_ix
+    });
+    assert!(after > 0);
+}

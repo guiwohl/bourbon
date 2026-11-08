@@ -16,6 +16,7 @@ const SORTS: [(NoteSort, &str); 3] = [
     (NoteSort::TitleAlphabetical, "Sort by title"),
 ];
 const TITLE_SIZE: f32 = 16.8;
+const TITLE_LINE_HEIGHT: f32 = 21.84;
 const HORIZONTAL_PADDING: f32 = 2.;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,6 +27,10 @@ pub(crate) enum ListView {
 }
 
 impl ListView {
+    pub(crate) fn shows_dates(self) -> bool {
+        self != Self::Templates
+    }
+
     pub(crate) fn of(navigation: &Navigation) -> Self {
         match navigation {
             Navigation::Trash => Self::Trash,
@@ -63,7 +68,7 @@ pub(crate) fn render(data: HeaderData, cx: &mut Context<Workspace>) -> impl Into
         .cursor_pointer()
         .text_size(px(TITLE_SIZE))
         .font_weight(tokens.scale.weight_medium)
-        .line_height(px(TITLE_SIZE * 1.3))
+        .line_height(px(TITLE_LINE_HEIGHT))
         .text_color(colors.text)
         .on_click(
             cx.listener(move |workspace, event: &ClickEvent, window, cx| {
@@ -149,6 +154,13 @@ mod tests {
     fn only_the_current_sort_is_checked() {
         assert!(is_current_sort(SORTS[0].0, SORTS[0].0));
         assert!(!is_current_sort(SORTS[0].0, SORTS[1].0));
+    }
+
+    #[test]
+    fn templates_are_the_only_view_without_dates() {
+        assert!(ListView::Notes.shows_dates());
+        assert!(ListView::Trash.shows_dates());
+        assert!(!ListView::Templates.shows_dates());
     }
 
     #[test]
