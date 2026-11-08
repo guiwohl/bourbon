@@ -9,6 +9,7 @@ mod fonts;
 mod locations;
 mod navigation;
 mod note_list;
+mod overlay;
 mod presentation;
 mod settings_view;
 mod sidebar;

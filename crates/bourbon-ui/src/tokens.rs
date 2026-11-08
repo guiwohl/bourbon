@@ -178,7 +178,18 @@ pub struct Colors {
 pub struct Shadows {
     pub floating: Vec<BoxShadow>,
     pub raised: Vec<BoxShadow>,
+    pub modal: Vec<BoxShadow>,
+    pub palette: Vec<BoxShadow>,
 }
+
+const MODAL_SHADOW_LAYERS: [(f32, f32, f32); 6] = [
+    (1., 2.8, 0.067),
+    (2., 6.7, 0.096),
+    (4., 12.5, 0.12),
+    (8., 22.3, 0.144),
+    (16., 41.8, 0.173),
+    (40., 100., 0.24),
+];
 
 impl Scale {
     #[must_use]
@@ -289,6 +300,11 @@ impl Shadows {
                 black_shadow(4., 6., 0., 0.2),
                 black_shadow(8., 12., -1., 0.1),
             ],
+            modal: MODAL_SHADOW_LAYERS
+                .iter()
+                .map(|&(y, blur, alpha)| black_shadow(y, blur, 0., alpha))
+                .collect(),
+            palette: vec![black_shadow(10., 30., 0., 0.3)],
         }
     }
 }
@@ -650,6 +666,16 @@ mod tests {
         let (light, dark) = (Tokens::light(), Tokens::dark());
         assert!(dark.shadows.floating[0].color.a > light.shadows.floating[0].color.a);
         assert_eq!(light.shadows.raised.len(), 3);
+        assert_eq!(light.shadows.modal.len(), 6);
+        let blurs: Vec<f32> = light
+            .shadows
+            .modal
+            .iter()
+            .map(|shadow| f32::from(shadow.blur_radius))
+            .collect();
+        assert!((blurs[0] - 2.8).abs() < 1e-6 && (blurs[5] - 100.).abs() < 1e-6);
+        assert!(light.shadows.modal[0].color.a < light.shadows.modal[5].color.a);
+        assert_eq!(light.shadows.palette[0].blur_radius, px(30.));
     }
 
     #[test]

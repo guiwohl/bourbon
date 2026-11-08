@@ -41,8 +41,9 @@ Run the demo: `cargo run -p bourbon-editor --example text_field_demo` (app id `b
 - Single line: `single_line` drops `\n` and `\r` from `set_text`, paste and IME input (like an HTML input); Enter and Esc are events only.
 - Element (`text_field/element.rs`): one `ShapedLine` in the UI font (`tokens.fonts.ui_family`, Inter) at `scale.medium` (14 px), `scale.line_height` (20 px) tall; placeholder in `input_placeholder` when empty; text in `input_text`; marked IME text underlined; selection in `focus_outline` (only while focused); caret 1 px in `input_text`, blinking 530 ms (`blink::schedule_blink`, shared with the editor). Horizontal scroll keeps the caret visible (`geometry::revealing_scroll`, pure).
 - Box (`text_field/view.rs`): 30 px tall, padding 0 8, gap 8, 7 px radius, 1 px `internal_border`; focused: the border turns transparent and a 2 px `focus_outline` ring is drawn just outside it (inset -3 px). Optional leading icon 16 px at 30% opacity in `text`. No background (the parent's shows through).
+- Options: `masked(true)` shows one `•` per character (`text_field/mask.rs` maps byte offsets to bullet offsets and back, so caret, selection, clicks and IME stay on the real text; used by the backup token); `borderless()` drops the box (no height, padding, border or ring; used by the control pane); `text_size(px)` sets the font size, the line height keeps the 20/14 ratio (control pane: 18 px).
 - Keys (`BourbonTextField`): arrows, `shift` and `ctrl` variants, home/end (+shift), backspace/delete (+ctrl word), enter, escape, ctrl-z / ctrl-shift-z / ctrl-y, ctrl-a, ctrl-c/x/v. Mouse: click, shift-click, drag, double-click word, triple-click all.
-- Tests: `tests/text_field.rs` (typing, events, keys, clipboard, IME and UTF-16, mouse, icon offset, scroll), unit tests for `single_line`, blink, scroll and the border/ring.
+- Tests: `tests/text_field.rs` (typing, events, keys, clipboard, IME and UTF-16, mouse, icon offset, scroll, masked, borderless, text size), unit tests for `mask`, `single_line`, blink, scroll and the border/ring.
 
 ## Preview design
 

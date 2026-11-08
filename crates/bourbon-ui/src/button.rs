@@ -19,6 +19,18 @@ pub enum ButtonVariant {
     Plain,
     Subtle,
     Primary,
+    Danger,
+}
+
+const DANGER_HOVER_DARKENING: f32 = 0.9;
+const DANGER_DOWN_DARKENING: f32 = 0.8;
+
+#[must_use]
+pub fn darkened(color: Hsla, factor: f32) -> Hsla {
+    Hsla {
+        l: color.l * factor,
+        ..color
+    }
 }
 
 #[must_use]
@@ -112,6 +124,12 @@ impl RenderOnce for Button {
                 colors.primary,
                 colors.primary_hover,
                 colors.primary_active,
+                colors.inverted_text,
+            ),
+            ButtonVariant::Danger => (
+                colors.negative,
+                darkened(colors.negative, DANGER_HOVER_DARKENING),
+                darkened(colors.negative, DANGER_DOWN_DARKENING),
                 colors.inverted_text,
             ),
         };
@@ -324,6 +342,22 @@ mod tests {
         assert!(has_ring(ButtonVariant::Subtle));
         assert!(!has_ring(ButtonVariant::Plain));
         assert!(!has_ring(ButtonVariant::Primary));
+        assert!(!has_ring(ButtonVariant::Danger));
+    }
+
+    #[test]
+    fn darkening_scales_only_the_lightness() {
+        let color = Hsla {
+            h: 0.1,
+            s: 0.8,
+            l: 0.5,
+            a: 0.7,
+        };
+        let darker = darkened(color, 0.8);
+        assert!((darker.l - 0.4).abs() < 1e-6);
+        assert!((darker.h - 0.1).abs() < 1e-6);
+        assert!((darker.s - 0.8).abs() < 1e-6);
+        assert!((darker.a - 0.7).abs() < 1e-6);
     }
 
     #[test]

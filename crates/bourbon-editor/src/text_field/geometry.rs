@@ -1,5 +1,7 @@
 use gpui::{Pixels, Point, ShapedLine, px};
 
+use super::mask::Mask;
+
 #[derive(Default)]
 pub(crate) struct LineGeometry {
     pub(crate) line: ShapedLine,
@@ -7,6 +9,7 @@ pub(crate) struct LineGeometry {
     pub(crate) origin: Point<Pixels>,
     pub(crate) line_height: Pixels,
     pub(crate) scroll_x: Pixels,
+    pub(crate) mask: Option<Mask>,
 }
 
 impl LineGeometry {
@@ -14,7 +17,7 @@ impl LineGeometry {
         let local = if self.shows_placeholder {
             px(0.0)
         } else {
-            self.line.x_for_index(offset)
+            self.line.x_for_index(self.shown_offset(offset))
         };
         self.origin.x + local - self.scroll_x
     }
@@ -23,8 +26,18 @@ impl LineGeometry {
         if self.shows_placeholder {
             return 0;
         }
-        self.line
-            .closest_index_for_x(x - self.origin.x + self.scroll_x)
+        let shown = self
+            .line
+            .closest_index_for_x(x - self.origin.x + self.scroll_x);
+        self.mask
+            .as_ref()
+            .map_or(shown, |mask| mask.text_offset(shown))
+    }
+
+    pub(crate) fn shown_offset(&self, offset: usize) -> usize {
+        self.mask
+            .as_ref()
+            .map_or(offset, |mask| mask.shown_offset(offset))
     }
 }
 

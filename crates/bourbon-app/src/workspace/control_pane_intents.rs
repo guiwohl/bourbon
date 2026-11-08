@@ -54,6 +54,15 @@ impl Workspace {
         }
     }
 
+    pub(crate) fn highlight_pane_row(&mut self, row: usize, cx: &mut Context<Self>) {
+        if let Some(pane) = self.control_pane.as_mut()
+            && pane.highlighted_row() != row
+        {
+            pane.highlight(row);
+            cx.notify();
+        }
+    }
+
     pub(crate) fn highlight_previous_pane_row(&mut self, cx: &mut Context<Self>) {
         if let Some(pane) = self.control_pane.as_mut() {
             pane.highlight_previous();
@@ -119,7 +128,7 @@ impl Workspace {
             (PaneAction::SortByTitle, _) => self.sort_by(NoteSort::TitleAlphabetical, cx),
             (PaneAction::EmptyTrash, _) => {
                 self.navigate(Navigation::Trash, cx);
-                self.confirm_empty_trash(window, cx);
+                self.confirm_empty_trash(cx);
             }
             (PaneAction::HistoryBack, _) => self.history_back(window, cx),
             (PaneAction::HistoryForward, _) => self.history_forward(window, cx),

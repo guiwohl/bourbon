@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 
 use bourbon_core::{NoteId, NoteSort, NoteStore, StoreError, Timestamp};
-use gpui_kit::component::WindowExt as _;
-use gpui_kit::component::button::ButtonVariant;
 use gpui_kit::{Context, Window};
 
 use crate::note_list::{Step, adjacent_note};
@@ -101,24 +99,6 @@ impl Workspace {
 
     pub(crate) fn restore(&mut self, id: &NoteId, cx: &mut Context<Self>) {
         self.change_notes(cx, |store| store.restore_note(id));
-    }
-
-    pub(crate) fn confirm_empty_trash(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let view = cx.entity();
-        let prompt = empty_trash_prompt(self.notes.len());
-        window.open_alert_dialog(cx, move |alert, _, _| {
-            let view = view.clone();
-            alert
-                .title("Empty trash")
-                .description(prompt.clone())
-                .ok_text("Empty trash")
-                .ok_variant(ButtonVariant::Danger)
-                .show_cancel(true)
-                .on_ok(move |_, _, cx| {
-                    view.update(cx, Workspace::empty_trash);
-                    true
-                })
-        });
     }
 
     pub(crate) fn empty_trash(&mut self, cx: &mut Context<Self>) {

@@ -8,7 +8,7 @@ use gpui_kit::{
     AnyWindowHandle, AppContext as _, Entity, Hsla, TestAppContext, VisualTestContext, point, px,
 };
 
-use super::{click, isolated_locations, open_view, open_view_with};
+use super::{choose_setting, click, isolated_locations, open_view, open_view_with};
 use crate::locations::Locations;
 use crate::theme::BOURBON_LIGHT_BACKGROUND;
 use crate::workspace::Workspace;
@@ -120,7 +120,7 @@ fn choosing_light_applies_the_light_palette_and_saves(cx: &mut TestAppContext) {
     );
     press(cx, handle, "ctrl-,");
 
-    click(cx, handle, "settings-appearance-light");
+    choose_setting(cx, handle, "settings-appearance", 0);
 
     assert!(!cx.read(|cx| cx.theme().is_dark()));
     assert_eq!(saved(&locations).appearance, Appearance::Light);
@@ -154,7 +154,7 @@ fn following_omarchy_applies_its_colors_and_saves(cx: &mut TestAppContext) {
     );
 
     press(cx, handle, "ctrl-,");
-    click(cx, handle, "settings-theme-omarchy");
+    choose_setting(cx, handle, "settings-theme", 1);
 
     assert_eq!(background(cx), color(0x00fd_f6e3));
     assert!(!cx.read(|cx| cx.theme().is_dark()));
@@ -170,12 +170,13 @@ fn the_appearance_choice_is_ignored_while_following_omarchy(cx: &mut TestAppCont
         copy_of(&locations),
     );
     press(cx, handle, "ctrl-,");
-    click(cx, handle, "settings-theme-omarchy");
+    choose_setting(cx, handle, "settings-theme", 1);
 
-    click(cx, handle, "settings-appearance-dark");
+    click(cx, handle, "settings-appearance");
 
     assert!(cx.read(|cx| cx.theme().is_dark()));
     view.read_with(cx, |view, _| {
+        assert!(view.open_menu.is_none());
         assert_eq!(view.settings.appearance, Appearance::Light);
     });
 }
@@ -190,7 +191,7 @@ fn an_unreadable_omarchy_file_falls_back_to_bourbon_without_an_error(cx: &mut Te
     );
 
     press(cx, handle, "ctrl-,");
-    click(cx, handle, "settings-theme-omarchy");
+    choose_setting(cx, handle, "settings-theme", 1);
 
     assert_eq!(background(cx), color(BOURBON_LIGHT_BACKGROUND));
     view.read_with(cx, |view, _| assert!(view.error_message.is_none()));
@@ -393,4 +394,27 @@ fn the_saved_view_mode_is_restored_at_startup(cx: &mut TestAppContext) {
         view.read_with(cx, |view, _| view.view_mode),
         bourbon_core::ViewMode::SideBySide
     );
+}
+
+#[gpui_kit::test]
+fn the_settings_screen_replaces_the_columns_and_switches_pages(cx: &mut TestAppContext) {
+    let (handle, view) = open_view(cx, NoteStore::open_in_memory().unwrap());
+    press(cx, handle, "ctrl-,");
+    let listed = |cx: &mut TestAppContext, id: &str| {
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find(id.to_owned()).is_some()
+        })
+        .unwrap()
+    };
+
+    assert!(!listed(cx, "sidebar"));
+    assert!(listed(cx, "settings-theme"));
+    assert!(!listed(cx, "settings-backup-repository"));
+
+    click(cx, handle, "settings-page-backup");
+
+    assert!(listed(cx, "settings-backup-repository"));
+    assert!(!listed(cx, "settings-theme"));
+    view.read_with(cx, |view, _| assert!(view.settings_open));
 }

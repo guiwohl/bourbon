@@ -2,6 +2,7 @@ mod element;
 mod geometry;
 mod input;
 mod keys;
+mod mask;
 mod mouse;
 mod view;
 
@@ -14,7 +15,7 @@ use bourbon_text::{
 };
 use bourbon_ui::IconName;
 use gpui::{
-    App, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, IntoElement, Render,
+    App, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, IntoElement, Pixels, Render,
     SharedString, Window,
 };
 
@@ -33,6 +34,13 @@ pub enum TextFieldEvent {
     Cancel,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct Look {
+    masked: bool,
+    borderless: bool,
+    text_size: Option<Pixels>,
+}
+
 pub struct TextField {
     state: EditorState,
     history: History,
@@ -45,6 +53,7 @@ pub struct TextField {
     started: Instant,
     dragging: bool,
     geometry: LineGeometry,
+    look: Look,
 }
 
 impl EventEmitter<TextFieldEvent> for TextField {}
@@ -75,6 +84,7 @@ impl TextField {
             started: Instant::now(),
             dragging: false,
             geometry: LineGeometry::default(),
+            look: Look::default(),
         };
         field.restart_blink(cx);
         field
@@ -89,6 +99,24 @@ impl TextField {
     #[must_use]
     pub fn leading_icon(mut self, icon: IconName) -> Self {
         self.leading_icon = Some(icon);
+        self
+    }
+
+    #[must_use]
+    pub fn masked(mut self, masked: bool) -> Self {
+        self.look.masked = masked;
+        self
+    }
+
+    #[must_use]
+    pub fn borderless(mut self) -> Self {
+        self.look.borderless = true;
+        self
+    }
+
+    #[must_use]
+    pub fn text_size(mut self, size: Pixels) -> Self {
+        self.look.text_size = Some(size);
         self
     }
 

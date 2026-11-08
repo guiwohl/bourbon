@@ -42,6 +42,12 @@ pub(crate) enum Prompt {
     },
 }
 
+impl Prompt {
+    pub(crate) fn has_input(&self) -> bool {
+        matches!(self, Self::Name { .. })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum Section {
     Notebooks,

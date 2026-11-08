@@ -4,14 +4,19 @@ mod query;
 mod render;
 
 use bourbon_core::{NoteStore, SearchHit, StoreError};
-use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::{AppContext as _, Context, Entity, Subscription, Window};
+use bourbon_editor::{TextField, TextFieldEvent};
+use bourbon_ui::ThemeExt as _;
+use gpui::{AppContext as _, Context, Entity, Subscription, Window, actions};
 
 use crate::workspace::Workspace;
 
 pub(crate) use actions::PaneAction;
 pub(crate) use query::{ACTIONS_QUERY, Mode};
 pub(crate) use render::render;
+
+actions!(bourbon_control_pane, [HighlightNext, HighlightPrevious]);
+
+pub(crate) const KEY_CONTEXT: &str = "ControlPane";
 
 const SEARCH_LIMIT: usize = 50;
 
@@ -21,7 +26,7 @@ pub(crate) enum Results {
 }
 
 pub(crate) struct ControlPane {
-    input: Entity<InputState>,
+    input: Entity<TextField>,
     highlighted: usize,
     results: Results,
     _subscription: Subscription,
@@ -35,20 +40,24 @@ impl ControlPane {
         window: &mut Window,
         cx: &mut Context<Workspace>,
     ) -> Result<Self, StoreError> {
+        let input_size = cx.theme().tokens.scale.big;
         let input = cx.new(|cx| {
-            InputState::new(window, cx).placeholder("Search notes or type > for actions")
+            TextField::new(cx)
+                .placeholder("Search notes or type > for actions")
+                .borderless()
+                .text_size(input_size)
         });
         input.update(cx, |input, cx| {
-            input.set_value(initial_query.to_owned(), window, cx);
+            input.set_text(initial_query, cx);
             input.focus(window, cx);
         });
         let subscription = cx.subscribe_in(
             &input,
             window,
-            |workspace, _, event: &InputEvent, window, cx| match event {
-                InputEvent::Change => workspace.control_pane_query_changed(cx),
-                InputEvent::PressEnter { .. } => workspace.activate_highlighted_row(window, cx),
-                _ => {}
+            |workspace, _, event: &TextFieldEvent, window, cx| match event {
+                TextFieldEvent::Changed(_) => workspace.control_pane_query_changed(cx),
+                TextFieldEvent::Submit => workspace.activate_highlighted_row(window, cx),
+                TextFieldEvent::Cancel => workspace.close_control_pane(window, cx),
             },
         );
         Ok(Self {
@@ -60,7 +69,7 @@ impl ControlPane {
     }
 
     pub(crate) fn query(&self, cx: &Context<Workspace>) -> String {
-        self.input.read(cx).value().to_string()
+        self.input.read(cx).text()
     }
 
     pub(crate) fn show(&mut self, results: Results) {
@@ -74,6 +83,16 @@ impl ControlPane {
 
     pub(crate) fn highlight_previous(&mut self) {
         self.highlighted = highlight::previous(self.highlighted);
+    }
+
+    pub(crate) fn highlight(&mut self, row: usize) {
+        if row < self.row_count() {
+            self.highlighted = row;
+        }
+    }
+
+    pub(crate) fn input(&self) -> &Entity<TextField> {
+        &self.input
     }
 
     pub(crate) fn highlighted_row(&self) -> usize {

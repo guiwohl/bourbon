@@ -8,6 +8,7 @@ use gpui_kit::{
 };
 
 use crate::assets::AppAssets;
+use crate::control_pane::{self, HighlightNext, HighlightPrevious};
 use crate::editor::actions::{
     CycleViewMode, ExitFocusMode, FindInNote, HistoryBack, HistoryForward, LinkPickCancel,
     LinkPickConfirm, LinkPickNext, LinkPickPrevious, OpenNotebookSelector, ReplaceInNote,
@@ -116,6 +117,8 @@ pub(crate) fn bind_keys(cx: &mut App) {
         KeyBinding::new("down", LinkPickNext, Some("LinkPicker > Input")),
         KeyBinding::new("enter", LinkPickConfirm, Some("LinkPicker > Input")),
         KeyBinding::new("escape", LinkPickCancel, Some("LinkPicker > Input")),
+        KeyBinding::new("down", HighlightNext, Some(control_pane::KEY_CONTEXT)),
+        KeyBinding::new("up", HighlightPrevious, Some(control_pane::KEY_CONTEXT)),
         KeyBinding::new("up", SelectPreviousNote, Some("NoteList")),
         KeyBinding::new("down", SelectNextNote, Some("NoteList")),
     ]);
