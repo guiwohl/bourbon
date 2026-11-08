@@ -27,7 +27,7 @@ Our own GPUI component kit and Inkdrop-faithful theme tokens (decision: `docs/de
 - Components are `RenderOnce` and read `cx.theme()` in `render`, so one global switches every component; `Themed` swaps it for a subtree during layout.
 - Radii: Inkdrop squircles (15 / 24 px) map to 12 / 18 px rounded rectangles (`radius_control`, `radius_large`), the 7 px default stays.
 - GPUI has no CSS transitions: the 0.1 s hover tint is instant; the chevron rotation uses `with_animation` (0.2 s, ease-out quint) and also plays when a row first mounts.
-- No text input yet (editor slice).
+- No text input here: the single-line `TextField` lives in `bourbon-editor` (it shares the text core), styled with these tokens; see [editor.md](editor.md#text-field).
 - `ListRow::dot` draws the 10 px tag dot in the 20 px slot; `Pill::compact` is the note-list chip (10 px text, no fixed height); `Menu::entries` exposes the entries; a splitter ignores drags that another splitter started (the drag payload carries its owner id).
 
 ## Gallery

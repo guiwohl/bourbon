@@ -21,14 +21,18 @@ impl Workspace {
         cx.notify();
     }
 
-    pub(crate) fn clear_filter(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn clear_filter(&mut self, cx: &mut Context<Self>) {
         let input = self.filter_input.clone();
-        input.update(cx, |input, cx| input.set_value("", window, cx));
+        input.update(cx, |input, cx| input.set_text("", cx));
         self.filter_changed(cx);
     }
 
+    pub(crate) fn focus_note_list(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        window.focus(&self.note_list_focus, cx);
+    }
+
     pub(super) fn filter_matches(&mut self, cx: &mut Context<Self>) -> Option<HashSet<NoteId>> {
-        let text = self.filter_input.read(cx).value().to_string();
+        let text = self.filter_input.read(cx).text();
         if text.trim().is_empty() {
             return None;
         }

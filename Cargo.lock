@@ -726,6 +726,7 @@ name = "bourbon-app"
 version = "0.1.0"
 dependencies = [
  "bourbon-core",
+ "bourbon-editor",
  "bourbon-ui",
  "gpui-kit",
  "jiff",
@@ -761,6 +762,7 @@ version = "0.1.0"
 dependencies = [
  "bourbon-markdown",
  "bourbon-text",
+ "bourbon-ui",
  "gpui-pre",
  "gpui-pre-platform",
  "proptest",

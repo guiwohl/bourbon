@@ -1,5 +1,5 @@
 use bourbon_core::{NotebookId, StoreError, TagColor, TagId, Timestamp};
-use gpui_kit::component::input::{InputEvent, InputState};
+use bourbon_editor::{TextField, TextFieldEvent};
 use gpui_kit::{AppContext as _, Context, Entity, Window};
 
 use super::Workspace;
@@ -91,16 +91,21 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let input: Entity<InputState> = cx.new(|cx| InputState::new(window, cx));
-        input.update(cx, |input, cx| {
-            input.set_value(initial.to_owned(), window, cx);
-            input.focus(window, cx);
+        let input: Entity<TextField> = cx.new(|cx| {
+            let mut field = TextField::new(cx);
+            field.set_text(initial, cx);
+            field
         });
-        let subscription = cx.subscribe(&input, |workspace, _, event: &InputEvent, cx| {
-            if matches!(event, InputEvent::PressEnter { .. }) {
-                workspace.confirm_prompt(cx);
-            }
-        });
+        input.update(cx, |field, cx| field.focus(window, cx));
+        let subscription =
+            cx.subscribe(
+                &input,
+                |workspace, _, event: &TextFieldEvent, cx| match event {
+                    TextFieldEvent::Submit => workspace.confirm_prompt(cx),
+                    TextFieldEvent::Cancel => workspace.cancel_prompt(cx),
+                    TextFieldEvent::Changed(_) => {}
+                },
+            );
         self.sidebar.prompt = Some(Prompt::Name {
             target,
             input,
@@ -154,7 +159,7 @@ impl Workspace {
         };
         let result = match &prompt {
             Prompt::Name { target, input, .. } => {
-                let name = input.read(cx).value().to_string();
+                let name = input.read(cx).text();
                 self.apply_name(target, &name)
             }
             Prompt::Deletion { target, .. } => self.apply_deletion(target, cx),

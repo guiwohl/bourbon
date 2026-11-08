@@ -9,7 +9,6 @@ use std::rc::Rc;
 use bourbon_core::{NoteId, NoteSort, NoteSummary, NotebookNode, TagSummary, Timestamp};
 use bourbon_ui::ThemeExt as _;
 use bourbon_ui::list_row::accent;
-use gpui_kit::component::input::InputState;
 use gpui_kit::{
     AnyElement, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement, ListAlignment,
     ListOffset, ListState, ParentElement as _, Styled as _, TestSupportExt as _, div, list, px,
@@ -19,7 +18,7 @@ use jiff::tz::TimeZone;
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
 
-pub(crate) use filter::{ClearFilter, narrow};
+pub(crate) use filter::narrow;
 use header::ListView;
 
 gpui_kit::actions!(bourbon, [SelectPreviousNote, SelectNextNote]);
@@ -37,7 +36,7 @@ pub(crate) struct NoteListData<'a> {
     pub(crate) notes: &'a Rc<[NoteSummary]>,
     pub(crate) templates: &'a [NoteSummary],
     pub(crate) selected: Option<&'a NoteId>,
-    pub(crate) filter: &'a Entity<InputState>,
+    pub(crate) filter: &'a Entity<bourbon_editor::TextField>,
     pub(crate) width: f32,
     pub(crate) is_focused: bool,
     pub(crate) focus: &'a FocusHandle,

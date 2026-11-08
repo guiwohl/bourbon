@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use bourbon_core::{NoteId, NoteSummary};
-use bourbon_ui::{Icon, IconName, ThemeExt as _};
-use gpui_kit::component::input::{Input, InputState};
+use bourbon_editor::TextField;
+use bourbon_ui::ThemeExt as _;
 use gpui_kit::{
     Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Styled as _,
     TestSupportExt as _, div, px,
@@ -10,15 +10,9 @@ use gpui_kit::{
 
 use crate::workspace::Workspace;
 
-gpui_kit::actions!(bourbon, [ClearFilter]);
-
 const SIDE_MARGIN: f32 = 12.;
 const VERTICAL_MARGIN: f32 = 2.;
-const HORIZONTAL_PADDING: f32 = 8.;
-const FIELD_HEIGHT: f32 = 30.;
 const GAP_BELOW: f32 = 4.;
-const ICON_OPACITY: f32 = 0.3;
-const ICON_SIZE: f32 = 16.;
 
 pub(crate) fn narrow(
     notes: Vec<NoteSummary>,
@@ -34,11 +28,10 @@ pub(crate) fn narrow(
 }
 
 pub(crate) fn render(
-    input: &Entity<InputState>,
+    field: &Entity<TextField>,
     cx: &mut Context<Workspace>,
 ) -> impl IntoElement + use<> {
     let tokens = cx.theme().tokens.clone();
-    let colors = tokens.colors;
     div()
         .h(tokens.scale.search_bar_height)
         .mb(px(GAP_BELOW))
@@ -47,42 +40,13 @@ pub(crate) fn render(
         .items_center()
         .child(
             div()
-                .id("note-filter")
+                .id("note-filter-input")
                 .test_support()
-                .key_context("NoteFilter")
-                .on_action(cx.listener(|workspace, _: &ClearFilter, window, cx| {
-                    workspace.clear_filter(window, cx);
-                }))
                 .flex_1()
                 .min_w_0()
                 .mx(px(SIDE_MARGIN))
                 .my(px(VERTICAL_MARGIN))
-                .px(px(HORIZONTAL_PADDING))
-                .h(px(FIELD_HEIGHT))
-                .overflow_hidden()
-                .flex()
-                .flex_row()
-                .items_center()
-                .gap(px(HORIZONTAL_PADDING))
-                .rounded(tokens.scale.radius_default)
-                .border_1()
-                .border_color(colors.internal_border)
-                .text_color(colors.text)
-                .child(
-                    div().flex_none().opacity(ICON_OPACITY).child(
-                        Icon::new(IconName::Search)
-                            .size(px(ICON_SIZE))
-                            .color(colors.text),
-                    ),
-                )
-                .child(
-                    div().flex_1().child(
-                        Input::new(input)
-                            .id("note-filter-input")
-                            .appearance(false)
-                            .bordered(false),
-                    ),
-                ),
+                .child(field.clone()),
         )
 }
 

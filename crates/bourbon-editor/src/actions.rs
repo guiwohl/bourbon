@@ -47,6 +47,7 @@ actions!(
         ToggleStrikethrough,
         ToggleCode,
         ToggleTask,
+        Cancel,
     ]
 );
 

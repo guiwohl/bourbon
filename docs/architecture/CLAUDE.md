@@ -10,4 +10,4 @@
 | [ui.md](ui.md) | bourbon-ui: our GPUI component kit, Inkdrop theme tokens, icons, components and their metrics, gallery, tests |
 | [markdown.md](markdown.md) | bourbon-markdown: highlight tokens, preview document, scroll-sync math, safe URLs |
 | [text.md](text.md) | bourbon-text: GPUI-free editor text core (rope, changes, selections, history, commands), invariants, tests |
-| [editor.md](editor.md) | bourbon-editor: own Markdown EditorView and PreviewView (GPUI), theme data, layout, input, tests, known gaps |
+| [editor.md](editor.md) | bourbon-editor: own Markdown EditorView, PreviewView and single-line TextField (GPUI), theme data, layout, input, tests, known gaps |

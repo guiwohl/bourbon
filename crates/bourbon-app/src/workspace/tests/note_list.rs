@@ -418,6 +418,19 @@ fn escape_in_the_filter_clears_it(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view).len(), 3);
 }
 
+#[gpui_kit::test]
+fn enter_in_the_filter_hands_the_focus_to_the_list(cx: &mut TestAppContext) {
+    let (store, _) = three_notes();
+    let (handle, view) = open_view(cx, store);
+    type_filter(cx, handle, "apple");
+    assert!(!list_has_focus(cx, handle, &view));
+
+    press_key(cx, handle, "enter");
+
+    assert!(list_has_focus(cx, handle, &view));
+    assert_eq!(listed_titles(cx, &view), ["Apple"]);
+}
+
 fn type_filter(cx: &mut TestAppContext, handle: AnyWindowHandle, text: &str) {
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
