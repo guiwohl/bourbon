@@ -107,9 +107,8 @@ impl Editor {
             }],
             None,
         );
-        let text_len = self.state.text.line_end(line) - self.state.text.line_start(line);
         let bounds = placeholder_bounds(
-            origin + layout.position_for_index(text_len),
+            origin + layout.end_position(),
             origin.y + layout.row_middle(layout.row_count() - 1),
             label.width,
             font_size,
