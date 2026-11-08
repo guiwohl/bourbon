@@ -169,7 +169,7 @@ fn status_row(
         status_label(status),
     )
     .count(data.counts.of_status(status))
-    .selected(data.current == &target)
+    .selected(is_current(data.current, &target))
     .pane_focused(data.is_focused)
     .on_click(cx.listener(move |workspace, _, _, cx| workspace.navigate(target.clone(), cx)));
     if let Some((icon, color)) = status_icon(status, &cx.theme().tokens.colors) {
@@ -189,11 +189,34 @@ fn simple_row(
 ) -> impl IntoElement + use<> {
     let mut row = ListRow::new(SharedString::from(format!("{id}-row")), label)
         .icon(icon)
-        .selected(data.current == &target)
+        .selected(is_current(data.current, &target))
         .pane_focused(data.is_focused)
         .on_click(cx.listener(move |workspace, _, _, cx| workspace.navigate(target.clone(), cx)));
     if let Some(count) = count {
         row = row.count(count);
     }
     div().id(id).test_support().child(row)
+}
+
+fn is_current(current: &Navigation, target: &Navigation) -> bool {
+    current == target
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_row_is_current_only_for_its_own_navigation() {
+        assert!(is_current(&Navigation::Trash, &Navigation::Trash));
+        assert!(!is_current(&Navigation::Trash, &Navigation::AllNotes));
+        assert!(is_current(
+            &Navigation::Status(NoteStatus::Active),
+            &Navigation::Status(NoteStatus::Active)
+        ));
+        assert!(!is_current(
+            &Navigation::Status(NoteStatus::Active),
+            &Navigation::Status(NoteStatus::Dropped)
+        ));
+    }
 }

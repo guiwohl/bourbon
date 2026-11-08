@@ -6,7 +6,7 @@ use gpui_kit::{
 };
 
 use super::SidebarData;
-use crate::presentation::{color_label, dot_color};
+use crate::presentation::{color_label, dot_color, is_current_color};
 use crate::workspace::{MenuBuilder, Workspace};
 
 pub(super) fn row(
@@ -66,7 +66,7 @@ fn colour_menu(tag: &bourbon_core::Tag) -> MenuBuilder {
         .fold(MenuBuilder::default(), |menu, color| {
             let id = tag.id.clone();
             menu.item(
-                MenuItem::new(color_label(color)).checked(color == tag.color),
+                MenuItem::new(color_label(color)).checked(is_current_color(tag.color, color)),
                 move |workspace, _, cx| workspace.set_tag_color(&id, color, cx),
             )
         })

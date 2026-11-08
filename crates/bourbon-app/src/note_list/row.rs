@@ -17,6 +17,7 @@ use crate::presentation::{display_title, dot_color, status_icon};
 use crate::workspace::{MenuBuilder, Workspace};
 
 const PROGRESS_INNER_WIDTH: f32 = 30.;
+const PROGRESS_OUTER_WIDTH: f32 = 32.;
 const PROGRESS_HEIGHT: f32 = 6.;
 const TITLE_MARGIN: f32 = 8.;
 const META_GAP: f32 = 5.;
@@ -49,6 +50,14 @@ pub(crate) fn progress_fill(progress: TaskProgress) -> f32 {
 
 fn progress_bar_width(progress: TaskProgress) -> f32 {
     PROGRESS_INNER_WIDTH * progress_fill(progress)
+}
+
+fn is_struck_through(status: NoteStatus) -> bool {
+    status == NoteStatus::Dropped
+}
+
+fn shows_excerpt(summary: &NoteSummary) -> bool {
+    !summary.excerpt.is_empty()
 }
 
 fn is_complete(progress: TaskProgress) -> bool {
@@ -100,7 +109,7 @@ pub(crate) fn render(data: &RowData, view: &Entity<Workspace>, cx: &mut App) -> 
         })
         .child(title_line(summary, &colors, cx))
         .child(meta_line(data, &colors, view))
-        .when(!summary.excerpt.is_empty(), |row| {
+        .when(shows_excerpt(summary), |row| {
             row.child(
                 div()
                     .truncate()
@@ -171,7 +180,7 @@ fn title_line(summary: &NoteSummary, colors: &Colors, cx: &App) -> impl IntoElem
                 .min_w_0()
                 .font_weight(tokens.scale.weight_semibold)
                 .line_clamp(2)
-                .when(summary.status == NoteStatus::Dropped, |title| {
+                .when(is_struck_through(summary.status), |title| {
                     title.line_through()
                 })
                 .child(display_title(&summary.title).to_owned()),
@@ -241,7 +250,7 @@ fn progress_bar(progress: TaskProgress, colors: &Colors) -> impl IntoElement + u
         colors.primary
     };
     div()
-        .w(px(PROGRESS_INNER_WIDTH + 2.))
+        .w(px(PROGRESS_OUTER_WIDTH))
         .h(px(PROGRESS_HEIGHT))
         .mx(px(4.))
         .my(px(2.))
@@ -297,6 +306,36 @@ pub(crate) fn note_menu(id: &NoteId, pinned: bool, in_trash: bool) -> MenuBuilde
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_dropped_notes_are_struck_through() {
+        assert!(is_struck_through(NoteStatus::Dropped));
+        assert!(!is_struck_through(NoteStatus::Completed));
+        assert!(!is_struck_through(NoteStatus::None));
+    }
+
+    #[test]
+    fn the_excerpt_shows_only_when_there_is_one() {
+        let mut summary = NoteSummary {
+            id: NoteId::generate(),
+            title: String::new(),
+            excerpt: String::new(),
+            created_at: Timestamp::from_millis(0),
+            updated_at: Timestamp::from_millis(0),
+            pinned: false,
+            status: NoteStatus::None,
+            tags: Vec::new(),
+            task_progress: None,
+        };
+        assert!(!shows_excerpt(&summary));
+        summary.excerpt = "text".to_owned();
+        assert!(shows_excerpt(&summary));
+    }
+
+    #[test]
+    fn the_bar_frame_is_two_pixels_wider_than_its_fill_area() {
+        assert!((PROGRESS_OUTER_WIDTH - PROGRESS_INNER_WIDTH - 2.).abs() < f32::EPSILON);
+    }
 
     #[test]
     fn progress_reads_done_of_total() {

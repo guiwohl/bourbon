@@ -90,3 +90,19 @@ fn the_sidebar_shortcut_is_ignored_while_in_focus_mode(cx: &mut TestAppContext) 
     press(cx, handle, "escape");
     assert!(columns_are_shown(cx, handle, &view));
 }
+
+#[gpui_kit::test]
+fn the_splitters_follow_the_columns_they_separate(cx: &mut TestAppContext) {
+    let (store, _) = seeded_store();
+    let (handle, view) = open_view(cx, store);
+    assert!(is_rendered(cx, handle, "sidebar-splitter"));
+    assert!(is_rendered(cx, handle, "note-list-splitter"));
+
+    focus_body(cx, handle, &view);
+    press(cx, handle, "ctrl-/");
+    assert!(!is_rendered(cx, handle, "sidebar-splitter"));
+    assert!(is_rendered(cx, handle, "note-list-splitter"));
+
+    press(cx, handle, "ctrl-shift-f");
+    assert!(!is_rendered(cx, handle, "note-list-splitter"));
+}

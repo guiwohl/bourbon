@@ -395,7 +395,7 @@ impl Workspace {
         self.editor.load(note.clone(), window, cx);
         self.history.visit(&note.id);
         if let Some(position) = self.notes.iter().position(|listed| listed.id == note.id) {
-            self.note_list_state.scroll_to_reveal_item(position);
+            note_list::reveal(&self.note_list_state, position);
         }
         self.selected = Some(note.id);
         cx.notify();

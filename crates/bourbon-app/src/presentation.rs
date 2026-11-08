@@ -61,6 +61,10 @@ pub(crate) fn color_label(color: TagColor) -> String {
         .unwrap_or_default()
 }
 
+pub(crate) fn is_current_color(current: TagColor, option: TagColor) -> bool {
+    current == option
+}
+
 fn rgb_value(color: TagColor) -> u32 {
     match color {
         TagColor::Default => 0x009c_a3af,
@@ -138,6 +142,12 @@ mod tests {
             labels,
             ["None", "Active", "On Hold", "Completed", "Dropped"]
         );
+    }
+
+    #[test]
+    fn only_the_current_colour_is_checked() {
+        assert!(is_current_color(TagColor::Red, TagColor::Red));
+        assert!(!is_current_color(TagColor::Red, TagColor::Blue));
     }
 
     #[test]
