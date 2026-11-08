@@ -873,4 +873,105 @@ mod tests {
         });
         assert!(near(number_y, 54.0));
     }
+
+    const WRAPPED_CODE_LINE: &str =
+        "`code` word word word word word word word word word word word word";
+
+    fn tall_first_row_document() -> String {
+        format!("{}{WRAPPED_CODE_LINE}", "x\n".repeat(30))
+    }
+
+    #[gpui::test]
+    fn the_caret_takes_the_height_of_its_own_row(cx: &mut TestAppContext) {
+        let source = tall_first_row_document();
+        let (editor, cx) = open(cx, &source);
+        let (caret, scroll_top, line_top) = editor.update_in(cx, |editor, window, cx| {
+            let start = editor.state.text.line_start(30);
+            editor.set_selection(start, start, cx);
+            let frame = editor.build_frame(bounds(400.0, 100.0), window);
+            assert!(editor.layout_for_line(30, window).row_count() > 1);
+            (frame.caret, editor.scroll_top, editor.heights.top(30))
+        });
+        let tall = 14.5 * 1.4 + 2.0;
+        assert!(near(caret.expect("caret").size.height, tall));
+        assert!(near(scroll_top, line_top + tall - 100.0));
+    }
+
+    #[gpui::test]
+    fn input_bounds_take_the_height_of_their_row(cx: &mut TestAppContext) {
+        use gpui::EntityInputHandler;
+        let source = tall_first_row_document();
+        let (editor, cx) = open(cx, &source);
+        let height = editor.update_in(cx, |editor, window, cx| {
+            let start = editor.state.text.line_start(30);
+            editor
+                .bounds_for_range(start + 1..start + 2, bounds(400.0, 100.0), window, cx)
+                .expect("bounds")
+                .size
+                .height
+        });
+        assert!(near(height, 14.5 * 1.4 + 2.0));
+    }
+
+    #[gpui::test]
+    fn fold_headers_get_a_chevron_in_the_gutter_only_with_numbers(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "## A\none\n## B");
+        let (open_chevrons, folded, gutter, off) = editor.update_in(cx, |editor, window, cx| {
+            editor.set_line_numbers(true, cx);
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            let open_chevrons: Vec<_> = frame.lines.iter().map(|line| line.chevron).collect();
+            editor.toggle_fold(0, cx);
+            let folded = editor.build_frame(bounds(400.0, 200.0), window).lines[0].chevron;
+            editor.set_line_numbers(false, cx);
+            let off = editor.build_frame(bounds(400.0, 200.0), window).lines[0].chevron;
+            (open_chevrons, folded, frame.gutter_width, off)
+        });
+        let width = 14.5 * 0.62;
+        let chevron = open_chevrons[0].expect("chevron on the header");
+        assert!(near(chevron.width, width));
+        assert!(near(
+            chevron.center.x,
+            100.0 + f32::from(chevron_center_x(gutter, px(width)))
+        ));
+        assert!(near(chevron.center.y, 50.0 + 21.75 * 1.16 / 2.0));
+        assert!(!chevron.folded);
+        assert_eq!(open_chevrons[1], None);
+        assert_eq!(open_chevrons[2], None);
+        assert!(folded.expect("folded chevron").folded);
+        assert_eq!(off, None);
+    }
+
+    #[gpui::test]
+    fn a_folded_header_gets_a_placeholder_after_its_text(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "## A\none\n## B");
+        let placeholders = editor.update_in(cx, |editor, window, cx| {
+            editor.toggle_fold(0, cx);
+            editor
+                .build_frame(bounds(400.0, 200.0), window)
+                .lines
+                .iter()
+                .map(|line| {
+                    line.fold_placeholder
+                        .as_ref()
+                        .map(|placeholder| (placeholder.bounds, placeholder.label.width))
+                })
+                .collect::<Vec<_>>()
+        });
+        let (placeholder, label_width) = placeholders[0].expect("placeholder");
+        let heading_char = 21.75 * 0.6;
+        assert!(near(
+            placeholder.origin.x,
+            108.0 + 4.0 * heading_char + 14.5 * 0.3
+        ));
+        assert!(near(
+            placeholder.origin.y,
+            50.0 + 21.75 * 1.16 / 2.0 - 14.5 / 2.0
+        ));
+        assert!(near(
+            placeholder.size.width,
+            f32::from(label_width) + 14.5 * 0.5
+        ));
+        assert!(label_width > px(0.0));
+        assert_eq!(placeholders[1], None);
+    }
 }
