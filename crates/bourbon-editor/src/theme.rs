@@ -59,6 +59,10 @@ pub struct EditorTheme {
     pub card_padding_y: Pixels,
     pub card_radius_em: f32,
     pub quote_bar_em: f32,
+    pub inline_code_line_height: f32,
+    pub inline_code_border: Pixels,
+    pub fold_chevron_em: f32,
+    pub fold_placeholder_radius_em: f32,
     pub caret_width: Pixels,
     pub gutter_font_scale: f32,
     pub gutter_min_width_em: f32,
@@ -83,6 +87,7 @@ pub struct EditorTheme {
     pub search_match: Hsla,
     pub search_match_current: Hsla,
     pub search_match_outline: Hsla,
+    pub fold_placeholder: Hsla,
 }
 
 fn hsl(hue: f32, saturation: f32, lightness: f32) -> Hsla {
@@ -113,6 +118,7 @@ impl EditorTheme {
             code_background: hsl_alpha(214.0, 32.0, 91.0, 0.30),
             code_border: hsl_alpha(213.0, 27.0, 84.0, 0.40),
             quote_bar: hsl(215.0, 20.0, 65.0),
+            fold_placeholder: hsl(215.0, 20.0, 65.0),
             ..Self::base()
         }
     }
@@ -136,6 +142,7 @@ impl EditorTheme {
             code_background: hsl_alpha(0.0, 0.0, 25.0, 0.20),
             code_border: hsl_alpha(213.0, 97.0, 87.0, 0.10),
             quote_bar: hsl(0.0, 0.0, 45.0),
+            fold_placeholder: hsl(0.0, 0.0, 64.0),
             ..Self::base()
         }
     }
@@ -156,6 +163,10 @@ impl EditorTheme {
             card_padding_y: px(4.0),
             card_radius_em: 0.4,
             quote_bar_em: 0.3,
+            inline_code_line_height: 1.4,
+            inline_code_border: px(1.0),
+            fold_chevron_em: 0.62,
+            fold_placeholder_radius_em: 0.2,
             caret_width: px(2.0),
             gutter_font_scale: 0.7,
             gutter_min_width_em: 4.5,
@@ -180,6 +191,7 @@ impl EditorTheme {
             search_match: hsl_alpha(38.0, 92.0, 50.0, 0.25),
             search_match_current: hsl_alpha(38.0, 92.0, 50.0, 0.50),
             search_match_outline: hsl(38.0, 92.0, 50.0),
+            fold_placeholder: placeholder,
         }
     }
 
@@ -335,6 +347,7 @@ mod tests {
             theme.code_background,
             theme.code_border,
             theme.quote_bar,
+            theme.fold_placeholder,
         ]
     }
 

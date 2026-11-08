@@ -22,3 +22,4 @@
 | [2026-11-07-editor-column.md](2026-11-07-editor-column.md) | Editor column on bourbon-ui/editor/markdown: toolbar, text fields, find gap, menus, scroll sync |
 | [2026-11-08-find-replace.md](2026-11-08-find-replace.md) | In-editor find and replace panel: keys, options, highlights |
 | [2026-11-08-overlays.md](2026-11-08-overlays.md) | Overlays on `bourbon-ui`: palette, settings screen, dialogs, new primitives, `gpui-kit` removal |
+| [2026-11-08-editor-folding.md](2026-11-08-editor-folding.md) | Editor folding (ranges, state, caret, chevrons, keys), no hanging indent, inline code rows, preview mono code and tables |

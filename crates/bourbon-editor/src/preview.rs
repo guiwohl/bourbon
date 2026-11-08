@@ -14,9 +14,9 @@ use crate::fonts::without_ligatures;
 use crate::inline::{LinkTarget, flatten_inlines};
 use crate::preview_style::{
     alert_title, alert_vertical_padding, cell_alignment, checkbox_size, checkbox_tick_size,
-    checkbox_top_margin, child_gap, footnote_size, heading_style, highlight_ranges, item_gap,
-    item_is_struck, item_number, list_indent, list_marker, quote_bar_width, row_is_striped,
-    rule_height, stack_gap,
+    checkbox_top_margin, child_gap, code_font_overrides, footnote_size, heading_style,
+    highlight_ranges, item_gap, item_is_struck, item_number, list_indent, list_marker,
+    quote_bar_width, row_is_striped, rule_height, stack_gap,
 };
 use crate::preview_theme::PreviewTheme;
 
@@ -415,49 +415,51 @@ impl Renderer {
         rows: &[Vec<Vec<Inline>>],
     ) -> AnyElement {
         let theme = &self.theme;
-        let header = self.table_row(alignments, head, true, false);
-        let body = rows
-            .iter()
-            .enumerate()
-            .map(|(index, row)| self.table_row(alignments, row, false, row_is_striped(index)));
-        div()
-            .flex()
-            .flex_col()
+        let columns = rows.iter().map(Vec::len).fold(head.len(), usize::max);
+        let header = self.table_row(alignments, head, columns, true, false);
+        let body = rows.iter().enumerate().flat_map(|(index, row)| {
+            self.table_row(alignments, row, columns, false, row_is_striped(index))
+        });
+        let grid = div()
+            .grid()
+            .grid_cols_max_content(u16::try_from(columns).unwrap_or(u16::MAX))
+            .min_w_0()
             .border_1()
             .border_color(theme.solid_border)
-            .child(header)
-            .children(body)
-            .into_any_element()
+            .children(header)
+            .children(body);
+        div().flex().child(grid).into_any_element()
     }
 
     fn table_row(
         &self,
         alignments: &[Alignment],
         cells: &[Vec<Inline>],
+        columns: usize,
         header: bool,
         striped: bool,
-    ) -> AnyElement {
+    ) -> Vec<AnyElement> {
         let theme = &self.theme;
-        let mut row = div().flex().flex_row();
-        if header {
-            row = row
-                .bg(theme.table_header_background)
-                .font_weight(FontWeight::SEMIBOLD);
-        } else if striped {
-            row = row.bg(theme.table_stripe_background);
-        }
-        row.children(cells.iter().enumerate().map(|(index, cell)| {
-            div()
-                .flex_1()
-                .min_w_0()
-                .px(px(13.0))
-                .py(px(6.0))
-                .border_1()
-                .border_color(theme.solid_border)
-                .text_align(cell_alignment(alignments.get(index)))
-                .child(self.inline(cell))
-        }))
-        .into_any_element()
+        (0..columns)
+            .map(|index| {
+                let mut cell = div()
+                    .min_w_0()
+                    .px(px(13.0))
+                    .py(px(6.0))
+                    .border_1()
+                    .border_color(theme.solid_border)
+                    .text_align(cell_alignment(alignments.get(index)));
+                if header {
+                    cell = cell
+                        .bg(theme.table_header_background)
+                        .font_weight(FontWeight::SEMIBOLD);
+                } else if striped {
+                    cell = cell.bg(theme.table_stripe_background);
+                }
+                cell.children(cells.get(index).map(|inlines| self.inline(inlines)))
+                    .into_any_element()
+            })
+            .collect()
     }
 
     fn inline(&self, inlines: &[Inline]) -> AnyElement {
@@ -465,7 +467,8 @@ impl Renderer {
         let index = self.next_text.get();
         self.next_text.set(index + 1);
         let styled = StyledText::new(flat.text.clone())
-            .with_highlights(highlight_ranges(&flat, &self.theme));
+            .with_highlights(highlight_ranges(&flat, &self.theme))
+            .with_font_family_overrides(code_font_overrides(&flat, &self.theme));
         let text: AnyElement = if flat.links.is_empty() {
             styled.into_any_element()
         } else {

@@ -1,3 +1,4 @@
+#[cfg(test)]
 #[allow(clippy::cast_precision_loss)]
 pub fn count_f32(count: usize) -> f32 {
     count as f32

@@ -2,19 +2,19 @@ use std::ops::Range;
 
 use gpui::{
     App, Bounds, Font, FontFallbacks, FontStyle, FontWeight, Pixels, Point, ShapedLine,
-    StrikethroughStyle, TextAlign, TextRun, UnderlineStyle, Window, WrappedLine, point, px, size,
+    StrikethroughStyle, TextAlign, TextRun, UnderlineStyle, Window, point, px, size,
 };
 
-use crate::numeric::{count_f32, row_from_ratio};
-use crate::segments::{Segment, split_segments};
+use crate::segments::{Segment, slice_segments};
 use crate::theme::EditorTheme;
 
 pub struct ShapeRequest<'a> {
     pub text: &'a str,
     pub segments: &'a [Segment],
-    pub prefix_len: usize,
     pub font_size: Pixels,
     pub line_height: Pixels,
+    pub tall_ranges: &'a [Range<usize>],
+    pub tall_row_height: Pixels,
     pub wrap_width: Option<Pixels>,
     pub bold: bool,
     pub box_model: LineBox,
@@ -28,12 +28,15 @@ pub struct LineBox {
     pub padding_bottom: Pixels,
 }
 
+struct Row {
+    range: Range<usize>,
+    shaped: ShapedLine,
+    top: Pixels,
+    height: Pixels,
+}
+
 pub struct LineLayout {
-    prefix: ShapedLine,
-    prefix_len: usize,
-    indent: Pixels,
-    body: WrappedLine,
-    line_height: Pixels,
+    rows: Vec<Row>,
     len: usize,
     box_model: LineBox,
 }
@@ -82,39 +85,76 @@ pub fn text_runs(segments: &[Segment], theme: &EditorTheme, force_bold: bool) ->
         .collect()
 }
 
+fn wrapped_row_ranges(request: &ShapeRequest, window: &mut Window) -> Vec<Range<usize>> {
+    let wrap_width = request
+        .wrap_width
+        .map(|width| (width - request.box_model.inset * 2.0).max(request.font_size));
+    let wrapped = window
+        .text_system()
+        .shape_text(
+            request.text.to_owned().into(),
+            request.font_size,
+            &text_runs(request.segments, request.theme, request.bold),
+            wrap_width,
+            None,
+        )
+        .unwrap_or_default()
+        .into_iter()
+        .next()
+        .unwrap_or_default();
+    let runs = wrapped.runs();
+    let boundaries: Vec<usize> = wrapped
+        .wrap_boundaries()
+        .iter()
+        .map(|boundary| runs[boundary.run_ix].glyphs[boundary.glyph_ix].index)
+        .collect();
+    let starts = std::iter::once(0).chain(boundaries.iter().copied());
+    let ends = boundaries
+        .iter()
+        .copied()
+        .chain(std::iter::once(request.text.len()));
+    starts.zip(ends).map(|(start, end)| start..end).collect()
+}
+
+fn holds_tall_text(row: &Range<usize>, tall_ranges: &[Range<usize>]) -> bool {
+    tall_ranges
+        .iter()
+        .any(|tall| tall.start < row.end && tall.end > row.start)
+}
+
 impl LineLayout {
     pub fn shape(request: &ShapeRequest, window: &mut Window) -> Self {
-        let (prefix_segments, body_segments) = split_segments(request.segments, request.prefix_len);
-        let (prefix_text, body_text) = request.text.split_at(request.prefix_len);
-        let prefix = window.text_system().shape_line(
-            prefix_text.to_owned().into(),
-            request.font_size,
-            &text_runs(&prefix_segments, request.theme, request.bold),
-            None,
-        );
-        let indent = prefix.width;
-        let body_wrap = request
-            .wrap_width
-            .map(|width| (width - request.box_model.inset * 2.0 - indent).max(request.font_size));
-        let body = window
-            .text_system()
-            .shape_text(
-                body_text.to_owned().into(),
-                request.font_size,
-                &text_runs(&body_segments, request.theme, request.bold),
-                body_wrap,
-                None,
-            )
-            .unwrap_or_default()
+        let mut top = px(0.0);
+        let rows = wrapped_row_ranges(request, window)
             .into_iter()
-            .next()
-            .unwrap_or_default();
+            .map(|range| {
+                let shaped = window.text_system().shape_line(
+                    request.text[range.clone()].to_owned().into(),
+                    request.font_size,
+                    &text_runs(
+                        &slice_segments(request.segments, &range),
+                        request.theme,
+                        request.bold,
+                    ),
+                    None,
+                );
+                let height = if holds_tall_text(&range, request.tall_ranges) {
+                    request.line_height.max(request.tall_row_height)
+                } else {
+                    request.line_height
+                };
+                let row = Row {
+                    range,
+                    shaped,
+                    top,
+                    height,
+                };
+                top += height;
+                row
+            })
+            .collect();
         Self {
-            prefix,
-            prefix_len: request.prefix_len,
-            indent,
-            body,
-            line_height: request.line_height,
+            rows,
             len: request.text.len(),
             box_model: request.box_model,
         }
@@ -125,114 +165,73 @@ impl LineLayout {
     }
 
     pub fn row_of_y(&self, y: Pixels) -> usize {
-        row_from_ratio((y - self.box_model.padding_top) / self.line_height)
-            .min(self.row_count() - 1)
+        let y = y - self.box_model.padding_top;
+        self.rows.iter().rposition(|row| row.top <= y).unwrap_or(0)
     }
 
     pub fn row_middle(&self, row: usize) -> Pixels {
-        self.box_model.padding_top + self.line_height * (count_f32(row) + 0.5)
+        let row = &self.rows[row];
+        self.box_model.padding_top + row.top + row.height / 2.0
     }
 
-    pub fn line_height(&self) -> Pixels {
-        self.line_height
+    pub fn first_row_height(&self) -> Pixels {
+        self.rows[0].height
+    }
+
+    pub fn row_height_at(&self, index: usize) -> Pixels {
+        self.rows[self.row_of_index(index)].height
     }
 
     pub fn row_count(&self) -> usize {
-        self.body.wrap_boundaries().len() + 1
+        self.rows.len()
     }
 
     pub fn height(&self) -> Pixels {
-        self.line_height * count_f32(self.row_count())
-            + self.box_model.padding_top
-            + self.box_model.padding_bottom
+        let last = &self.rows[self.rows.len() - 1];
+        last.top + last.height + self.box_model.padding_top + self.box_model.padding_bottom
     }
 
     pub fn rows(&self) -> Vec<Range<usize>> {
-        let runs = self.body.runs();
-        let starts = std::iter::once(0).chain(
-            self.body
-                .wrap_boundaries()
-                .iter()
-                .map(|boundary| runs[boundary.run_ix].glyphs[boundary.glyph_ix].index),
-        );
-        let ends = self
-            .body
-            .wrap_boundaries()
-            .iter()
-            .map(|boundary| runs[boundary.run_ix].glyphs[boundary.glyph_ix].index)
-            .chain(std::iter::once(self.body.len()));
-        starts
-            .zip(ends)
-            .enumerate()
-            .map(|(row, (start, end))| {
-                let first = if row == 0 { 0 } else { self.prefix_len + start };
-                first..self.prefix_len + end
-            })
-            .collect()
+        self.rows.iter().map(|row| row.range.clone()).collect()
     }
 
-    fn row_of(index: usize, rows: &[Range<usize>]) -> usize {
-        rows.iter().rposition(|row| row.start <= index).unwrap_or(0)
-    }
-
-    fn x_in_row(&self, row: usize, index: usize, rows: &[Range<usize>]) -> Pixels {
+    fn row_of_index(&self, index: usize) -> usize {
         let index = index.min(self.len);
-        if row > 0 && index == rows[row].start {
-            return self.indent;
-        }
-        self.prefix.x_for_index(index.min(self.prefix_len))
-            + self
-                .body
-                .position_for_index(index.saturating_sub(self.prefix_len), self.line_height)
-                .map_or(px(0.0), |position| position.x)
+        self.rows
+            .iter()
+            .rposition(|row| row.range.start <= index)
+            .unwrap_or(0)
+    }
+
+    fn x_in_row(&self, row: usize, index: usize) -> Pixels {
+        let row = &self.rows[row];
+        let index = index.clamp(row.range.start, row.range.end);
+        row.shaped.x_for_index(index - row.range.start)
     }
 
     pub fn position_for_index(&self, index: usize) -> Point<Pixels> {
-        let rows = self.rows();
-        let row = Self::row_of(index.min(self.len), &rows);
-        self.text_origin()
-            + point(
-                self.x_in_row(row, index, &rows),
-                self.line_height * count_f32(row),
-            )
+        let row = self.row_of_index(index);
+        self.text_origin() + point(self.x_in_row(row, index), self.rows[row].top)
     }
 
     pub fn index_for_position(&self, position: Point<Pixels>) -> usize {
         let position = position - self.text_origin();
-        let rows = self.rows();
-        let row = row_from_ratio(position.y / self.line_height).min(rows.len() - 1);
-        let prefix_index = if row == 0 {
-            self.prefix
-                .closest_index_for_x(position.x.min(self.indent))
-                .min(self.prefix_len)
+        let row = &self.rows[self.row_of_y(position.y + self.box_model.padding_top)];
+        let within = row.shaped.closest_index_for_x(position.x.max(px(0.0)));
+        let last_in_row = if row.range.end == self.len {
+            row.range.end
         } else {
-            self.prefix_len
+            row.range.end.saturating_sub(1).max(row.range.start)
         };
-        let body_point = point(
-            (position.x - self.indent).max(px(0.0)),
-            self.line_height * count_f32(row),
-        );
-        let body_index = self
-            .body
-            .closest_index_for_position(body_point, self.line_height)
-            .unwrap_or_else(|edge| edge);
-        prefix_index + body_index
+        (row.range.start + within).min(last_in_row)
     }
 
     pub fn glyph_index_at(&self, position: Point<Pixels>) -> Option<usize> {
         let position = position - self.text_origin();
-        let row_count = self.row_count();
-        let row = row_from_ratio(position.y / self.line_height).min(row_count - 1);
-        let prefix_hit = (row == 0)
-            .then(|| self.prefix.index_for_x(position.x))
-            .flatten();
-        prefix_hit.or_else(|| {
-            let body_point = point(position.x - self.indent, self.line_height * count_f32(row));
-            self.body
-                .index_for_position(body_point, self.line_height)
-                .ok()
-                .map(|index| self.prefix_len + index)
-        })
+        let row = &self.rows[self.row_of_y(position.y + self.box_model.padding_top)];
+        row.shaped
+            .index_for_x(position.x)
+            .map(|index| row.range.start + index)
     }
 
     pub fn selection_rects(
@@ -241,28 +240,22 @@ impl LineLayout {
         through_line_break: bool,
         break_width: Pixels,
     ) -> Vec<Bounds<Pixels>> {
-        let rows = self.rows();
-        let last = rows.len() - 1;
+        let last = self.rows.len() - 1;
         let mut rects = Vec::new();
-        for (row, range) in rows.iter().enumerate() {
+        for (index, row) in self.rows.iter().enumerate() {
+            let range = &row.range;
             if selected.start > range.end || selected.end < range.start {
                 continue;
             }
-            let start = selected.start.clamp(range.start, range.end);
-            let end = selected.end.clamp(range.start, range.end);
-            let left = if start == range.start {
-                if row == 0 { px(0.0) } else { self.indent }
-            } else {
-                self.x_in_row(row, start, &rows)
-            };
-            let mut right = self.x_in_row(row, end, &rows);
-            if through_line_break && row == last {
+            let left = self.x_in_row(index, selected.start);
+            let mut right = self.x_in_row(index, selected.end);
+            if through_line_break && index == last {
                 right += break_width;
             }
             if right > left {
                 rects.push(Bounds::new(
-                    self.text_origin() + point(left, self.line_height * count_f32(row)),
-                    size(right - left, self.line_height),
+                    self.text_origin() + point(left, row.top),
+                    size(right - left, row.height),
                 ));
             }
         }
@@ -275,33 +268,12 @@ impl LineLayout {
 
     pub fn paint(&self, origin: Point<Pixels>, window: &mut Window, cx: &mut App) {
         let origin = self.text_paint_origin(origin);
-        self.prefix
-            .paint_background(origin, self.line_height, TextAlign::Left, None, window, cx)
-            .ok();
-        self.prefix
-            .paint(origin, self.line_height, TextAlign::Left, None, window, cx)
-            .ok();
-        let body_origin = point(origin.x + self.indent, origin.y);
-        self.body
-            .paint_background(
-                body_origin,
-                self.line_height,
-                TextAlign::Left,
-                None,
-                window,
-                cx,
-            )
-            .ok();
-        self.body
-            .paint(
-                body_origin,
-                self.line_height,
-                TextAlign::Left,
-                None,
-                window,
-                cx,
-            )
-            .ok();
+        for row in &self.rows {
+            let row_origin = point(origin.x, origin.y + row.top);
+            row.shaped
+                .paint(row_origin, row.height, TextAlign::Left, None, window, cx)
+                .ok();
+        }
     }
 }
 
@@ -312,6 +284,7 @@ mod tests {
 
     const CHAR: f32 = 7.8;
     const LINE: f32 = 19.5;
+    const TALL: f32 = 25.0;
 
     fn shape(cx: &mut TestAppContext, text: &str, wrap_chars: Option<f32>) -> LineLayout {
         shape_boxed(cx, text, wrap_chars, LineBox::default())
@@ -323,22 +296,32 @@ mod tests {
         wrap_chars: Option<f32>,
         box_model: LineBox,
     ) -> LineLayout {
+        shape_with_tall(cx, text, wrap_chars, box_model, &[])
+    }
+
+    fn shape_with_tall(
+        cx: &mut TestAppContext,
+        text: &str,
+        wrap_chars: Option<f32>,
+        box_model: LineBox,
+        tall_ranges: &[Range<usize>],
+    ) -> LineLayout {
         let theme = EditorTheme::light();
         let segments = [Segment {
             len: text.len(),
             class: None,
             marked: false,
         }];
-        let prefix_len = crate::segments::hanging_prefix_len(text);
         let window = cx.add_empty_window();
         window.update(|window, _| {
             LineLayout::shape(
                 &ShapeRequest {
                     text,
                     segments: if text.is_empty() { &[] } else { &segments },
-                    prefix_len,
                     font_size: px(13.0),
                     line_height: px(LINE),
+                    tall_ranges,
+                    tall_row_height: px(TALL),
                     wrap_width: wrap_chars.map(|chars| px(chars * CHAR + 0.5)),
                     bold: false,
                     box_model,
@@ -468,19 +451,72 @@ mod tests {
     }
 
     #[gpui::test]
-    fn list_lines_hang_their_continuation_rows_under_the_text(cx: &mut TestAppContext) {
+    fn list_continuation_rows_start_at_the_left_edge(cx: &mut TestAppContext) {
         let layout = shape(cx, "- aaaa bbbb cccc dddd", Some(14.0));
         let rows = layout.rows();
         assert!(rows.len() >= 2);
-        assert_eq!(rows[0].start, 0);
-        assert_eq!(rows[0].end, 12);
-        assert!(close(layout.position_for_index(0).x, 0.0));
         let continuation = layout.position_for_index(rows[1].start);
-        assert!(close(continuation.x, 2.0 * CHAR));
+        assert!(close(continuation.x, 0.0));
         assert!(close(continuation.y, LINE));
-        let after_marker = layout.position_for_index(2);
-        assert!(close(after_marker.x, 2.0 * CHAR));
-        assert!(close(layout.position_for_index(1).x, CHAR));
+        assert!(close(layout.position_for_index(2).x, 2.0 * CHAR));
+    }
+
+    #[gpui::test]
+    fn only_rows_holding_tall_text_get_the_tall_height(cx: &mut TestAppContext) {
+        let layout = shape_with_tall(
+            cx,
+            "aaaa bbbb cccc dddd",
+            Some(10.0),
+            LineBox::default(),
+            std::slice::from_ref(&(12..14)),
+        );
+        assert_eq!(layout.row_count(), 2);
+        assert!(close(layout.height(), LINE + TALL));
+        assert!(close(layout.first_row_height(), LINE));
+        assert!(close(layout.row_height_at(15), TALL));
+        assert!(close(layout.position_for_index(15).y, LINE));
+        assert!(close(layout.row_middle(1), LINE + TALL / 2.0));
+        assert_eq!(layout.row_of_y(px(LINE + TALL - 0.5)), 1);
+        let rects = layout.selection_rects(&(0..15), false, px(6.0));
+        assert!(close(rects[1].size.height, TALL));
+        assert!(close(rects[1].origin.y, LINE));
+    }
+
+    #[gpui::test]
+    fn a_tall_range_never_shrinks_a_row(cx: &mut TestAppContext) {
+        let theme = EditorTheme::light();
+        let segments = [Segment {
+            len: 3,
+            class: None,
+            marked: false,
+        }];
+        let window = cx.add_empty_window();
+        let layout = window.update(|window, _| {
+            LineLayout::shape(
+                &ShapeRequest {
+                    text: "abc",
+                    segments: &segments,
+                    font_size: px(13.0),
+                    line_height: px(LINE),
+                    tall_ranges: std::slice::from_ref(&(0..1)),
+                    tall_row_height: px(5.0),
+                    wrap_width: None,
+                    bold: false,
+                    box_model: LineBox::default(),
+                    theme: &theme,
+                },
+                window,
+            )
+        });
+        assert!(close(layout.height(), LINE));
+    }
+
+    #[gpui::test]
+    fn a_click_past_a_wrapped_row_stays_on_that_row(cx: &mut TestAppContext) {
+        let layout = shape(cx, "aaaa bbbb cccc dddd", Some(10.0));
+        let rows = layout.rows();
+        let index = layout.index_for_position(point(px(500.0), px(5.0)));
+        assert_eq!(index, rows[0].end - 1);
     }
 
     #[gpui::test]
@@ -491,10 +527,7 @@ mod tests {
             "aaaa bbbb cccc dddd",
         ] {
             let layout = shape(cx, text, Some(12.0));
-            let skipped = [
-                text.len() - 1,
-                crate::segments::hanging_prefix_len(text).max(1) - 1,
-            ];
+            let skipped = [text.len() - 1];
             for index in (0..text.len()).filter(|index| !skipped.contains(index)) {
                 let position = layout.position_for_index(index);
                 let probe = point(position.x + px(1.0), position.y + px(5.0));
@@ -549,10 +582,10 @@ mod tests {
     }
 
     #[gpui::test]
-    fn glyph_lookup_on_continuation_rows_uses_the_hanging_indent(cx: &mut TestAppContext) {
+    fn glyph_lookup_on_continuation_rows_starts_at_the_left_edge(cx: &mut TestAppContext) {
         let layout = shape(cx, "- aaaa bbbb cccc dddd", Some(14.0));
         let start = layout.rows()[1].start;
-        let found = layout.glyph_index_at(point(px(2.0 * CHAR + 1.0), px(LINE + 5.0)));
+        let found = layout.glyph_index_at(point(px(1.0), px(LINE + 5.0)));
         assert_eq!(found, Some(start));
     }
 
@@ -607,15 +640,6 @@ mod tests {
             rects[1].size.width,
             crate::numeric::count_f32(15 - rows[1].start) * CHAR
         ));
-    }
-
-    #[gpui::test]
-    fn a_selection_on_hanging_rows_starts_at_the_indent(cx: &mut TestAppContext) {
-        let layout = shape(cx, "- aaaa bbbb cccc dddd", Some(14.0));
-        let rows = layout.rows();
-        let rects = layout.selection_rects(&(0..rows[1].end), false, px(6.0));
-        assert!(close(rects[0].origin.x, 0.0));
-        assert!(close(rects[1].origin.x, 2.0 * CHAR));
     }
 
     #[gpui::test]

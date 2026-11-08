@@ -78,27 +78,18 @@ fn split_by_marked(
     segments
 }
 
-pub fn split_segments(segments: &[Segment], at: usize) -> (Vec<Segment>, Vec<Segment>) {
-    let mut head = Vec::new();
-    let mut tail = Vec::new();
-    let mut consumed = 0;
+pub fn slice_segments(segments: &[Segment], range: &Range<usize>) -> Vec<Segment> {
+    let mut sliced = Vec::new();
+    let mut start = 0;
     for segment in segments {
-        let head_len = at.saturating_sub(consumed).min(segment.len);
-        if head_len > 0 {
-            head.push(Segment {
-                len: head_len,
-                ..*segment
-            });
+        let end = start + segment.len;
+        let len = end.min(range.end).saturating_sub(start.max(range.start));
+        if len > 0 {
+            sliced.push(Segment { len, ..*segment });
         }
-        if segment.len > head_len {
-            tail.push(Segment {
-                len: segment.len - head_len,
-                ..*segment
-            });
-        }
-        consumed += segment.len;
+        start = end;
     }
-    (head, tail)
+    sliced
 }
 
 pub fn heading_level(line: Range<usize>, spans: &[HighlightSpan]) -> Option<u8> {
@@ -139,71 +130,6 @@ pub fn inline_code_ranges(segments: &[Segment]) -> Vec<Range<usize>> {
             starts[first]..starts[last + 1]
         })
         .collect()
-}
-
-pub fn hanging_prefix_len(line: &str) -> usize {
-    let bytes = line.as_bytes();
-    let mut index = skip_blanks(bytes, 0);
-    let mut quoted_end = None;
-    for _ in 0..bytes.len() {
-        if bytes.get(index) != Some(&b'>') {
-            break;
-        }
-        index += 1;
-        if is_blank(bytes.get(index)) {
-            index += 1;
-        }
-        quoted_end = Some(index);
-        index = skip_blanks(bytes, index);
-    }
-    match list_marker_end(bytes, index) {
-        Some(end) => task_box_end(bytes, end),
-        None => quoted_end.unwrap_or(0),
-    }
-}
-
-fn is_blank(byte: Option<&u8>) -> bool {
-    matches!(byte, Some(b' ' | b'\t'))
-}
-
-fn skip_blanks(bytes: &[u8], from: usize) -> usize {
-    from + bytes[from..]
-        .iter()
-        .take_while(|byte| matches!(byte, b' ' | b'\t'))
-        .count()
-}
-
-fn list_marker_end(bytes: &[u8], start: usize) -> Option<usize> {
-    let marker_len = match bytes.get(start)? {
-        b'-' | b'*' | b'+' => 1,
-        b'0'..=b'9' => {
-            let digits = bytes[start..]
-                .iter()
-                .take_while(|byte| byte.is_ascii_digit())
-                .count();
-            match bytes.get(start + digits) {
-                Some(b'.' | b')') => digits + 1,
-                _ => return None,
-            }
-        }
-        _ => return None,
-    };
-    is_blank(bytes.get(start + marker_len)).then(|| skip_blanks(bytes, start + marker_len))
-}
-
-fn task_box_end(bytes: &[u8], start: usize) -> usize {
-    let is_box = bytes.get(start) == Some(&b'[')
-        && matches!(bytes.get(start + 1), Some(b' ' | b'x' | b'X'))
-        && bytes.get(start + 2) == Some(&b']');
-    if !is_box {
-        return start;
-    }
-    let after_box = start + 3;
-    if is_blank(bytes.get(after_box)) {
-        skip_blanks(bytes, after_box)
-    } else {
-        after_box
-    }
 }
 
 #[cfg(test)]
@@ -350,30 +276,18 @@ mod tests {
     }
 
     #[test]
-    fn splitting_at_a_boundary_keeps_both_halves() {
+    fn slicing_keeps_the_segments_inside_the_range() {
         let segments = [segment(2, None), segment(3, Some(TokenClass::Strong))];
-        let (head, tail) = split_segments(&segments, 2);
-        assert_eq!(head, vec![segment(2, None)]);
-        assert_eq!(tail, vec![segment(3, Some(TokenClass::Strong))]);
-    }
-
-    #[test]
-    fn splitting_inside_a_segment_cuts_it() {
-        let segments = [segment(2, None), segment(3, Some(TokenClass::Strong))];
-        let (head, tail) = split_segments(&segments, 3);
+        assert_eq!(slice_segments(&segments, &(0..2)), vec![segment(2, None)]);
         assert_eq!(
-            head,
-            vec![segment(2, None), segment(1, Some(TokenClass::Strong))]
+            slice_segments(&segments, &(1..4)),
+            vec![segment(1, None), segment(2, Some(TokenClass::Strong))]
         );
-        assert_eq!(tail, vec![segment(2, Some(TokenClass::Strong))]);
-    }
-
-    #[test]
-    fn splitting_past_the_end_leaves_an_empty_tail() {
-        let segments = [segment(2, None)];
-        let (head, tail) = split_segments(&segments, 9);
-        assert_eq!(head, vec![segment(2, None)]);
-        assert_eq!(tail, vec![]);
+        assert_eq!(
+            slice_segments(&segments, &(2..9)),
+            vec![segment(3, Some(TokenClass::Strong))]
+        );
+        assert_eq!(slice_segments(&segments, &(5..5)), vec![]);
     }
 
     #[test]
@@ -390,52 +304,6 @@ mod tests {
     fn heading_level_ignores_other_classes() {
         let spans = [span(0..4, TokenClass::Strong)];
         assert_eq!(heading_level(0..4, &spans), None);
-    }
-
-    #[test]
-    fn prefix_covers_bullets_and_indentation() {
-        assert_eq!(hanging_prefix_len("- item"), 2);
-        assert_eq!(hanging_prefix_len("* item"), 2);
-        assert_eq!(hanging_prefix_len("+ item"), 2);
-        assert_eq!(hanging_prefix_len("  - item"), 4);
-        assert_eq!(hanging_prefix_len("-   item"), 4);
-    }
-
-    #[test]
-    fn prefix_covers_ordered_markers() {
-        assert_eq!(hanging_prefix_len("1. a"), 3);
-        assert_eq!(hanging_prefix_len("10) a"), 4);
-    }
-
-    #[test]
-    fn prefix_covers_task_boxes() {
-        assert_eq!(hanging_prefix_len("- [ ] t"), 6);
-        assert_eq!(hanging_prefix_len("- [x] t"), 6);
-        assert_eq!(hanging_prefix_len("1. [X] t"), 7);
-    }
-
-    #[test]
-    fn prefix_covers_quote_marks_and_nested_lists() {
-        assert_eq!(hanging_prefix_len("> quote"), 2);
-        assert_eq!(hanging_prefix_len("> > deep"), 4);
-        assert_eq!(hanging_prefix_len("> - item"), 4);
-        assert_eq!(hanging_prefix_len(">quote"), 1);
-    }
-
-    #[test]
-    fn prefix_is_zero_for_plain_lines() {
-        assert_eq!(hanging_prefix_len("plain"), 0);
-        assert_eq!(hanging_prefix_len(""), 0);
-        assert_eq!(hanging_prefix_len("-x"), 0);
-        assert_eq!(hanging_prefix_len("**bold** x"), 0);
-        assert_eq!(hanging_prefix_len("1.x"), 0);
-        assert_eq!(hanging_prefix_len("# title"), 0);
-        assert_eq!(hanging_prefix_len("    code"), 0);
-    }
-
-    #[test]
-    fn a_bare_marker_is_all_prefix() {
-        assert_eq!(hanging_prefix_len("- "), 2);
     }
 
     #[test]
@@ -462,13 +330,5 @@ mod tests {
     fn heading_level_ignores_a_heading_that_starts_at_the_line_end() {
         let spans = [span(4..8, TokenClass::Heading(2))];
         assert_eq!(heading_level(0..4, &spans), None);
-    }
-
-    #[test]
-    fn broken_task_boxes_are_not_part_of_the_prefix() {
-        assert_eq!(hanging_prefix_len("- [y] t"), 2);
-        assert_eq!(hanging_prefix_len("- [ x t"), 2);
-        assert_eq!(hanging_prefix_len("- ax] t"), 2);
-        assert_eq!(hanging_prefix_len("- [x]t"), 5);
     }
 }

@@ -1,7 +1,9 @@
 use bourbon_markdown::{AlertKind, Alignment, BlockKind};
 use std::ops::Range;
 
-use gpui::{FontStyle, FontWeight, HighlightStyle, Pixels, StrikethroughStyle, TextAlign, px};
+use gpui::{
+    FontStyle, FontWeight, HighlightStyle, Pixels, SharedString, StrikethroughStyle, TextAlign, px,
+};
 
 use crate::inline::{BOLD, CODE, FlatText, ITALIC, LINK, STRIKE};
 use crate::preview_theme::PreviewTheme;
@@ -139,6 +141,25 @@ pub fn highlight_ranges(
         offset += len;
     }
     ranges
+}
+
+pub fn code_font_overrides(
+    flat: &FlatText,
+    theme: &PreviewTheme,
+) -> Vec<(Range<usize>, SharedString)> {
+    let family = SharedString::from(theme.mono_family.clone());
+    let mut overrides: Vec<(Range<usize>, SharedString)> = Vec::new();
+    let mut offset = 0;
+    for (len, flags) in flat.flag_runs() {
+        if flags & CODE != 0 {
+            match overrides.last_mut() {
+                Some((range, _)) if range.end == offset => range.end = offset + len,
+                _ => overrides.push((offset..offset + len, family.clone())),
+            }
+        }
+        offset += len;
+    }
+    overrides
 }
 
 pub fn highlight_style(flags: u8, theme: &PreviewTheme) -> HighlightStyle {
@@ -321,6 +342,27 @@ mod tests {
         assert_eq!(ranges[0].1, highlight_style(BOLD, &theme));
         assert_eq!(ranges[1].0, 6..8);
         assert_eq!(ranges[1].1, highlight_style(CODE, &theme));
+    }
+
+    #[test]
+    fn code_runs_switch_to_the_mono_family_and_adjacent_runs_merge() {
+        use bourbon_markdown::Inline;
+        let theme = theme();
+        let flat = crate::inline::flatten_inlines(&[
+            Inline::Text("ab".to_owned()),
+            Inline::Code("cd".to_owned()),
+            Inline::Link {
+                href: "https://x.y".to_owned(),
+                children: vec![Inline::Code("ef".to_owned())],
+            },
+            Inline::Text("g".to_owned()),
+            Inline::Code("h".to_owned()),
+        ]);
+        let family = SharedString::from(theme.mono_family.clone());
+        assert_eq!(
+            code_font_overrides(&flat, &theme),
+            vec![(2..6, family.clone()), (7..8, family)]
+        );
     }
 
     #[test]

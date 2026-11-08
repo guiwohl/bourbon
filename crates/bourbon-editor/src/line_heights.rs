@@ -87,6 +87,12 @@ impl LineHeights {
         self.top(index) + (line.max(0.0) - whole) * height
     }
 
+    pub fn invalidate(&mut self, lines: std::ops::Range<usize>) {
+        let end = lines.end.min(self.measured.len());
+        let start = lines.start.min(end);
+        self.measured[start..end].fill(false);
+    }
+
     pub fn replace_lines(&mut self, first: usize, removed: usize, inserted: usize) {
         let first = first.min(self.heights.len());
         let end = (first + removed).min(self.heights.len());
@@ -154,6 +160,25 @@ mod tests {
         let heights = heights(0);
         assert!((heights.line_position(25.0) - 0.0).abs() < 1e-4);
         assert!((heights.offset_of_line(3.0) - 0.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn invalidating_forgets_only_those_lines_and_is_clamped() {
+        let mut heights = heights(4);
+        for line in 0..4 {
+            heights.set_measured(line, 30.0);
+        }
+        heights.invalidate(1..3);
+        assert_eq!(
+            (0..4)
+                .map(|line| heights.is_measured(line))
+                .collect::<Vec<_>>(),
+            vec![true, false, false, true]
+        );
+        heights.invalidate(3..9);
+        assert!(!heights.is_measured(3));
+        heights.invalidate(7..9);
+        assert_eq!(heights.line_count(), 4);
     }
 
     #[test]

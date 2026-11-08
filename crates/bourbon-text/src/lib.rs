@@ -1,6 +1,7 @@
 mod change;
 pub mod commands;
 mod compose;
+mod fold;
 mod history;
 mod markup;
 pub mod movement;
@@ -13,6 +14,7 @@ mod text;
 mod testing;
 
 pub use change::{Assoc, Change, ChangeSet};
+pub use fold::Folds;
 pub use history::History;
 pub use search::{InvalidPattern, Search, SearchQuery, current_match, next_match, previous_match};
 pub use selection::{Selection, SelectionRange};

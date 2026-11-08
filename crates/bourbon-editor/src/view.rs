@@ -122,4 +122,6 @@ fn with_edit_actions(root: Div, cx: &mut Context<Editor>) -> Div {
         )
         .on_action(cx.listener(|e, _: &actions::ToggleCode, _, cx| e.toggle_code(cx)))
         .on_action(cx.listener(|e, _: &actions::ToggleTask, _, cx| e.toggle_task(cx)))
+        .on_action(cx.listener(|e, _: &actions::Fold, _, cx| e.fold_at_caret(cx)))
+        .on_action(cx.listener(|e, _: &actions::Unfold, _, cx| e.unfold_at_caret(cx)))
 }
