@@ -113,3 +113,13 @@ fn clicking_a_note_link_opens_the_note(cx: &mut TestAppContext) {
         [PreviewEvent::OpenNote("abcdefghij12".to_owned())]
     );
 }
+
+#[gpui::test]
+fn changing_the_theme_replaces_it(cx: &mut TestAppContext) {
+    let (preview, cx) = open(cx, "one\n");
+    preview.update(cx, |preview, cx| {
+        preview.set_theme(PreviewTheme::dark(), cx)
+    });
+    let dark = preview.read_with(cx, |preview, _| preview.theme().clone());
+    assert_eq!(dark, PreviewTheme::dark());
+}

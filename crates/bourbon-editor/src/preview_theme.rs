@@ -175,4 +175,34 @@ mod tests {
             PreviewTheme::dark().background
         );
     }
+
+    fn colours(theme: &PreviewTheme) -> Vec<Hsla> {
+        vec![
+            theme.background,
+            theme.text,
+            theme.muted,
+            theme.border,
+            theme.solid_border,
+            theme.code_background,
+            theme.code_border,
+            theme.inline_code_background,
+            theme.table_header_background,
+            theme.table_stripe_background,
+        ]
+    }
+
+    #[test]
+    fn every_colour_of_both_themes_is_set() {
+        let unset = hsl(0.0, 0.0, 50.0, 1.0);
+        for theme in [PreviewTheme::light(), PreviewTheme::dark()] {
+            assert!(colours(&theme).iter().all(|colour| *colour != unset));
+        }
+    }
+
+    #[test]
+    fn dark_colours_differ_from_light_ones_field_by_field() {
+        let light = colours(&PreviewTheme::light());
+        let dark = colours(&PreviewTheme::dark());
+        assert!(light.iter().zip(&dark).all(|(a, b)| a != b));
+    }
 }

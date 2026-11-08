@@ -51,12 +51,7 @@ pub fn word_range_at(text: &Text, offset: usize) -> SelectionRange {
 
 pub fn line_range_at(text: &Text, offset: usize) -> SelectionRange {
     let line = text.line_of(offset.min(text.len()));
-    let end = if line + 1 < text.line_count() {
-        text.line_start(line + 1)
-    } else {
-        text.len()
-    };
-    SelectionRange::new(text.line_start(line), end)
+    SelectionRange::new(text.line_start(line), text.line_start(line + 1))
 }
 
 pub fn extend_to(range: SelectionRange, head: usize) -> SelectionRange {

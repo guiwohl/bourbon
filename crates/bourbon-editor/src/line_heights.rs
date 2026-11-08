@@ -47,7 +47,6 @@ impl LineHeights {
 
     pub fn refresh(&mut self) {
         self.tops.clear();
-        self.tops.reserve(self.heights.len() + 1);
         let mut running = 0.0;
         self.tops.push(running);
         for height in &self.heights {
@@ -253,5 +252,12 @@ mod tests {
         assert!(heights.is_measured(2));
         assert!(heights.is_measured(3));
         assert!(!heights.is_measured(4));
+    }
+
+    #[test]
+    fn a_change_of_exactly_epsilon_is_not_a_change() {
+        let mut heights = heights(1);
+        heights.set_measured(0, 1.0);
+        assert!(!heights.set_measured(0, 1.0 + f32::EPSILON));
     }
 }

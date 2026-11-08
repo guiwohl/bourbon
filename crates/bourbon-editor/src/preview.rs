@@ -85,6 +85,10 @@ impl PreviewView {
         cx.notify();
     }
 
+    pub fn theme(&self) -> &PreviewTheme {
+        &self.theme
+    }
+
     pub fn block_layouts(&self) -> &[BlockLayout] {
         &self.layouts
     }
