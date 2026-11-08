@@ -551,3 +551,65 @@ fn opening_a_note_below_the_fold_scrolls_it_into_view(cx: &mut TestAppContext) {
     });
     assert!(after > 0);
 }
+
+fn long_list(cx: &mut TestAppContext) -> (AnyWindowHandle, Entity<Workspace>) {
+    let store = NoteStore::open_in_memory().unwrap();
+    let inbox = store.default_notebook().unwrap();
+    for index in 0..60 {
+        note_in(&store, &inbox, &format!("Note {index}"), index);
+    }
+    let (handle, view) = open_view(cx, store);
+    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
+        .unwrap();
+    (handle, view)
+}
+
+#[gpui_kit::test]
+fn revealing_a_fully_visible_row_leaves_the_scroll_position_alone(cx: &mut TestAppContext) {
+    let (handle, view) = long_list(cx);
+    let top = |cx: &mut TestAppContext| {
+        view.read_with(cx, |view, _| {
+            view.note_list_state.logical_scroll_top().item_ix
+        })
+    };
+
+    cx.update_window(handle, |_, window, cx| {
+        view.read(cx)
+            .note_list_state
+            .scroll_to(gpui_kit::ListOffset {
+                item_ix: 10,
+                offset_in_item: gpui_kit::px(0.),
+            });
+        window.render_frame(cx);
+        window.render_frame(cx);
+        crate::note_list::reveal(&view.read(cx).note_list_state, 11);
+        window.render_frame(cx);
+    })
+    .unwrap();
+
+    assert_eq!(top(cx), 10);
+}
+
+#[gpui_kit::test]
+fn revealing_a_row_cut_by_the_bottom_edge_scrolls_to_it(cx: &mut TestAppContext) {
+    let (handle, view) = long_list(cx);
+
+    let (target, top) = cx
+        .update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            let state = view.read(cx).note_list_state.clone();
+            let viewport = state.viewport_bounds();
+            let cut = (0..60).find(|index| {
+                state
+                    .bounds_for_item(*index)
+                    .is_some_and(|bounds| bounds.bottom() > viewport.bottom())
+            });
+            let cut = cut.expect("a partly visible row at the bottom");
+            crate::note_list::reveal(&state, cut);
+            window.render_frame(cx);
+            (cut, state.logical_scroll_top().item_ix)
+        })
+        .unwrap();
+
+    assert_eq!(top, target);
+}
