@@ -54,7 +54,7 @@ Not covered yet: markup-aware Backspace, heading/list/quote toggles, links, code
 |---|---|
 | `SearchQuery { pattern, match_case, regex, whole_word }` | Plain patterns are escaped; case-insensitive unless `match_case`; `^`/`$` work per line |
 | `Search::new(&query)` | `Err(InvalidPattern)` for a bad regex; an empty pattern finds nothing |
-| `find_all(&text)` | Sorted, non-overlapping byte ranges. Empty matches are skipped; every step moves forward at least one char, so the loop ends. Whole word: no letter, digit or `_` right before or after; a rejected start retries one char later |
+| `find_all(&text)` | Sorted, non-overlapping byte ranges. Empty matches are skipped; every step moves forward at least one char, and the loop is capped at `len + 1` steps. Whole word: no letter, digit or `_` right before or after; a rejected start retries one char later |
 | `replace_all(state, replacement)` / `replace_match(state, range, replacement)` | One `Command` transaction, `isolate`d, so each is one undo step. Regex mode expands `$1`, `$name`; plain mode inserts literally. `replace_all` maps the selection; `replace_match` puts the caret after the new text and refuses a range that is not a match |
 | `next_match` / `previous_match` / `current_match` | Index into the matches from a `SelectionRange`: next starts at the selection end, previous ends at its start, both wrap; current is the match equal to the selection |
 

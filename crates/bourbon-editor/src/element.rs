@@ -6,8 +6,8 @@ use gpui::{
 
 use crate::editor::Editor;
 use crate::frame::{Frame, FrameLine};
+use crate::search::match_quad;
 use crate::theme::EditorTheme;
-use crate::search::paint_match_rects;
 
 pub fn active_line_bounds(bounds: Bounds<Pixels>, line: &FrameLine) -> Bounds<Pixels> {
     Bounds::new(
@@ -160,7 +160,9 @@ impl Element for EditorElement {
             } else {
                 theme.selection_unfocused
             };
-            paint_match_rects(&frame.search_matches, &theme, window);
+            for rect in &frame.search_matches {
+                window.paint_quad(match_quad(rect, &theme));
+            }
             for rect in frame.lines.iter().flat_map(|line| line.selections.iter()) {
                 window.paint_quad(fill(*rect, selection_color));
             }

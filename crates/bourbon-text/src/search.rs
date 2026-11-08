@@ -56,7 +56,10 @@ impl Search {
         let haystack = text.to_string();
         let mut matches = Vec::new();
         let mut position = Some(0);
-        while let Some(start) = position {
+        for _ in 0..=haystack.len() {
+            let Some(start) = position else {
+                break;
+            };
             let Some(found) = pattern.find_at(&haystack, start) else {
                 break;
             };
