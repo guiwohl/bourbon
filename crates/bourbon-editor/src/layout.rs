@@ -269,8 +269,12 @@ impl LineLayout {
         rects
     }
 
+    pub fn text_paint_origin(&self, line_origin: Point<Pixels>) -> Point<Pixels> {
+        line_origin + self.text_origin()
+    }
+
     pub fn paint(&self, origin: Point<Pixels>, window: &mut Window, cx: &mut App) {
-        let origin = origin + self.text_origin();
+        let origin = self.text_paint_origin(origin);
         self.prefix
             .paint_background(origin, self.line_height, TextAlign::Left, None, window, cx)
             .ok();
@@ -386,11 +390,21 @@ mod tests {
     }
 
     #[gpui::test]
-    fn a_boxed_line_wraps_inside_its_inset(cx: &mut TestAppContext) {
-        let plain = shape(cx, "aaaa bbbb", Some(9.0));
+    fn a_boxed_line_wraps_inside_both_sides_of_its_inset(cx: &mut TestAppContext) {
+        let room_for_one_inset = Some(9.0 + 2.0 / CHAR);
+        let plain = shape(cx, "aaaa bbbb", room_for_one_inset);
         assert_eq!(plain.row_count(), 1);
-        let boxed = shape_boxed(cx, "aaaa bbbb", Some(9.0), card_box());
+        let boxed = shape_boxed(cx, "aaaa bbbb", room_for_one_inset, card_box());
         assert_eq!(boxed.row_count(), 2);
+    }
+
+    #[gpui::test]
+    fn the_text_is_painted_at_the_box_offset(cx: &mut TestAppContext) {
+        let layout = shape_boxed(cx, "x", None, card_box());
+        assert_eq!(
+            layout.text_paint_origin(point(px(10.0), px(20.0))),
+            point(px(12.0), px(24.0))
+        );
     }
 
     #[gpui::test]

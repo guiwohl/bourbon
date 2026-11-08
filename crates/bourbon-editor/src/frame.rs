@@ -710,6 +710,19 @@ mod tests {
     }
 
     #[gpui::test]
+    fn the_card_starts_after_the_gutter(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "```\nx\n```");
+        let (gutter, card) = editor.update_in(cx, |editor, window, cx| {
+            editor.set_line_numbers(true, cx);
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            let card = frame.lines[1].card.as_ref().expect("card").bounds;
+            (f32::from(frame.gutter_width), card)
+        });
+        assert!(near(card.origin.x, 100.0 + gutter + 3.0));
+        assert!(near(card.size.width, 400.0 - gutter - 6.0));
+    }
+
+    #[gpui::test]
     fn the_caret_in_a_card_follows_the_block_padding(cx: &mut TestAppContext) {
         let (editor, cx) = open(cx, "```\nx\n```");
         let caret = editor.update_in(cx, |editor, window, cx| {

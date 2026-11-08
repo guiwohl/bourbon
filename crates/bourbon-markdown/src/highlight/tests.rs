@@ -391,6 +391,11 @@ fn math_commands_are_marked_inside_the_formula() {
 }
 
 #[test]
+fn empty_display_math_is_all_marks() {
+    assert_eq!(spans("a $$$$ b"), [("$$$$", MathMark)]);
+}
+
+#[test]
 fn multibyte_text_keeps_char_boundaries() {
     assert_eq!(
         spans("# héllo ✓ `ç`"),
