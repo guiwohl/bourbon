@@ -145,6 +145,11 @@ impl Menu {
     }
 
     #[must_use]
+    pub fn entries(&self) -> &[MenuEntry] {
+        &self.entries
+    }
+
+    #[must_use]
     pub fn selected(&self) -> Option<usize> {
         self.selected
     }
@@ -342,6 +347,17 @@ mod tests {
         opened
             .visual
             .read_entity(&opened.menu, |menu, _| menu.selected())
+    }
+
+    #[gpui::test]
+    fn the_menu_exposes_its_entries_in_order(cx: &mut TestAppContext) {
+        let opened = open(cx);
+
+        let labels: Vec<_> = opened
+            .menu
+            .read_with(opened.visual, |menu, _| menu.entries().to_vec());
+
+        assert_eq!(labels, entries());
     }
 
     #[gpui::test]

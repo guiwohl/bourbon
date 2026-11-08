@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
-pub const SIDEBAR_WIDTH_RANGE: RangeInclusive<u16> = 160..=400;
-pub const NOTE_LIST_WIDTH_RANGE: RangeInclusive<u16> = 220..=560;
+pub const SIDEBAR_WIDTH_RANGE: RangeInclusive<u16> = 170..=500;
+pub const NOTE_LIST_WIDTH_RANGE: RangeInclusive<u16> = 220..=500;
 
 const DEFAULT_SIDEBAR_WIDTH: u16 = 200;
 const DEFAULT_NOTE_LIST_WIDTH: u16 = 260;
@@ -330,8 +330,8 @@ mod tests {
     #[test]
     fn widths_are_clamped_when_loaded() {
         let settings = Settings::parse("sidebar_width = 5\nnote_list_width = 9000\n");
-        assert_eq!(settings.sidebar_width(), 160);
-        assert_eq!(settings.note_list_width(), 560);
+        assert_eq!(settings.sidebar_width(), 170);
+        assert_eq!(settings.note_list_width(), 500);
     }
 
     #[test]
@@ -339,7 +339,7 @@ mod tests {
         let mut settings = Settings::default();
         settings.set_sidebar_width(1000);
         settings.set_note_list_width(10);
-        assert_eq!(settings.sidebar_width(), 400);
+        assert_eq!(settings.sidebar_width(), 500);
         assert_eq!(settings.note_list_width(), 220);
         settings.set_sidebar_width(200);
         settings.set_note_list_width(300);

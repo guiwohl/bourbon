@@ -1,4 +1,5 @@
 use bourbon_core::{NoteStatus, TagColor};
+use bourbon_ui::{Colors, IconName};
 use gpui_kit::component::ColorName;
 use gpui_kit::{Hsla, rgb};
 
@@ -15,6 +16,16 @@ pub(crate) fn status_label(status: NoteStatus) -> &'static str {
         NoteStatus::OnHold => "On Hold",
         NoteStatus::Completed => "Completed",
         NoteStatus::Dropped => "Dropped",
+    }
+}
+
+pub(crate) fn status_icon(status: NoteStatus, colors: &Colors) -> Option<(IconName, Hsla)> {
+    match status {
+        NoteStatus::None => None,
+        NoteStatus::Active => Some((IconName::CirclePlay, colors.status_active)),
+        NoteStatus::OnHold => Some((IconName::CirclePause, colors.status_on_hold)),
+        NoteStatus::Completed => Some((IconName::CircleCheck, colors.status_completed)),
+        NoteStatus::Dropped => Some((IconName::CircleX, colors.status_dropped)),
     }
 }
 
@@ -50,10 +61,6 @@ pub(crate) fn color_label(color: TagColor) -> String {
         .unwrap_or_default()
 }
 
-pub(crate) fn is_current_color(current: TagColor, option: TagColor) -> bool {
-    current == option
-}
-
 fn rgb_value(color: TagColor) -> u32 {
     match color {
         TagColor::Default => 0x009c_a3af,
@@ -76,6 +83,24 @@ fn rgb_value(color: TagColor) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_notes_with_a_status_get_a_status_icon_in_the_status_colour() {
+        let colors = bourbon_ui::Tokens::light().colors;
+        assert!(status_icon(NoteStatus::None, &colors).is_none());
+        assert_eq!(
+            status_icon(NoteStatus::Completed, &colors),
+            Some((IconName::CircleCheck, colors.status_completed))
+        );
+        let mut icons: Vec<_> = NoteStatus::ALL
+            .into_iter()
+            .filter_map(|status| status_icon(status, &colors))
+            .map(|(icon, _)| icon.file_name())
+            .collect();
+        icons.sort_unstable();
+        icons.dedup();
+        assert_eq!(icons.len(), 4);
+    }
 
     #[test]
     fn a_blank_title_is_shown_as_untitled() {
@@ -109,12 +134,6 @@ mod tests {
             labels,
             ["None", "Active", "On Hold", "Completed", "Dropped"]
         );
-    }
-
-    #[test]
-    fn only_the_current_colour_is_checked() {
-        assert!(is_current_color(TagColor::Red, TagColor::Red));
-        assert!(!is_current_color(TagColor::Red, TagColor::Blue));
     }
 
     #[test]

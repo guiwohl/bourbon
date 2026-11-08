@@ -26,12 +26,21 @@ impl Theme {
     }
 
     #[must_use]
+    pub fn with_tokens(tokens: Tokens, appearance: Appearance) -> Self {
+        Self { tokens, appearance }
+    }
+
+    #[must_use]
     pub fn is_dark(&self) -> bool {
         self.appearance == Appearance::Dark
     }
 
     pub fn install(appearance: Appearance, cx: &mut App) {
         cx.set_global(Self::new(appearance));
+    }
+
+    pub fn install_tokens(tokens: Tokens, appearance: Appearance, cx: &mut App) {
+        cx.set_global(Self::with_tokens(tokens, appearance));
     }
 }
 
@@ -208,6 +217,17 @@ mod tests {
         );
 
         assert!(clicked.get());
+    }
+
+    #[test]
+    fn a_theme_can_carry_custom_tokens_for_its_appearance() {
+        let mut tokens = Tokens::dark();
+        tokens.colors.primary = gpui::red();
+
+        let theme = Theme::with_tokens(tokens, Appearance::Dark);
+
+        assert!(theme.is_dark());
+        assert_eq!(theme.tokens.colors.primary, gpui::red());
     }
 
     #[test]

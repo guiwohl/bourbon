@@ -3,8 +3,8 @@ use std::rc::Rc;
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
     Animation, AnimationExt as _, AnyElement, App, ClickEvent, Div, ElementId, FontWeight, Hsla,
-    InteractiveElement as _, IntoElement, ParentElement as _, RenderOnce, SharedString, Stateful,
-    StatefulInteractiveElement as _, Styled as _, Window, div, ease_out_quint, px,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, RenderOnce, SharedString,
+    Stateful, StatefulInteractiveElement as _, Styled as _, Window, div, ease_out_quint, px,
 };
 
 use crate::button::{ClickHandler, IconButton, IconButtonSize};
@@ -14,6 +14,7 @@ use crate::tokens::Tokens;
 
 type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
 
+const TAG_DOT_DIAMETER: f32 = 10.;
 const COUNT_SIZE: f32 = 10.;
 const COUNT_OPACITY: f32 = 0.6;
 const DISCLOSURE_SIZE: f32 = 12.;
@@ -85,12 +86,29 @@ fn disclosure_toggle(
         })
 }
 
+#[cfg(test)]
+const ACCENT_BAR_SELECTOR: &str = "list-row-accent-bar";
+
+fn accent_bar(width: Pixels, color: Hsla) -> Div {
+    let bar = div()
+        .absolute()
+        .top_0()
+        .bottom_0()
+        .left_0()
+        .w(width)
+        .bg(color);
+    #[cfg(test)]
+    let bar = bar.debug_selector(|| ACCENT_BAR_SELECTOR.to_owned());
+    bar
+}
+
 #[derive(IntoElement)]
 pub struct ListRow {
     id: ElementId,
     label: SharedString,
     icon: Option<IconName>,
     icon_color: Option<Hsla>,
+    dot: Option<Hsla>,
     count: Option<usize>,
     depth: usize,
     disclosure: Option<bool>,
@@ -109,6 +127,7 @@ impl ListRow {
             label: label.into(),
             icon: None,
             icon_color: None,
+            dot: None,
             count: None,
             depth: 0,
             disclosure: None,
@@ -129,6 +148,12 @@ impl ListRow {
     #[must_use]
     pub fn icon_color(mut self, color: Hsla) -> Self {
         self.icon_color = Some(color);
+        self
+    }
+
+    #[must_use]
+    pub fn dot(mut self, color: Hsla) -> Self {
+        self.dot = Some(color);
         self
     }
 
@@ -214,15 +239,10 @@ impl RenderOnce for ListRow {
             .text_color(text)
             .when(shown.tinted, |row| row.bg(colors.selection_inactive))
             .when(shown.bar, |row| {
-                row.child(
-                    div()
-                        .absolute()
-                        .top_0()
-                        .bottom_0()
-                        .left_0()
-                        .w(tokens.scale.sidebar_accent_bar)
-                        .bg(colors.selection_active_sidebar),
-                )
+                row.child(accent_bar(
+                    tokens.scale.sidebar_accent_bar,
+                    colors.selection_active_sidebar,
+                ))
             })
             .children(disclosure)
             .when_some(self.icon, |row, icon| {
@@ -238,6 +258,17 @@ impl RenderOnce for ListRow {
                                 .size(tokens.scale.icon_slot)
                                 .color(icon_color),
                         ),
+                )
+            })
+            .when_some(self.dot, |row, color| {
+                row.child(
+                    div()
+                        .flex()
+                        .flex_none()
+                        .items_center()
+                        .justify_center()
+                        .size(tokens.scale.tag_dot_slot)
+                        .child(div().size(px(TAG_DOT_DIAMETER)).rounded_full().bg(color)),
                 )
             })
             .child(div().flex_1().min_w_0().truncate().child(self.label))
@@ -441,6 +472,57 @@ mod tests {
     fn clicking_the_label_area_selects_the_row_only(cx: &mut TestAppContext) {
         let clicks = Rc::new(RefCell::new(Vec::new()));
         let visual = host(cx, sidebar_row(clicks.clone(), false));
+
+        visual.simulate_click(point(px(100.), px(15.)), Modifiers::none());
+
+        assert_eq!(*clicks.borrow(), ["row"]);
+    }
+
+    fn accent_bar_is_drawn(cx: &mut TestAppContext, selected: bool, pane_focused: bool) -> bool {
+        let visual = host(cx, move || {
+            div()
+                .w(px(200.))
+                .child(
+                    ListRow::new("notebook-work", "Work")
+                        .selected(selected)
+                        .pane_focused(pane_focused),
+                )
+                .into_any_element()
+        });
+        visual.debug_bounds(ACCENT_BAR_SELECTOR).is_some()
+    }
+
+    #[gpui::test]
+    fn the_accent_bar_is_drawn_only_for_a_selected_row_in_a_focused_pane(cx: &mut TestAppContext) {
+        assert!(accent_bar_is_drawn(cx, true, true));
+    }
+
+    #[gpui::test]
+    fn a_selected_row_in_an_unfocused_pane_draws_no_accent_bar(cx: &mut TestAppContext) {
+        assert!(!accent_bar_is_drawn(cx, true, false));
+    }
+
+    #[gpui::test]
+    fn an_unselected_row_draws_no_accent_bar_even_in_a_focused_pane(cx: &mut TestAppContext) {
+        assert!(!accent_bar_is_drawn(cx, false, true));
+    }
+
+    #[gpui::test]
+    fn a_row_with_a_tag_dot_still_selects_from_its_label(cx: &mut TestAppContext) {
+        let clicks = Rc::new(RefCell::new(Vec::new()));
+        let recorded = clicks.clone();
+        let visual = host(cx, move || {
+            let recorded = recorded.clone();
+            div()
+                .w(px(200.))
+                .child(
+                    ListRow::new("tag-idea", "idea")
+                        .dot(gpui::red())
+                        .count(2)
+                        .on_click(move |_, _, _| recorded.borrow_mut().push("row")),
+                )
+                .into_any_element()
+        });
 
         visual.simulate_click(point(px(100.), px(15.)), Modifiers::none());
 

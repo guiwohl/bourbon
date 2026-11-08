@@ -132,6 +132,38 @@ fn popup_labels(cx: &mut TestAppContext, handle: AnyWindowHandle) -> Vec<String>
     .unwrap()
 }
 
+fn menu_labels(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Vec<String> {
+    cx.read(|cx| {
+        view.read(cx)
+            .open_menu
+            .as_ref()
+            .map(|open| {
+                open.menu()
+                    .read(cx)
+                    .entries()
+                    .iter()
+                    .filter_map(|entry| match entry {
+                        bourbon_ui::MenuEntry::Item(item) => Some(item.label.to_string()),
+                        bourbon_ui::MenuEntry::Separator => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    })
+}
+
+fn choose_menu_entry(cx: &mut TestAppContext, handle: AnyWindowHandle, position: usize) {
+    cx.update_window(handle, |_, window, cx| {
+        for _ in 0..=position {
+            window.press("down", cx);
+        }
+        window.press("enter", cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+}
+
 fn click(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) {
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);

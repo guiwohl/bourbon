@@ -1,6 +1,6 @@
 # bourbon-ui
 
-Our own GPUI component kit and Inkdrop-faithful theme tokens (decision: `docs/decisions/2026-11-07-ui-rebuild.md`, values: `docs/research/inkdrop-ui-shell.md`). Depends only on `gpui-pre` (lib name `gpui`); `just architecture` fails if `gpui-kit` or `gpui-component` appear in its tree. `bourbon-app` still renders with `gpui-kit`; only the Inter font registration and the pill text shade are shared so far. Phase 2 migrates the app onto this crate.
+Our own GPUI component kit and Inkdrop-faithful theme tokens (decision: `docs/decisions/2026-11-07-ui-rebuild.md`, values: `docs/research/inkdrop-ui-shell.md`). Depends only on `gpui-pre` (lib name `gpui`); `just architecture` fails if `gpui-kit` or `gpui-component` appear in its tree. `bourbon-app` renders its sidebar and note list columns with this crate (phase 2, slice 1); the editor, control pane and settings still use `gpui-kit` until the next slices.
 
 ## Modules
 
@@ -8,7 +8,7 @@ Our own GPUI component kit and Inkdrop-faithful theme tokens (decision: `docs/de
 |---|---|
 | `tokens` | `Tokens { scale, fonts, colors, shadows }`, `Tokens::light()`, `Tokens::dark()`, `Appearance`. `Scale` is shared (research 2.1 and layout widths), `Colors` has the resolved `light-dark()` pair (2.3, hex from the research conversions, alpha kept as authored), `Fonts` has `Inter` and the mono stack (`Liberation Mono` is the pick on Linux) |
 | `palette` | Hex ramp constants used by the tokens and `solid`, `translucent`, `blended` |
-| `theme` | `Theme { tokens, appearance }` GPUI global, `cx.theme()` via `ThemeExt`, `Theme::install`, `Themed::new(appearance, child)` renders a subtree with the other appearance (used by the gallery) |
+| `theme` | `Theme { tokens, appearance }` GPUI global, `cx.theme()` via `ThemeExt`, `Theme::install`, `Theme::install_tokens` (custom tokens such as the Omarchy mapping), `Themed::new(appearance, child)` renders a subtree with the other appearance (used by the gallery) |
 | `fonts` | `register_fonts(cx)`, `UI_FAMILY`; Inter TTFs and OFL text in `assets/fonts` |
 | `icon` | `IconName` (32 Lucide icons), `Icon` (size, colour, `Stroke`, `bold(accent)`, `quarter_turns`), `IconAssets` (`AssetSource`) |
 | `button` | `Button` (plain, subtle, primary; icon and/or label; disabled, selected) and `IconButton` (header 30 px or accessory 22 px; `tooltip`, `tooltip_action(label, &Action)`) |
@@ -28,6 +28,7 @@ Our own GPUI component kit and Inkdrop-faithful theme tokens (decision: `docs/de
 - Radii: Inkdrop squircles (15 / 24 px) map to 12 / 18 px rounded rectangles (`radius_control`, `radius_large`), the 7 px default stays.
 - GPUI has no CSS transitions: the 0.1 s hover tint is instant; the chevron rotation uses `with_animation` (0.2 s, ease-out quint) and also plays when a row first mounts.
 - No text input yet (editor slice).
+- `ListRow::dot` draws the 10 px tag dot in the 20 px slot; `Pill::compact` is the note-list chip (10 px text, no fixed height); `Menu::entries` exposes the entries; a splitter ignores drags that another splitter started (the drag payload carries its owner id).
 
 ## Gallery
 
