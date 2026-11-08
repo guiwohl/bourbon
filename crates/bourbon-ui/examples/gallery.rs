@@ -299,8 +299,12 @@ fn main() {
             app_id: Some(APP_ID.to_owned()),
             ..WindowOptions::default()
         };
-        cx.open_window(options, |_, cx| cx.new(Gallery::new))
-            .expect("the gallery window opens");
-        cx.activate(true);
+        match cx.open_window(options, |_, cx| cx.new(Gallery::new)) {
+            Ok(_) => cx.activate(true),
+            Err(error) => {
+                eprintln!("bourbon-gallery: cannot open the window: {error}");
+                cx.quit();
+            }
+        }
     });
 }
