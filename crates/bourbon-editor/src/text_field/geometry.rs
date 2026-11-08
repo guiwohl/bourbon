@@ -37,14 +37,11 @@ pub(crate) fn revealing_scroll(
 ) -> Pixels {
     let visible_width = (viewport_width - caret_width).max(px(0.0));
     let max_scroll = (content_width - visible_width).max(px(0.0));
-    let revealed = if caret_x < scroll_x {
-        caret_x
-    } else if caret_x > scroll_x + visible_width {
-        caret_x - visible_width
-    } else {
-        scroll_x
-    };
-    revealed.min(max_scroll).max(px(0.0))
+    scroll_x
+        .min(caret_x)
+        .max(caret_x - visible_width)
+        .min(max_scroll)
+        .max(px(0.0))
 }
 
 #[cfg(test)]
