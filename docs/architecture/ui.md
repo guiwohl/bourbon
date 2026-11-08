@@ -1,6 +1,6 @@
 # bourbon-ui
 
-Our own GPUI component kit and Inkdrop-faithful theme tokens (decision: `docs/decisions/2026-11-07-ui-rebuild.md`, values: `docs/research/inkdrop-ui-shell.md`). Depends only on `gpui-pre` (lib name `gpui`); `just architecture` fails if `gpui-kit` or `gpui-component` appear in its tree. `bourbon-app` renders its sidebar, note list, control pane, settings screen, dialogs and menus with this crate; the editor column moves in PR #38.
+Our own GPUI component kit and Inkdrop-faithful theme tokens (decision: `docs/decisions/2026-11-07-ui-rebuild.md`, values: `docs/research/inkdrop-ui-shell.md`). Depends only on `gpui-pre` (lib name `gpui`); `just architecture` fails if `gpui-kit` or `gpui-component` appear in its tree. `bourbon-app` renders its sidebar, note list, control pane, settings screen, dialogs and menus with this crate; and its editor column.
 
 ## Modules
 
@@ -10,10 +10,10 @@ Our own GPUI component kit and Inkdrop-faithful theme tokens (decision: `docs/de
 | `palette` | Hex ramp constants used by the tokens and `solid`, `translucent`, `blended` |
 | `theme` | `Theme { tokens, appearance }` GPUI global, `cx.theme()` via `ThemeExt`, `Theme::install`, `Theme::install_tokens` (custom tokens such as the Omarchy mapping), `Themed::new(appearance, child)` renders a subtree with the other appearance (used by the gallery) |
 | `fonts` | `register_fonts(cx)`, `UI_FAMILY`; Inter TTFs and OFL text in `assets/fonts` |
-| `icon` | `IconName` (32 Lucide icons), `Icon` (size, colour, `Stroke`, `bold(accent)`, `quarter_turns`), `IconAssets` (`AssetSource`) |
-| `button` | `Button` (plain, subtle, primary, danger = negative fill darkened 10 / 20 % on hover / press; icon and/or label; disabled, selected) and `IconButton` (header 30 px or accessory 22 px; `tooltip`, `tooltip_action(label, &Action)`) |
+| `icon` | `IconName` (34 Lucide icons), `Icon` (size, colour, `Stroke`, `bold(accent)`, `quarter_turns`), `IconAssets` (`AssetSource`) |
+| `button` | `Button` (plain, subtle, primary, danger = negative fill darkened 10 / 20 % on hover / press; icon and/or label; disabled, selected) and `IconButton` (header 32 px with a 22 px icon, or accessory 22 px; `tooltip`, `tooltip_action(label, &Action)`) |
 | `tooltip` | `Tooltip` entity: label plus a `kbd` chip with the live binding (`live_binding` reads the keymap), 11 px, floating shadow |
-| `segmented` | `SegmentedControl` (44 x 28 segments, 1 px border, selected fill plus accent icon, no thumb animation) with `on_change(index)` |
+| `segmented` | `SegmentedControl` (44 x 30 segments, 20 px icons, 1 px border, selected fill plus accent icon, no thumb animation) with `on_change(index)` |
 | `pill` | `Pill` tag chip: tint 15 %, border 30 %, text from `readable::pill_text_color` (WCAG 4.5 contrast search, moved from the app with its tests) |
 | `list_row` | `ListRow` (30 px min height, left padding 14 + 12 per depth, icon slot 16, count, disclosure chevron rotating over 0.2 s, accessories revealed on row hover, no hover background) and `SectionHeader` (12 px label, accessories, collapse). `accent(selected, pane_focused)`: tint when selected, 5 px left bar only when the pane is focused |
 | `modal` | `Modal::new(id, content)`: deferred full-window layer on the 30 % black backdrop, `Placement::Centered` or `Top(px)`, `track_focus(handle)`, `on_dismiss` (backdrop mouse down, Esc) and `on_submit` (Enter). Key context `BourbonModal`, actions `Dismiss`, `Submit`; `bourbon_ui::init` binds them |

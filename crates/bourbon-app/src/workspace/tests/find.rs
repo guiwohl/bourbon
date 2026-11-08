@@ -1,83 +1,83 @@
-use gpui::TestAppContext;
+use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
 
-use super::view_modes::{focus_body, is_rendered, mode};
-use super::{click, open_view, press, seeded_store};
+use super::view_modes::{focus_body, is_rendered, mode, press};
+use super::{click, open_view, seeded_store};
+use crate::workspace::Workspace;
 use bourbon_core::ViewMode;
 
-#[gpui::test]
-fn ctrl_f_in_the_editor_opens_find(cx: &mut TestAppContext) {
-    let (store, _) = seeded_store();
-    let (handle, view) = open_view(cx, store);
-    focus_body(cx, handle, &view);
-
-    press(cx, handle, "ctrl-f");
-
-    cx.read(|cx| {
-        let editor = &view.read(cx).editor;
-        assert!(editor.search_is_open(cx));
-        assert!(!editor.search_is_replacing(cx));
-    });
+fn body_has_focus(
+    cx: &mut TestAppContext,
+    handle: AnyWindowHandle,
+    view: &Entity<Workspace>,
+) -> bool {
+    cx.update_window(handle, |_, window, cx| {
+        let body = view
+            .read(cx)
+            .editor
+            .body_editor()
+            .read(cx)
+            .focus_handle()
+            .clone();
+        body.is_focused(window)
+    })
+    .unwrap()
 }
 
 #[gpui::test]
-fn ctrl_h_in_the_editor_opens_find_with_replace(cx: &mut TestAppContext) {
-    let (store, _) = seeded_store();
-    let (handle, view) = open_view(cx, store);
-    focus_body(cx, handle, &view);
-
-    press(cx, handle, "ctrl-h");
-
-    cx.read(|cx| {
-        let editor = &view.read(cx).editor;
-        assert!(editor.search_is_open(cx));
-        assert!(editor.search_is_replacing(cx));
-    });
-}
-
-#[gpui::test]
-fn ctrl_f_from_the_title_field_still_opens_find_in_the_body(cx: &mut TestAppContext) {
+fn ctrl_f_from_the_title_field_moves_to_the_body(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
     click(cx, handle, "title");
+    assert!(!body_has_focus(cx, handle, &view));
 
     press(cx, handle, "ctrl-f");
 
-    cx.read(|cx| assert!(view.read(cx).editor.search_is_open(cx)));
+    assert!(body_has_focus(cx, handle, &view));
 }
 
 #[gpui::test]
-fn ctrl_h_from_the_title_field_opens_replace(cx: &mut TestAppContext) {
+fn ctrl_h_from_the_title_field_moves_to_the_body(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
     click(cx, handle, "title");
 
     press(cx, handle, "ctrl-h");
 
-    cx.read(|cx| assert!(view.read(cx).editor.search_is_replacing(cx)));
+    assert!(body_has_focus(cx, handle, &view));
 }
 
 #[gpui::test]
 fn find_from_the_preview_returns_to_the_editor(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
-    click(cx, handle, "view-mode-preview");
+    super::choose_view_mode(cx, handle, ViewMode::Preview);
     assert!(!is_rendered(cx, handle, "body-editor"));
 
     press(cx, handle, "ctrl-f");
 
     assert_eq!(mode(cx, &view), ViewMode::Edit);
     assert!(is_rendered(cx, handle, "body-editor"));
-    cx.read(|cx| assert!(view.read(cx).editor.search_is_open(cx)));
+    assert!(body_has_focus(cx, handle, &view));
 }
 
 #[gpui::test]
 fn find_from_side_by_side_keeps_the_mode(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
-    click(cx, handle, "view-mode-side-by-side");
+    super::choose_view_mode(cx, handle, ViewMode::SideBySide);
+    focus_body(cx, handle, &view);
 
     press(cx, handle, "ctrl-f");
 
     assert_eq!(mode(cx, &view), ViewMode::SideBySide);
-    cx.read(|cx| assert!(view.read(cx).editor.search_is_open(cx)));
+    assert!(body_has_focus(cx, handle, &view));
+}
+
+#[gpui::test]
+fn find_without_an_open_note_does_nothing(cx: &mut TestAppContext) {
+    let (handle, view) = open_view(cx, bourbon_core::NoteStore::open_in_memory().unwrap());
+
+    press(cx, handle, "ctrl-f");
+
+    assert!(!body_has_focus(cx, handle, &view));
 }

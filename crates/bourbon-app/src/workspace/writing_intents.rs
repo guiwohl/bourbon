@@ -3,7 +3,7 @@ use bourbon_core::{NoteId, StoreError, format_note_link, parse_note_link};
 use gpui::{Context, Window};
 
 use super::{Workspace, load_note};
-use crate::editor::{LinkPicker, MAX_SUGGESTIONS, tasks};
+use crate::editor::{LinkPicker, MAX_SUGGESTIONS};
 use crate::editor::{closing_brackets_after, link_query_before_cursor};
 use crate::navigation::Navigation;
 use crate::presentation::display_title;
@@ -31,33 +31,16 @@ impl Workspace {
         self.set_view_mode(self.view_mode.next(), window, cx);
     }
 
-    pub(crate) fn toggle_task_on_line(
-        &mut self,
-        line: usize,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let body = self.editor.body(cx);
-        if let Some(edit) = tasks::toggle_task_on_line(&body, line) {
-            self.edit_body(&edit, window, cx);
-        }
+    pub(crate) fn leave_title(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.focus_body(window, cx);
     }
 
-    pub(crate) fn toggle_task_at_cursor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let body = self.editor.body(cx);
-        let cursor = self.editor.cursor(cx);
-        if let Some(edit) = tasks::toggle_task_at_offset(&body, cursor) {
-            self.edit_body(&edit, window, cx);
-        }
-    }
-
-    fn edit_body(&mut self, edit: &tasks::TextEdit, window: &mut Window, cx: &mut Context<Self>) {
-        self.editor.apply_edit(edit, window, cx);
-        self.restart_autosave(cx);
-        cx.notify();
+    pub(crate) fn toggle_task_on_line(&mut self, line: usize, cx: &mut Context<Self>) {
+        self.editor.toggle_task_on_line(line, cx);
     }
 
     pub(crate) fn body_edited(&mut self, cx: &mut Context<Self>) {
+        self.editor.refresh_preview(cx);
         self.restart_autosave(cx);
         let before_cursor = self.editor.text_before_cursor(cx);
         self.editor.link_picker = link_query_before_cursor(&before_cursor).and_then(|query| {
@@ -112,45 +95,58 @@ impl Workspace {
         let link = format_note_link(display_title(&note.title), &note.id);
         let end =
             self.editor.cursor(cx) + closing_brackets_after(&self.editor.text_after_cursor(cx));
-        self.editor
-            .replace_range(picker.start..end, &link, window, cx);
+        self.editor.replace_range(picker.start..end, &link, cx);
         self.editor.focus_body(window, cx);
         self.restart_autosave(cx);
         cx.notify();
     }
 
-    pub(crate) fn open_link(&mut self, url: &str, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn open_link(&mut self, url: &str, cx: &mut Context<Self>) {
         match parse_note_link(url) {
-            Some(id) => self.open_linked_note(&id, window, cx),
+            Some(id) => self.open_linked_note(&id, cx),
             None => cx.open_url(url),
         }
     }
 
-    fn open_linked_note(&mut self, id: &NoteId, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn open_note_by_id(&mut self, id: &str, cx: &mut Context<Self>) {
+        if let Ok(id) = NoteId::parse(id) {
+            self.open_linked_note(&id, cx);
+        }
+    }
+
+    pub(crate) fn editor_scrolled(&mut self, cx: &mut Context<Self>) {
+        if self.view_mode == ViewMode::SideBySide {
+            self.editor.follow_editor_scroll(cx);
+        }
+    }
+
+    pub(crate) fn preview_scrolled(&mut self, cx: &mut Context<Self>) {
+        if self.view_mode == ViewMode::SideBySide {
+            self.editor.follow_preview_scroll(cx);
+        }
+    }
+
+    fn open_linked_note(&mut self, id: &NoteId, cx: &mut Context<Self>) {
         self.flush_then(cx, |this, cx| match load_live_note(this, id) {
             Ok(note) => {
                 if !this.notes.iter().any(|listed| listed.id == note.id) {
                     this.navigate(Navigation::AllNotes, cx);
                 }
-                this.show(note, window, cx);
+                this.show(note, cx);
             }
             Err(error) => this.report(&error, cx),
         });
     }
 
-    pub(crate) fn find_in_note(
-        &mut self,
-        replace_mode: bool,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub(crate) fn find_in_note(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.selected.is_none() {
             return;
         }
-        if !self.view_mode.shows_editor() {
+        if self.view_mode.shows_editor() {
+            self.editor.focus_body(window, cx);
+        } else {
             self.set_view_mode(ViewMode::Edit, window, cx);
         }
-        self.editor.open_search(replace_mode, window, cx);
     }
 
     pub(crate) fn toggle_focus_mode(&mut self, window: &mut Window, cx: &mut Context<Self>) {

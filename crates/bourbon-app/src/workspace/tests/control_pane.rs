@@ -434,7 +434,7 @@ fn the_move_to_notebook_action_opens_the_notebook_selector(cx: &mut TestAppConte
 
     run_action(cx, handle, "move to notebook");
 
-    assert!(view.read_with(cx, |view, _| view.editor.notebook_selector_is_open()));
+    assert_eq!(super::menu_labels(cx, &view), ["Inbox"]);
 }
 
 #[gpui::test]

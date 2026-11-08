@@ -26,7 +26,9 @@ pub use actions::{KEY_CONTEXT, bind_editor_keys};
 pub use editor::{Editor, EditorEvent};
 pub use element::EditorElement;
 pub use fonts::{MONO_FAMILY, register_editor_fonts};
-pub use preview::{BlockLayout, PreviewEvent, PreviewView, block_layouts, gap_between};
+pub use preview::{
+    BlockLayout, PreviewEvent, PreviewView, block_layouts, gap_between, scroll_anchors,
+};
 pub use preview_theme::PreviewTheme;
 pub use text_field::{TEXT_FIELD_CONTEXT, TextField, TextFieldEvent, bind_text_field_keys};
 pub use theme::{EditorTheme, TokenStyle};

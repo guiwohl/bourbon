@@ -95,8 +95,8 @@ impl Workspace {
     ) -> Self {
         let settings = locations.settings.load();
         theme::apply(&settings, &locations.omarchy_colors, cx);
-        let editor = EditorPane::new(window, cx);
-        let mut subscriptions = editor.subscribe_to_edits(cx);
+        let editor = EditorPane::new(cx);
+        let mut subscriptions = editor.subscribe_to_edits(window, cx);
         subscriptions.push(cx.on_app_quit(|view, cx| {
             view.flush_before_closing(cx);
             std::future::ready(())
@@ -162,7 +162,7 @@ impl Workspace {
         view.reload_list(cx);
         view.reload_sidebar(cx);
         if let Some(most_recent) = view.notes.first().map(|summary| summary.id.clone()) {
-            view.select(&most_recent, window, cx);
+            view.select(&most_recent, cx);
         }
         window.focus(&view.focus_handle, cx);
         view
@@ -279,9 +279,9 @@ impl Workspace {
         }
     }
 
-    pub(crate) fn select(&mut self, id: &NoteId, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn select(&mut self, id: &NoteId, cx: &mut Context<Self>) {
         self.flush_then(cx, |this, cx| match load_note(&this.store, id) {
-            Ok(note) => this.show(note, window, cx),
+            Ok(note) => this.show(note, cx),
             Err(error) => this.report(&error, cx),
         });
     }
@@ -347,7 +347,7 @@ impl Workspace {
         self.refresh_listing(cx);
         match created {
             Ok(note) => {
-                self.show(note, window, cx);
+                self.show(note, cx);
                 self.editor.focus_title(window, cx);
             }
             Err(error) => self.report(&error, cx),
@@ -375,10 +375,10 @@ impl Workspace {
         })
     }
 
-    fn show(&mut self, note: Note, window: &mut Window, cx: &mut Context<Self>) {
+    fn show(&mut self, note: Note, cx: &mut Context<Self>) {
         self.settings_open = false;
         self.editor.link_picker = None;
-        self.editor.load(note.clone(), window, cx);
+        self.editor.load(&note, cx);
         self.history.visit(&note.id);
         if let Some(position) = self.notes.iter().position(|listed| listed.id == note.id) {
             note_list::reveal(&self.note_list_state, position);
@@ -416,8 +416,11 @@ impl Workspace {
                     &EditorView {
                         notebooks: &self.notebooks,
                         tags: &self.tags,
-                        mode: self.view_mode,
-                        focus_mode: self.focus_mode,
+                        toolbar: editor::toolbar_data(
+                            self.view_mode,
+                            self.focus_mode,
+                            &self.history,
+                        ),
                     },
                     cx,
                 )
@@ -601,6 +604,7 @@ impl Workspace {
 
 impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.editor.sync_theme(cx);
         let body = if self.settings_open {
             self.settings_screen(cx)
         } else {

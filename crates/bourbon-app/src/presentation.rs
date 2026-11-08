@@ -1,7 +1,6 @@
 use bourbon_core::{NoteStatus, TagColor};
 use bourbon_ui::{Colors, IconName};
 use gpui::{Hsla, rgb};
-use gpui_kit::component::ColorName;
 
 pub(crate) const UNTITLED: &str = "Untitled";
 
@@ -26,25 +25,6 @@ pub(crate) fn status_icon(status: NoteStatus, colors: &Colors) -> Option<(IconNa
         NoteStatus::OnHold => Some((IconName::CirclePause, colors.status_on_hold)),
         NoteStatus::Completed => Some((IconName::CircleCheck, colors.status_completed)),
         NoteStatus::Dropped => Some((IconName::CircleX, colors.status_dropped)),
-    }
-}
-
-pub(crate) fn chip_color(color: TagColor) -> ColorName {
-    match color {
-        TagColor::Default => ColorName::Gray,
-        TagColor::Red => ColorName::Red,
-        TagColor::Orange => ColorName::Orange,
-        TagColor::Yellow => ColorName::Yellow,
-        TagColor::Olive => ColorName::Lime,
-        TagColor::Green => ColorName::Green,
-        TagColor::Teal => ColorName::Teal,
-        TagColor::Blue => ColorName::Blue,
-        TagColor::Violet => ColorName::Violet,
-        TagColor::Purple => ColorName::Purple,
-        TagColor::Pink => ColorName::Pink,
-        TagColor::Brown => ColorName::Amber,
-        TagColor::Grey => ColorName::Neutral,
-        TagColor::Black => ColorName::Black,
     }
 }
 
@@ -122,17 +102,6 @@ mod tests {
         values.sort_unstable();
         values.dedup();
         assert_eq!(values.len(), TagColor::ALL.len());
-    }
-
-    #[test]
-    fn every_tag_colour_has_its_own_chip_colour() {
-        let mut names: Vec<_> = TagColor::ALL
-            .into_iter()
-            .map(|color| format!("{:?}", chip_color(color)))
-            .collect();
-        names.sort_unstable();
-        names.dedup();
-        assert_eq!(names.len(), TagColor::ALL.len());
     }
 
     #[test]

@@ -89,13 +89,15 @@ impl RenderOnce for SegmentedControl {
                     .w(tokens.scale.segment_width)
                     .h(tokens.scale.segment_height)
                     .cursor_pointer()
-                    .child(Icon::new(segment.icon).size(tokens.scale.icon_slot).color(
-                        if is_selected {
-                            colors.primary
-                        } else {
-                            colors.muted_text
-                        },
-                    ))
+                    .child(
+                        Icon::new(segment.icon)
+                            .size(tokens.scale.segment_icon)
+                            .color(if is_selected {
+                                colors.primary
+                            } else {
+                                colors.muted_text
+                            }),
+                    )
                     .tooltip(move |_, cx| Tooltip::text(label.clone(), cx));
                 button = if is_selected {
                     button.bg(colors.button_active_background)

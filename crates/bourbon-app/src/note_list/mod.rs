@@ -21,6 +21,7 @@ use crate::workspace::Workspace;
 
 pub(crate) use filter::narrow;
 use header::ListView;
+pub(crate) use row::note_menu;
 
 gpui::actions!(bourbon, [SelectPreviousNote, SelectNextNote]);
 
@@ -122,13 +123,11 @@ pub(crate) fn render(data: &NoteListData, cx: &mut Context<Workspace>) -> impl I
                 .id("note-list")
                 .key_context("NoteList")
                 .track_focus(data.focus)
-                .on_action(
-                    cx.listener(|workspace, _: &SelectPreviousNote, window, cx| {
-                        workspace.select_adjacent_note(Step::Previous, window, cx);
-                    }),
-                )
-                .on_action(cx.listener(|workspace, _: &SelectNextNote, window, cx| {
-                    workspace.select_adjacent_note(Step::Next, window, cx);
+                .on_action(cx.listener(|workspace, _: &SelectPreviousNote, _, cx| {
+                    workspace.select_adjacent_note(Step::Previous, cx);
+                }))
+                .on_action(cx.listener(|workspace, _: &SelectNextNote, _, cx| {
+                    workspace.select_adjacent_note(Step::Next, cx);
                 }))
                 .flex_1()
                 .min_h_0()

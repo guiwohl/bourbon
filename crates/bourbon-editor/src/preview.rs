@@ -2,12 +2,12 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use bourbon_markdown::{
-    AlertKind, Alignment, Block, BlockKind, Inline, ListItem, PreviewDoc, SourceLines,
+    AlertKind, Alignment, Anchor, Block, BlockKind, Inline, ListItem, PreviewDoc, SourceLines,
 };
 use gpui::{
     AnyElement, Bounds, Context, CursorStyle, Entity, EventEmitter, FontWeight, InteractiveText,
-    IntoElement, ParentElement, Pixels, Render, StatefulInteractiveElement, Styled, StyledText,
-    Window, div, prelude::*, px, relative,
+    IntoElement, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled,
+    StyledText, Window, div, point, prelude::*, px, relative,
 };
 
 use crate::inline::{LinkTarget, flatten_inlines};
@@ -24,7 +24,10 @@ pub enum PreviewEvent {
     ToggleTask { source_line: usize },
     OpenLink(String),
     OpenNote(String),
+    Scrolled,
 }
+
+const PADDING: f32 = 10.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BlockLayout {
@@ -38,6 +41,8 @@ pub struct PreviewView {
     theme: Rc<PreviewTheme>,
     rendered_lines: Vec<SourceLines>,
     layouts: Vec<BlockLayout>,
+    scroll: ScrollHandle,
+    reported_scroll: Pixels,
 }
 
 impl EventEmitter<PreviewEvent> for PreviewView {}
@@ -70,6 +75,18 @@ pub fn block_layouts(lines: &[SourceLines], bounds: &[Bounds<Pixels>]) -> Vec<Bl
         .collect()
 }
 
+pub fn scroll_anchors(layouts: &[BlockLayout]) -> Vec<Anchor> {
+    layouts
+        .iter()
+        .map(|layout| Anchor {
+            line_start: layout.source_lines.0,
+            line_end: layout.source_lines.1,
+            top: f32::from(layout.top) + PADDING,
+            height: f32::from(layout.height),
+        })
+        .collect()
+}
+
 impl PreviewView {
     pub fn new(source: &str, theme: PreviewTheme, _cx: &mut Context<Self>) -> Self {
         Self {
@@ -77,6 +94,33 @@ impl PreviewView {
             theme: Rc::new(theme),
             rendered_lines: Vec::new(),
             layouts: Vec::new(),
+            scroll: ScrollHandle::new(),
+            reported_scroll: px(0.0),
+        }
+    }
+
+    pub fn doc(&self) -> &PreviewDoc {
+        &self.doc
+    }
+
+    pub fn scroll_top(&self) -> Pixels {
+        -self.scroll.offset().y
+    }
+
+    pub fn set_scroll_top(&mut self, top: Pixels, cx: &mut Context<Self>) {
+        self.scroll.set_offset(point(px(0.0), -top.max(px(0.0))));
+        cx.notify();
+    }
+
+    pub fn scroll_anchors(&self) -> Vec<Anchor> {
+        scroll_anchors(&self.layouts)
+    }
+
+    fn report_scroll(&mut self, cx: &mut Context<Self>) {
+        let top = self.scroll_top();
+        if top != self.reported_scroll {
+            self.reported_scroll = top;
+            cx.emit(PreviewEvent::Scrolled);
         }
     }
 
@@ -130,6 +174,7 @@ impl Render for PreviewView {
             .id("bourbon-preview")
             .size_full()
             .overflow_y_scroll()
+            .track_scroll(&self.scroll)
             .bg(theme.background)
             .text_color(theme.text)
             .font_family(theme.font_family.clone())
@@ -139,9 +184,12 @@ impl Render for PreviewView {
                 div()
                     .flex()
                     .flex_col()
-                    .p(px(10.0))
+                    .p(px(PADDING))
                     .on_children_prepainted(move |bounds, _, cx| {
-                        view.update(cx, |preview, _| preview.record_layouts(&bounds));
+                        view.update(cx, |preview, cx| {
+                            preview.record_layouts(&bounds);
+                            preview.report_scroll(cx);
+                        });
                     })
                     .children(children),
             )
@@ -451,6 +499,39 @@ mod tests {
 
     fn kind(source: &str) -> BlockKind {
         PreviewDoc::parse(source).blocks.remove(0).kind
+    }
+
+    #[test]
+    fn scroll_anchors_carry_the_lines_and_sit_below_the_padding() {
+        let layouts = [
+            BlockLayout {
+                source_lines: (0, 1),
+                top: px(0.0),
+                height: px(30.0),
+            },
+            BlockLayout {
+                source_lines: (3, 5),
+                top: px(46.0),
+                height: px(20.0),
+            },
+        ];
+        assert_eq!(
+            scroll_anchors(&layouts),
+            [
+                Anchor {
+                    line_start: 0,
+                    line_end: 1,
+                    top: 10.0,
+                    height: 30.0,
+                },
+                Anchor {
+                    line_start: 3,
+                    line_end: 5,
+                    top: 56.0,
+                    height: 20.0,
+                },
+            ]
+        );
     }
 
     #[test]

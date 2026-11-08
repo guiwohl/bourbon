@@ -171,3 +171,48 @@ fn headings_are_sized_by_level(cx: &mut TestAppContext) {
     assert!((f32::from(blocks[0].height) - (40.0 + 9.6 + 2.0)).abs() < 0.1);
     assert!((f32::from(blocks[1].height) - 25.0).abs() < 0.1);
 }
+
+fn tall_document() -> String {
+    "Paragraph\n\n".repeat(80)
+}
+
+#[gpui::test]
+fn setting_the_scroll_top_scrolls_and_reports_it(cx: &mut TestAppContext) {
+    let (preview, cx) = open(cx, &tall_document());
+    let seen = record(&preview, cx);
+    preview.update(cx, |preview, cx| {
+        preview.set_scroll_top(gpui::px(200.0), cx);
+    });
+    cx.run_until_parked();
+    assert_eq!(
+        preview.read_with(cx, |preview, _| preview.scroll_top()),
+        gpui::px(200.0)
+    );
+    assert_eq!(seen.borrow().as_slice(), [PreviewEvent::Scrolled]);
+}
+
+#[gpui::test]
+fn an_unscrolled_preview_reports_nothing(cx: &mut TestAppContext) {
+    let (preview, cx) = open(cx, &tall_document());
+    let seen = record(&preview, cx);
+    preview.update(cx, |_, cx| cx.notify());
+    cx.run_until_parked();
+    assert!(seen.borrow().is_empty());
+}
+
+#[gpui::test]
+fn the_anchors_follow_the_rendered_blocks(cx: &mut TestAppContext) {
+    let (preview, cx) = open(cx, "# Title\n\nParagraph text.\n");
+    let anchors = preview.read_with(cx, |preview, _| preview.scroll_anchors());
+    assert_eq!(anchors.len(), 2);
+    assert_eq!((anchors[0].line_start, anchors[1].line_start), (0, 2));
+    assert!((anchors[0].top - 10.0).abs() < 0.05);
+}
+
+#[gpui::test]
+fn the_document_is_the_parsed_source(cx: &mut TestAppContext) {
+    let (preview, cx) = open(cx, "one\n\ntwo\n");
+    preview.update(cx, |preview, cx| preview.set_source("only\n", cx));
+    let blocks = preview.read_with(cx, |preview, _| preview.doc().blocks.len());
+    assert_eq!(blocks, 1);
+}

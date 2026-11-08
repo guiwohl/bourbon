@@ -78,9 +78,11 @@ impl Element for EditorElement {
         window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
-        let frame = self
-            .editor
-            .update(cx, |editor, _| editor.build_frame(bounds, window));
+        let frame = self.editor.update(cx, |editor, cx| {
+            let frame = editor.build_frame(bounds, window);
+            editor.report_scroll(cx);
+            frame
+        });
         if frame.measuring_pending {
             window.request_animation_frame();
         }

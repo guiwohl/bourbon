@@ -13,7 +13,7 @@ use crate::editor::actions::{
     CycleViewMode, ExitFocusMode, FindInNote, HistoryBack, HistoryForward, LinkPickCancel,
     LinkPickConfirm, LinkPickNext, LinkPickPrevious, OpenNotebookSelector, ReplaceInNote,
     SetStatusActive, SetStatusCompleted, SetStatusDropped, SetStatusNone, SetStatusOnHold,
-    ToggleFocusMode, ToggleTaskAtCursor,
+    TagSuggestionNext, TagSuggestionPrevious, ToggleFocusMode,
 };
 use crate::fonts;
 use crate::locations::Locations;
@@ -54,6 +54,7 @@ pub(crate) fn run(store: NoteStore, locations: Locations, focus_requests: Receiv
         .run(move |cx| {
             gpui_kit::init(cx);
             fonts::register(cx);
+            bourbon_editor::register_editor_fonts(cx);
             bind_keys(cx);
             let opened = gpui_kit::open_window(window_options(&CURRENT), cx, |window, cx| {
                 build_workspace(store, locations, window, cx)
@@ -87,6 +88,7 @@ fn forward_focus_requests(window: AnyWindowHandle, focus_requests: Receiver<()>,
 pub(crate) fn bind_keys(cx: &mut App) {
     bourbon_ui::init(cx);
     bourbon_editor::bind_text_field_keys(cx);
+    bourbon_editor::bind_editor_keys(cx);
     cx.bind_keys([
         KeyBinding::new("ctrl-n", NewNote, None),
         KeyBinding::new("ctrl-/", ToggleSidebar, None),
@@ -109,14 +111,19 @@ pub(crate) fn bind_keys(cx: &mut App) {
         KeyBinding::new("ctrl-shift-f", ToggleFocusMode, Some("Input")),
         KeyBinding::new("escape", ExitFocusMode, None),
         KeyBinding::new(
-            "ctrl-enter",
-            ToggleTaskAtCursor,
-            Some("Input && mode == editor"),
+            "down",
+            TagSuggestionNext,
+            Some("TagInput > BourbonTextField"),
         ),
-        KeyBinding::new("up", LinkPickPrevious, Some("LinkPicker > Input")),
-        KeyBinding::new("down", LinkPickNext, Some("LinkPicker > Input")),
-        KeyBinding::new("enter", LinkPickConfirm, Some("LinkPicker > Input")),
-        KeyBinding::new("escape", LinkPickCancel, Some("LinkPicker > Input")),
+        KeyBinding::new(
+            "up",
+            TagSuggestionPrevious,
+            Some("TagInput > BourbonTextField"),
+        ),
+        KeyBinding::new("up", LinkPickPrevious, Some("LinkPicker > BourbonEditor")),
+        KeyBinding::new("down", LinkPickNext, Some("LinkPicker > BourbonEditor")),
+        KeyBinding::new("enter", LinkPickConfirm, Some("LinkPicker > BourbonEditor")),
+        KeyBinding::new("escape", LinkPickCancel, Some("LinkPicker > BourbonEditor")),
         KeyBinding::new("down", HighlightNext, Some(control_pane::KEY_CONTEXT)),
         KeyBinding::new("up", HighlightPrevious, Some(control_pane::KEY_CONTEXT)),
         KeyBinding::new("up", SelectPreviousNote, Some("NoteList")),

@@ -5,6 +5,8 @@ use bourbon_text::commands::{
 };
 use bourbon_text::movement::next_word_boundary;
 use bourbon_text::{EditorState, Selection, SelectionRange, Transaction, TransactionKind};
+use std::ops::Range;
+
 use gpui::{ClipboardItem, Context, Pixels, Window, point, px};
 
 use crate::editor::{Editor, line_height_of};
@@ -152,6 +154,15 @@ impl Editor {
         }
         let offset = self.state.text.line_start(line);
         self.run_command(|state| toggle_task_at(state, offset), cx);
+    }
+
+    pub fn replace_range(&mut self, range: Range<usize>, text: &str, cx: &mut Context<Self>) {
+        let length = self.state.text.len();
+        self.state.selection = Selection::single(SelectionRange::new(
+            range.start.min(length),
+            range.end.min(length),
+        ));
+        self.run_command(|state| insert_text(state, text), cx);
     }
 
     pub(crate) fn copy(&mut self, cx: &mut Context<Self>) -> bool {
