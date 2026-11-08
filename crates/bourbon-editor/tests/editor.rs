@@ -399,6 +399,11 @@ fn line_numbers_shift_the_text_and_are_off_by_default(cx: &mut TestAppContext) {
     assert_eq!(selection(&editor, cx), 0..0);
 }
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn rows_in(height: f32) -> usize {
+    (height / LINE_HEIGHT).floor() as usize
+}
+
 fn long_document() -> String {
     "line\n".repeat(200)
 }
@@ -633,7 +638,7 @@ fn down_inside_a_wrapped_line_advances_one_row_at_a_time(cx: &mut TestAppContext
 fn page_down_and_up_move_by_the_visible_rows(cx: &mut TestAppContext) {
     let (editor, cx) = open(cx, &long_document());
     let height = cx.update(|window, _| window.viewport_size().height);
-    let page = (f32::from(height) / LINE_HEIGHT).floor() as usize - 1;
+    let page = rows_in(f32::from(height)) - 1;
     cx.simulate_keystrokes("pagedown");
     assert_eq!(selection(&editor, cx).start, page * 5);
     cx.simulate_keystrokes("pageup");

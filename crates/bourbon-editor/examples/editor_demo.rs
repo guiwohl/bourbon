@@ -49,10 +49,10 @@ fn reflow(rows: &[Row]) -> usize {
 ";
 
 const FONTS: [&[u8]; 4] = [
-    include_bytes!("../../../assets/fonts/Inter-Regular.ttf"),
-    include_bytes!("../../../assets/fonts/Inter-Medium.ttf"),
-    include_bytes!("../../../assets/fonts/Inter-SemiBold.ttf"),
-    include_bytes!("../../../assets/fonts/Inter-Bold.ttf"),
+    include_bytes!("../../bourbon-ui/assets/fonts/Inter-Regular.ttf"),
+    include_bytes!("../../bourbon-ui/assets/fonts/Inter-Medium.ttf"),
+    include_bytes!("../../bourbon-ui/assets/fonts/Inter-SemiBold.ttf"),
+    include_bytes!("../../bourbon-ui/assets/fonts/Inter-Bold.ttf"),
 ];
 
 struct Demo {
