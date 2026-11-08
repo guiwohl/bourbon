@@ -17,6 +17,8 @@ Grey-scale row and column ink profiles of the crop (count of pixels darker than 
 | Text inset | x = 55, 8 px after the gutter | `line_padding` 8 px |
 | Code card | x 50 to 415 (3 px inset), 1 px slate-300 at 50% border, rounded ends, text at +2 px, first and last line 4 px taller | `block_padding` 10, `card_inset` 3, `card_padding_y` 4, radius 0.4 em, `code_background` slate-200 at 50%, `code_border` slate-300 at 50% |
 | Inline code | box with the card colours around code and backticks | same colours, 1 px outset, row height |
+| Ink | line 17 holds 139k grey levels of ink over a (235) background; Linux rendering of gray-800 gave 187k | foreground slate-600 (71,85,105): 158k. The darkest reference pixel is still gray-800, the thinner macOS stems make it read lighter |
+| Card tint | card fill 5 levels and border 17 levels darker than the page | `code_background` slate-200 at 30%, `code_border` slate-300 at 40% |
 | Colours | `##` and fences blue-600 (36,99,235), heading pink-600 (219,41,121), list marks indigo-500 (100,103,242), text gray-800 (31,41,55) | unchanged tokens |
 | Math | `$` and `\times` blue-600, formula text gray-800 | `MathMark` (delimiters and `\commands`) in `mark`, `Math` in the foreground |
 | Ligatures | `->`, `==` drawn as separate glyphs | `calt` and `liga` off on every editor and preview code font |
@@ -28,7 +30,9 @@ Grey-scale row and column ink profiles of the crop (count of pixels darker than 
 | Body | cap height 12 px, x-height 9 px, pitch 23 to 24 px; a 54 character line is 381 px wide | Inter 15 px, line height 1.55 (23.25 px), same line breaks as the reference |
 | h2 | cap height 17 px | 24 px (headings scale from a 16 px base, `heading_base_size`) |
 | Code block | advance 8.41 px, pitch 20 px, text 17 px from the left border, lines wrap | JetBrains Mono 14 px, line height 1.45, padding 16, wrapped |
-| Lists | marker right edge to text 6 px, items 28 px apart | 2 em indent, 0.25 em item gap |
+| Lists | marker right edge to text 6 px, items 28 px apart | 2 em indent, 0.3 em item gap (27.75 px) |
+| Size check | body line 1 spans rows 11 to 25 (cap to descender), h2 "Repro" rows 82 to 103 | Inter 15: rows 16 to 29, h2 rows 87 to 108: same glyph heights, a 16 px body would wrap "freezes" onto the next line |
+| Code card | border 14 levels darker than its fill, first text row 22 px below the top border | `code_border` slate-300 at 35%, padding 16 (also 22 px) |
 
 ## Known differences
 

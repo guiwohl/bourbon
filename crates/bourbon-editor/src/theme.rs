@@ -93,7 +93,7 @@ fn hsl_alpha(hue: f32, saturation: f32, lightness: f32, alpha: f32) -> Hsla {
 impl EditorTheme {
     pub fn light() -> Self {
         Self {
-            foreground: hsl(215.0, 28.0, 17.0),
+            foreground: hsl(215.0, 19.0, 35.0),
             background: hsl(0.0, 0.0, 100.0),
             caret: hsl(262.0, 83.0, 58.0),
             selection: hsl_alpha(262.0, 83.0, 58.0, 0.30),
@@ -107,8 +107,8 @@ impl EditorTheme {
             quote: hsl(215.0, 19.0, 35.0),
             link: hsl(175.0, 84.0, 32.0),
             comment: hsl(215.0, 20.0, 65.0),
-            code_background: hsl_alpha(214.0, 32.0, 91.0, 0.50),
-            code_border: hsl_alpha(213.0, 27.0, 84.0, 0.50),
+            code_background: hsl_alpha(214.0, 32.0, 91.0, 0.30),
+            code_border: hsl_alpha(213.0, 27.0, 84.0, 0.40),
             quote_bar: hsl(215.0, 20.0, 65.0),
             ..Self::base()
         }
@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn colours_are_converted_from_hsl_degrees_and_percent() {
         let light = EditorTheme::light();
-        assert_eq!(light.foreground, hsla(215.0 / 360.0, 0.28, 0.17, 1.0));
+        assert_eq!(light.foreground, hsla(215.0 / 360.0, 0.19, 0.35, 1.0));
         assert_eq!(light.selection, hsla(262.0 / 360.0, 0.83, 0.58, 0.30));
     }
 
