@@ -730,6 +730,7 @@ dependencies = [
  "bourbon-ui",
  "gpui-kit",
  "gpui-pre",
+ "gpui-pre-platform",
  "jiff",
  "tempfile",
 ]

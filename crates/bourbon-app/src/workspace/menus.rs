@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use bourbon_ui::{Menu, MenuEntry, MenuEvent, MenuItem, Popover};
-use gpui_kit::{
+use gpui::{
     AppContext as _, Context, Entity, FocusHandle, IntoElement, Pixels, Point, Subscription, Window,
 };
 

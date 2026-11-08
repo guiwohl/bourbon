@@ -1,8 +1,8 @@
 use bourbon_core::{NoteId, NoteStatus, NoteStore, NotebookId, TagColor};
+use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext, VisualTestContext};
 use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext, VisualTestContext};
 
-use super::{at, click, note_in, open_view, seeded_store};
+use super::{at, click, note_in, open_view, seeded_store, type_text};
 use crate::editor::History;
 use crate::workspace::Workspace;
 
@@ -11,17 +11,12 @@ fn press(cx: &mut TestAppContext, handle: AnyWindowHandle, keystrokes: &str) {
 }
 
 fn type_into_tag_input(cx: &mut TestAppContext, handle: AnyWindowHandle, text: &str) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.click("tag-input", cx);
-        window.input(text, cx);
-    })
-    .unwrap();
+    click(cx, handle, "tag-input");
+    type_text(cx, handle, text);
 }
 
 fn press_in_window(cx: &mut TestAppContext, handle: AnyWindowHandle, key: &str) {
-    cx.update_window(handle, |_, window, cx| window.press(key, cx))
-        .unwrap();
+    press(cx, handle, key);
 }
 
 fn is_rendered(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> bool {
@@ -51,7 +46,7 @@ fn note_ids_after_opening(cx: &mut TestAppContext, view: &Entity<Workspace>) -> 
     cx.read(|cx| view.read(cx).notes.iter().map(|n| n.id.clone()).collect())
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn choosing_a_notebook_in_the_selector_moves_the_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let work = work_notebook(&store);
@@ -65,7 +60,7 @@ fn choosing_a_notebook_in_the_selector_moves_the_note(cx: &mut TestAppContext) {
     assert!(!is_rendered(cx, handle, &format!("notebook-option-{work}")));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn moving_a_note_flushes_the_pending_edit_first(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let work = work_notebook(&store);
@@ -80,7 +75,7 @@ fn moving_a_note_flushes_the_pending_edit_first(cx: &mut TestAppContext) {
     assert_eq!(note.notebook, work);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn moving_a_note_refreshes_the_sidebar_counts(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let work = work_notebook(&store);
@@ -96,7 +91,7 @@ fn moving_a_note_refreshes_the_sidebar_counts(cx: &mut TestAppContext) {
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_selector_lists_every_notebook(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let work = work_notebook(&store);
@@ -110,7 +105,7 @@ fn the_selector_lists_every_notebook(cx: &mut TestAppContext) {
     assert!(is_rendered(cx, handle, &format!("notebook-option-{work}")));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_alt_m_opens_the_notebook_selector(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let work = work_notebook(&store);
@@ -122,7 +117,7 @@ fn ctrl_alt_m_opens_the_notebook_selector(cx: &mut TestAppContext) {
     assert!(is_rendered(cx, handle, &format!("notebook-option-{work}")));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_alt_m_without_an_open_note_does_nothing(cx: &mut TestAppContext) {
     let (handle, view) = open_view(cx, NoteStore::open_in_memory().unwrap());
 
@@ -140,7 +135,7 @@ fn choose_status(cx: &mut TestAppContext, handle: AnyWindowHandle, index: usize)
     cx.run_until_parked();
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn choosing_a_status_in_the_status_button_sets_it(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -153,7 +148,7 @@ fn choosing_a_status_in_the_status_button_sets_it(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn every_status_option_sets_its_status(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -164,7 +159,7 @@ fn every_status_option_sets_its_status(cx: &mut TestAppContext) {
     }
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn shift_alt_digits_set_the_status(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -180,7 +175,7 @@ fn shift_alt_digits_set_the_status(cx: &mut TestAppContext) {
     }
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn shift_alt_4_completes_the_note_and_keeps_it_open(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -196,7 +191,7 @@ fn shift_alt_4_completes_the_note_and_keeps_it_open(cx: &mut TestAppContext) {
     assert!(!note_ids_after_opening(cx, &view).contains(&seeded.newer));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn changing_the_status_flushes_the_pending_edit_first(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -227,7 +222,7 @@ fn tag_names(cx: &mut TestAppContext, view: &Entity<Workspace>, id: &NoteId) -> 
         .collect()
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_header_shows_a_chip_for_each_tag_of_the_note(cx: &mut TestAppContext) {
     let (store, _, rust, ruby) = store_with_tags();
     let (handle, _) = open_view(cx, store);
@@ -236,7 +231,7 @@ fn the_header_shows_a_chip_for_each_tag_of_the_note(cx: &mut TestAppContext) {
     assert!(!is_rendered(cx, handle, &format!("tag-chip-{}", rust.id)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn typing_offers_existing_tags_not_yet_on_the_note(cx: &mut TestAppContext) {
     let (store, _, rust, ruby) = store_with_tags();
     let (handle, _) = open_view(cx, store);
@@ -255,7 +250,7 @@ fn typing_offers_existing_tags_not_yet_on_the_note(cx: &mut TestAppContext) {
     ));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn picking_a_suggestion_with_the_keyboard_adds_the_existing_tag(cx: &mut TestAppContext) {
     let (store, note, rust, _) = store_with_tags();
     let (handle, view) = open_view(cx, store);
@@ -277,7 +272,7 @@ fn picking_a_suggestion_with_the_keyboard_adds_the_existing_tag(cx: &mut TestApp
     ));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_suggestion_adds_the_existing_tag(cx: &mut TestAppContext) {
     let (store, note, rust, _) = store_with_tags();
     let (handle, view) = open_view(cx, store);
@@ -307,12 +302,12 @@ fn highlight_with_keys(cx: &mut TestAppContext, keys: &[&str]) -> Vec<String> {
     tag_names(cx, &view, &note)
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_first_down_highlights_the_first_suggestion(cx: &mut TestAppContext) {
     assert_eq!(highlight_with_keys(cx, &["down"]), ["ruby", "rust"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_second_down_highlights_the_next_suggestion(cx: &mut TestAppContext) {
     assert_eq!(
         highlight_with_keys(cx, &["down", "down"]),
@@ -320,7 +315,7 @@ fn a_second_down_highlights_the_next_suggestion(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_highlight_stops_at_the_last_suggestion(cx: &mut TestAppContext) {
     assert_eq!(
         highlight_with_keys(cx, &["down", "down", "down", "down"]),
@@ -328,7 +323,7 @@ fn the_highlight_stops_at_the_last_suggestion(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn up_moves_the_highlight_back_one_suggestion(cx: &mut TestAppContext) {
     assert_eq!(
         highlight_with_keys(cx, &["down", "down", "up"]),
@@ -336,7 +331,7 @@ fn up_moves_the_highlight_back_one_suggestion(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn up_from_the_first_suggestion_clears_the_highlight(cx: &mut TestAppContext) {
     let (store, note) = store_with_rust_and_rustacean();
     let (handle, view) = open_view(cx, store);
@@ -347,19 +342,18 @@ fn up_from_the_first_suggestion_clears_the_highlight(cx: &mut TestAppContext) {
     assert_eq!(tag_names(cx, &view, &note), ["ruby", "rus"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn typing_clears_the_highlight(cx: &mut TestAppContext) {
     let (store, note) = store_with_rust_and_rustacean();
     let (handle, view) = open_view(cx, store);
     type_into_tag_input(cx, handle, "rust");
     press_in_window(cx, handle, "down");
-    cx.update_window(handle, |_, window, cx| window.input("a", cx))
-        .unwrap();
+    type_text(cx, handle, "a");
     press_in_window(cx, handle, "enter");
     assert_eq!(tag_names(cx, &view, &note), ["ruby", "rusta"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn down_without_suggestions_highlights_nothing(cx: &mut TestAppContext) {
     let (store, note, _, _) = store_with_tags();
     let (handle, view) = open_view(cx, store);
@@ -369,7 +363,7 @@ fn down_without_suggestions_highlights_nothing(cx: &mut TestAppContext) {
     assert_eq!(tag_names(cx, &view, &note), ["ruby", "zzz"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn enter_without_a_highlight_adds_the_tag_named_exactly_as_typed(cx: &mut TestAppContext) {
     let (store, note, _, _) = store_with_tags();
     let (handle, view) = open_view(cx, store);
@@ -381,7 +375,7 @@ fn enter_without_a_highlight_adds_the_tag_named_exactly_as_typed(cx: &mut TestAp
     cx.read(|cx| assert_eq!(view.read(cx).tags.len(), 2));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn enter_on_an_unknown_name_creates_the_tag_with_the_default_color(cx: &mut TestAppContext) {
     let (store, note, _, _) = store_with_tags();
     let (handle, view) = open_view(cx, store);
@@ -400,7 +394,7 @@ fn enter_on_an_unknown_name_creates_the_tag_with_the_default_color(cx: &mut Test
     assert!(is_rendered(cx, handle, &format!("tag-chip-{}", created.id)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn enter_on_an_empty_field_changes_nothing(cx: &mut TestAppContext) {
     let (store, note, _, _) = store_with_tags();
     let (handle, view) = open_view(cx, store);
@@ -412,7 +406,7 @@ fn enter_on_an_empty_field_changes_nothing(cx: &mut TestAppContext) {
     cx.read(|cx| assert_eq!(view.read(cx).tags.len(), 2));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn removing_a_chip_removes_the_tag_from_the_note_only(cx: &mut TestAppContext) {
     let (store, note, _, ruby) = store_with_tags();
     let (handle, view) = open_view(cx, store);
@@ -424,7 +418,7 @@ fn removing_a_chip_removes_the_tag_from_the_note_only(cx: &mut TestAppContext) {
     assert!(!is_rendered(cx, handle, &format!("tag-chip-{}", ruby.id)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn adding_a_tag_flushes_the_pending_edit_first(cx: &mut TestAppContext) {
     let (store, note, rust, _) = store_with_tags();
     let (handle, view) = open_view(cx, store);
@@ -436,7 +430,7 @@ fn adding_a_tag_flushes_the_pending_edit_first(cx: &mut TestAppContext) {
     assert_eq!(stored_note(cx, &view, &note).title, "Newer!");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_header_action_failure_is_reported_in_the_banner(cx: &mut TestAppContext) {
     let (store, _, rust, _) = store_with_tags();
     let (handle, view) = open_view(cx, store);
@@ -479,7 +473,7 @@ fn visit_middle_then_oldest(cx: &mut TestAppContext, handle: AnyWindowHandle, no
     click(cx, handle, &format!("note-{}", notes.oldest));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn alt_left_and_alt_right_walk_the_viewed_notes(cx: &mut TestAppContext) {
     let (store, notes) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -499,7 +493,7 @@ fn alt_left_and_alt_right_walk_the_viewed_notes(cx: &mut TestAppContext) {
     assert_eq!(selected(cx, &view), notes.oldest);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn going_back_does_not_add_history_entries(cx: &mut TestAppContext) {
     let (store, notes) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -513,7 +507,7 @@ fn going_back_does_not_add_history_entries(cx: &mut TestAppContext) {
     assert_eq!(selected(cx, &view), notes.newest);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn history_skips_trashed_notes(cx: &mut TestAppContext) {
     let (store, notes) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -528,7 +522,7 @@ fn history_skips_trashed_notes(cx: &mut TestAppContext) {
     assert_eq!(selected(cx, &view), notes.oldest);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn history_skips_notes_that_no_longer_exist(cx: &mut TestAppContext) {
     let (store, notes) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -545,7 +539,7 @@ fn history_skips_notes_that_no_longer_exist(cx: &mut TestAppContext) {
     assert_eq!(selected(cx, &view), notes.newest);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn going_back_flushes_the_pending_edit_first(cx: &mut TestAppContext) {
     let (store, notes) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -557,7 +551,7 @@ fn going_back_flushes_the_pending_edit_first(cx: &mut TestAppContext) {
     assert_eq!(stored_note(cx, &view, &notes.oldest).title, "Oldest!");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn walking_history_without_earlier_notes_changes_nothing(cx: &mut TestAppContext) {
     let (store, notes) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -628,7 +622,7 @@ fn label_of(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> Optio
     .unwrap()
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_buttons_show_the_notebook_name_and_the_status_label(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let work = work_notebook(&store);
@@ -648,7 +642,7 @@ fn the_buttons_show_the_notebook_name_and_the_status_label(cx: &mut TestAppConte
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn nested_notebooks_are_indented_in_the_selector(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let work = work_notebook(&store);
@@ -672,10 +666,10 @@ fn nested_notebooks_are_indented_in_the_selector(cx: &mut TestAppContext) {
             )
         })
         .unwrap();
-    assert_eq!(child_x - root_x, gpui_kit::px(12.));
+    assert_eq!(child_x - root_x, gpui::px(12.));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn down_on_a_name_already_on_the_note_does_not_break_the_exact_match(cx: &mut TestAppContext) {
     let (store, note, _, _) = store_with_tags();
     let (handle, view) = open_view(cx, store);
@@ -689,7 +683,7 @@ fn down_on_a_name_already_on_the_note_does_not_break_the_exact_match(cx: &mut Te
     assert!(!is_rendered(cx, handle, "error-banner"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_status_menu_checks_the_current_status(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     store
@@ -726,7 +720,7 @@ fn selected_of(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> Op
     .unwrap()
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_selector_marks_only_the_notebook_of_the_note_as_selected(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let work = work_notebook(&store);
@@ -745,7 +739,7 @@ fn the_selector_marks_only_the_notebook_of_the_note_as_selected(cx: &mut TestApp
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn only_the_highlighted_suggestion_is_marked_as_selected(cx: &mut TestAppContext) {
     let (store, _, rust, _) = store_with_tags();
     let rustacean = store

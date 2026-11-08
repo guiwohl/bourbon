@@ -1,13 +1,14 @@
 use bourbon_core::{NoteId, NoteSort};
 use bourbon_ui::{IconButton, IconName, MenuItem, ThemeExt as _};
-use gpui_kit::{
+use gpui::{
     ClickEvent, Context, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
+    StatefulInteractiveElement as _, Styled as _, div, px,
 };
 
 use crate::navigation::Navigation;
 use crate::presentation::display_title;
 use crate::sidebar::ToggleSidebar;
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::{MenuBuilder, Workspace};
 
 const SORTS: [(NoteSort, &str); 3] = [

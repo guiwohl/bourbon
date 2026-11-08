@@ -1,6 +1,6 @@
 use bourbon_core::{Appearance, OmarchyColors, Rgb, ThemeSource};
 use bourbon_ui::Tokens;
-use gpui_kit::Hsla;
+use gpui::Hsla;
 
 const SIDEBAR_MIX: f32 = 0.05;
 const NOTE_LIST_MIX: f32 = 0.03;
@@ -9,7 +9,7 @@ const SELECTION_TINT: f32 = 0.2;
 const NOTE_LIST_BAR_TINT: f32 = 0.4;
 
 fn hsla(color: Rgb) -> Hsla {
-    Hsla::from(gpui_kit::rgb(color.as_hex()))
+    Hsla::from(gpui::rgb(color.as_hex()))
 }
 
 pub(super) fn tokens_for(

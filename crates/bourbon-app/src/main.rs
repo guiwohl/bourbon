@@ -14,6 +14,7 @@ mod presentation;
 mod settings_view;
 mod sidebar;
 mod single_instance;
+mod test_id;
 mod theme;
 mod window;
 mod workspace;

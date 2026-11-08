@@ -2,7 +2,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use bourbon_core::{BackupOutcome, GitHubRepository, NoteStore, StoreError};
-use gpui_kit::{AnyWindowHandle, Context, PathPromptOptions, SharedString, Task, Window};
+use gpui::{AnyWindowHandle, Context, PathPromptOptions, SharedString, Task, Window};
 use jiff::Zoned;
 
 use super::Workspace;

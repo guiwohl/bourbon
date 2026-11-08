@@ -1,7 +1,7 @@
 use bourbon_core::{NoteStatus, TagColor};
 use bourbon_ui::{Colors, IconName};
+use gpui::{Hsla, rgb};
 use gpui_kit::component::ColorName;
-use gpui_kit::{Hsla, rgb};
 
 pub(crate) const UNTITLED: &str = "Untitled";
 

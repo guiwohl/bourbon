@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use bourbon_ui::IconAssets;
+use gpui::{AssetSource, Result, SharedString};
 use gpui_kit::assets::Assets;
-use gpui_kit::{AssetSource, Result, SharedString};
 
 pub(crate) struct AppAssets;
 

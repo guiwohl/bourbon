@@ -1,7 +1,7 @@
-use gpui_kit::{AnyWindowHandle, Entity, TestAppContext};
+use gpui::{AnyWindowHandle, Entity, TestAppContext};
 
-use super::view_modes::{focus_body, is_rendered, press};
-use super::{open_view, seeded_store};
+use super::view_modes::{focus_body, is_rendered};
+use super::{open_view, press, seeded_store};
 use crate::workspace::Workspace;
 
 fn columns_are_shown(
@@ -16,7 +16,7 @@ fn columns_are_shown(
     sidebar
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_shift_f_hides_the_sidebar_and_the_list_and_again_restores_them(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -31,7 +31,7 @@ fn ctrl_shift_f_hides_the_sidebar_and_the_list_and_again_restores_them(cx: &mut 
     assert!(columns_are_shown(cx, handle, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn escape_leaves_focus_mode(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -43,7 +43,7 @@ fn escape_leaves_focus_mode(cx: &mut TestAppContext) {
     assert!(columns_are_shown(cx, handle, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn escape_outside_focus_mode_changes_nothing(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -55,7 +55,7 @@ fn escape_outside_focus_mode_changes_nothing(cx: &mut TestAppContext) {
     assert!(!cx.read(|cx| view.read(cx).focus_mode));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_sidebar_hidden_before_focus_mode_stays_hidden_after_it(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -77,7 +77,7 @@ fn a_sidebar_hidden_before_focus_mode_stays_hidden_after_it(cx: &mut TestAppCont
     ));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_sidebar_shortcut_is_ignored_while_in_focus_mode(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -91,7 +91,7 @@ fn the_sidebar_shortcut_is_ignored_while_in_focus_mode(cx: &mut TestAppContext) 
     assert!(columns_are_shown(cx, handle, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_splitters_follow_the_columns_they_separate(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);

@@ -1,10 +1,11 @@
 use bourbon_ui::{IconButton, IconName, MenuItem, ThemeExt as _};
-use gpui_kit::{
+use gpui::{
     Context, InteractiveElement as _, IntoElement, ParentElement as _, SharedString, Styled as _,
-    TestSupportExt as _, div, px,
+    div, px,
 };
 
 use crate::control_pane::PaneAction;
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::{MenuBuilder, Workspace};
 
 pub(super) const ENTRIES: [(&str, PaneAction); 4] = [
@@ -37,7 +38,7 @@ pub(super) fn control_strip(cx: &mut Context<Workspace>) -> impl IntoElement + u
         IconButton::new("app-menu-button", IconName::Settings)
             .tooltip("Settings")
             .on_click(
-                cx.listener(|workspace, event: &gpui_kit::ClickEvent, window, cx| {
+                cx.listener(|workspace, event: &gpui::ClickEvent, window, cx| {
                     workspace.open_menu(event.position(), builder(), window, cx);
                 }),
             ),

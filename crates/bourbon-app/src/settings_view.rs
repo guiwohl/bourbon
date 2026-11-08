@@ -7,9 +7,9 @@ use gpui::{
     AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
     SharedString, StatefulInteractiveElement as _, Styled as _, div, px,
 };
-use gpui_kit::TestSupportExt as _;
 
 use crate::overlay::tagged;
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::{MenuBuilder, Workspace};
 
 const MENU_WIDTH: f32 = 160.;
@@ -224,11 +224,11 @@ fn page_menu(
                 .h(px(MENU_ITEM_HEIGHT))
                 .px(px(MENU_ITEM_PADDING))
                 .cursor_pointer()
-                .aria_selected(active)
                 .opacity(menu_item_opacity(active))
                 .when(active, |item| {
                     item.bg(colors.selection_inactive).child(
                         div()
+                            .debug_selector(move || format!("{}-active", page.id()))
                             .absolute()
                             .top_0()
                             .bottom_0()

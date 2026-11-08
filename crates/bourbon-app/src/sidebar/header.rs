@@ -1,9 +1,8 @@
 use bourbon_ui::{IconButton, IconButtonSize, IconName, SectionHeader};
-use gpui_kit::{
-    Context, InteractiveElement as _, IntoElement, ParentElement as _, TestSupportExt as _, div,
-};
+use gpui::{Context, InteractiveElement as _, IntoElement, ParentElement as _, div};
 
 use super::state::{Section, SidebarState};
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::Workspace;
 
 pub(super) struct Spec {

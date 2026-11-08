@@ -1,5 +1,5 @@
 use bourbon_core::{NoteId, NoteSort};
-use gpui_kit::{Context, Window};
+use gpui::{Context, Window};
 
 use super::Workspace;
 use crate::cli_command::copy_cli_command;

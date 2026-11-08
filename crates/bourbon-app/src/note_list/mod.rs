@@ -9,19 +9,20 @@ use std::rc::Rc;
 use bourbon_core::{NoteId, NoteSort, NoteSummary, NotebookNode, TagSummary, Timestamp};
 use bourbon_ui::ThemeExt as _;
 use bourbon_ui::list_row::accent;
-use gpui_kit::{
+use gpui::{
     AnyElement, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement, ListAlignment,
-    ListOffset, ListState, ParentElement as _, Styled as _, TestSupportExt as _, div, list, px,
+    ListOffset, ListState, ParentElement as _, Styled as _, div, list, px,
 };
 use jiff::tz::TimeZone;
 
 use crate::navigation::Navigation;
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::Workspace;
 
 pub(crate) use filter::narrow;
 use header::ListView;
 
-gpui_kit::actions!(bourbon, [SelectPreviousNote, SelectNextNote]);
+gpui::actions!(bourbon, [SelectPreviousNote, SelectNextNote]);
 
 const OVERDRAW: f32 = 400.;
 const EMPTY_OPACITY: f32 = 0.5;
@@ -179,7 +180,7 @@ fn empty_state(cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
         .pb(px(EMPTY_BOTTOM_PADDING))
         .opacity(EMPTY_OPACITY)
         .text_size(px(EMPTY_MESSAGE_SIZE))
-        .font_weight(gpui_kit::FontWeight::LIGHT)
+        .font_weight(gpui::FontWeight::LIGHT)
         .font_family(tokens.fonts.ui_family.clone())
         .text_color(tokens.colors.text)
         .child("No notes")

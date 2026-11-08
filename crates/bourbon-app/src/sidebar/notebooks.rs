@@ -1,14 +1,15 @@
 use bourbon_core::{NotebookId, NotebookNode};
 use bourbon_ui::{IconName, ListRow, MenuItem, ThemeExt as _};
-use gpui_kit::{
+use gpui::{
     Context, InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent, ParentElement as _,
-    SharedString, Styled as _, TestSupportExt as _, Window, div,
+    SharedString, Styled as _, Window, div,
 };
 
 use super::state::{Section, SidebarState};
 use super::tree::VisibleNotebook;
 use super::{SidebarData, header};
 use crate::dragged_note::DraggedNote;
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::{MenuBuilder, Workspace};
 
 pub(super) fn section_header(

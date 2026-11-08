@@ -3,17 +3,18 @@ use bourbon_core::{
 };
 use bourbon_ui::list_row::RowAccent;
 use bourbon_ui::{Colors, Icon, IconName, Pill, ThemeExt as _};
-use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::{
+use gpui::prelude::FluentBuilder as _;
+use gpui::{
     AnyElement, App, AppContext as _, Entity, Hsla, InteractiveElement as _, IntoElement,
     MouseButton, MouseDownEvent, ParentElement as _, SharedString, StatefulInteractiveElement as _,
-    Styled as _, TestSupportExt as _, div, px,
+    Styled as _, div, px,
 };
 use jiff::tz::TimeZone;
 
 use super::date::date_label;
 use crate::dragged_note::DraggedNote;
 use crate::presentation::{display_title, dot_color, status_icon};
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::{MenuBuilder, Workspace};
 
 const PROGRESS_INNER_WIDTH: f32 = 30.;

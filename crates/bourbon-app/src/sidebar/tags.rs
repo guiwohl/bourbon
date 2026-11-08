@@ -1,12 +1,13 @@
 use bourbon_core::{TagColor, TagSummary};
 use bourbon_ui::{ListRow, MenuItem};
-use gpui_kit::{
+use gpui::{
     ClickEvent, Context, InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
-    ParentElement as _, SharedString, TestSupportExt as _, div,
+    ParentElement as _, SharedString, div,
 };
 
 use super::SidebarData;
 use crate::presentation::{color_label, dot_color, is_current_color};
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::{MenuBuilder, Workspace};
 
 pub(super) fn row(

@@ -1,12 +1,13 @@
 use bourbon_core::{Note, NoteId, NoteStatus, NoteStore, Notebook, NotebookDepth, Tag, TagColor};
-use gpui_kit::test::{ClickOptions, TestWindowExt as _};
-use gpui_kit::{
+use gpui::{
     AnyWindowHandle, AppContext as _, Entity, Modifiers, TestAppContext, VisualTestContext,
 };
-use gpui_kit::{point, px};
+use gpui::{point, px};
 
+use super::harness::{Press, RenderFrame as _, click_with};
 use super::{
-    at, banner_is_shown, choose_menu_entry, click, listed_titles, menu_labels, note_in, open_view,
+    at, banner_is_shown, bounds, choose_menu_entry, click, click_at, is_listed, listed_titles,
+    menu_labels, note_in, open_view, press, render, right_click, type_text,
 };
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
@@ -58,20 +59,19 @@ fn tag_row(tag: &Tag) -> String {
 }
 
 fn ctrl_click(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        let options = ClickOptions::new().with_modifiers(Modifiers::control());
-        window.click_with_options(id.to_owned(), options, cx);
-    })
-    .unwrap();
+    click_with(
+        cx,
+        handle,
+        id,
+        &Press {
+            modifiers: Modifiers::control(),
+            ..Press::LEFT
+        },
+    );
 }
 
 fn open_menu(cx: &mut TestAppContext, handle: AnyWindowHandle, row: &str) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.right_click(row.to_owned(), cx);
-    })
-    .unwrap();
+    right_click(cx, handle, row);
     cx.run_until_parked();
 }
 
@@ -91,37 +91,17 @@ fn menu_labels_of(
 }
 
 fn toggle_notebook(cx: &mut TestAppContext, handle: AnyWindowHandle, notebook: &Notebook) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.click_at(row(notebook), point(px(20.), px(15.)), cx);
-    })
-    .unwrap();
+    click_at(cx, handle, &row(notebook), point(px(20.), px(15.)));
 }
 
 fn click_section_collapse(cx: &mut TestAppContext, handle: AnyWindowHandle, header: &str) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        let width = window.find(header.to_owned()).bounds().size.width;
-        window.click_at(header.to_owned(), point(width - px(17.), px(15.)), cx);
-    })
-    .unwrap();
+    let width = bounds(cx, handle, header).unwrap().size.width;
+    click_at(cx, handle, header, point(width - px(17.), px(15.)));
 }
 
 fn type_name(cx: &mut TestAppContext, handle: AnyWindowHandle, name: &str) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.press("ctrl-a", cx);
-        window.input(name, cx);
-    })
-    .unwrap();
-}
-
-fn is_listed(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> bool {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.try_find(id.to_owned()).is_some()
-    })
-    .unwrap()
+    press(cx, handle, "ctrl-a");
+    type_text(cx, handle, name);
 }
 
 fn navigation(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Navigation {
@@ -157,7 +137,7 @@ fn note_of(cx: &mut TestAppContext, view: &Entity<Workspace>, id: &NoteId) -> No
     view.read_with(cx, |view, _| view.store.find_note(id).unwrap().unwrap())
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_collapsed_notebook_lists_its_sub_notebooks_notes_too(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -171,7 +151,7 @@ fn a_collapsed_notebook_lists_its_sub_notebooks_notes_too(cx: &mut TestAppContex
     assert_eq!(listed_titles(cx, &view), ["In sub", "In work"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn an_expanded_notebook_lists_only_its_direct_notes(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -186,7 +166,7 @@ fn an_expanded_notebook_lists_only_its_direct_notes(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view), ["In work"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn expanding_the_selected_notebook_narrows_the_list_and_collapsing_widens_it(
     cx: &mut TestAppContext,
 ) {
@@ -201,7 +181,7 @@ fn expanding_the_selected_notebook_narrows_the_list_and_collapsing_widens_it(
     assert_eq!(listed_titles(cx, &view), ["In sub", "In work"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn expanding_another_notebook_reveals_its_children_and_keeps_the_navigation(
     cx: &mut TestAppContext,
 ) {
@@ -218,7 +198,7 @@ fn expanding_another_notebook_reveals_its_children_and_keeps_the_navigation(
     assert!(!is_listed(cx, handle, &row(&tree.sub)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn expanding_a_notebook_keeps_another_selected_notebook_selected(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -232,7 +212,7 @@ fn expanding_a_notebook_keeps_another_selected_notebook_selected(cx: &mut TestAp
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_plus_button_creates_a_top_level_notebook(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -249,21 +229,20 @@ fn the_plus_button_creates_a_top_level_notebook(cx: &mut TestAppContext) {
     assert!(!banner_is_shown(cx, handle));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn pressing_enter_confirms_the_name(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
 
     click(cx, handle, "new-notebook");
     type_name(cx, handle, "Ideas");
-    cx.update_window(handle, |_, window, cx| window.press("enter", cx))
-        .unwrap();
+    press(cx, handle, "enter");
 
     assert!(notebook_names(cx, &view).contains(&"Ideas".to_owned()));
     assert!(!is_listed(cx, handle, "sidebar-prompt"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn an_empty_name_is_refused_with_the_banner_and_keeps_the_prompt(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -281,21 +260,20 @@ fn an_empty_name_is_refused_with_the_banner_and_keeps_the_prompt(cx: &mut TestAp
     assert!(notebook_names(cx, &view).contains(&"Ideas".to_owned()));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn escape_in_the_name_field_cancels_the_prompt(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
 
     click(cx, handle, "new-notebook");
     type_name(cx, handle, "Ideas");
-    cx.update_window(handle, |_, window, cx| window.press("escape", cx))
-        .unwrap();
+    press(cx, handle, "escape");
 
     assert!(!is_listed(cx, handle, "sidebar-prompt"));
     assert_eq!(notebook_names(cx, &view), ["Inbox", "Other", "Work", "Sub"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn cancelling_the_prompt_changes_nothing(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -308,7 +286,7 @@ fn cancelling_the_prompt_changes_nothing(cx: &mut TestAppContext) {
     assert_eq!(notebook_names(cx, &view), ["Inbox", "Other", "Work", "Sub"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_context_menu_creates_a_sub_notebook_and_reveals_it(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -334,18 +312,14 @@ fn the_context_menu_creates_a_sub_notebook_and_reveals_it(cx: &mut TestAppContex
     assert_eq!(listed_titles(cx, &view), ["In work"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_context_menu_renames_a_notebook_starting_from_its_name(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
 
     choose_menu_item(cx, handle, &row(&tree.work), RENAME_NOTEBOOK);
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.press("end", cx);
-        window.input("s", cx);
-    })
-    .unwrap();
+    press(cx, handle, "end");
+    type_text(cx, handle, "s");
     click(cx, handle, "sidebar-prompt-confirm");
 
     assert_eq!(
@@ -354,25 +328,21 @@ fn the_context_menu_renames_a_notebook_starting_from_its_name(cx: &mut TestAppCo
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn renaming_a_notebook_to_nothing_is_refused(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
 
     choose_menu_item(cx, handle, &row(&tree.work), RENAME_NOTEBOOK);
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.press("ctrl-a", cx);
-        window.press("backspace", cx);
-    })
-    .unwrap();
+    press(cx, handle, "ctrl-a");
+    press(cx, handle, "backspace");
     click(cx, handle, "sidebar-prompt-confirm");
 
     assert!(banner_is_shown(cx, handle));
     assert_eq!(notebook_names(cx, &view), ["Inbox", "Other", "Work", "Sub"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn deleting_a_notebook_asks_first_and_moves_its_notes_to_trash(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -398,7 +368,7 @@ fn deleting_a_notebook_asks_first_and_moves_its_notes_to_trash(cx: &mut TestAppC
     assert_eq!(listed_titles(cx, &view), ["In sub", "In work"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn deleting_a_notebook_saves_the_pending_edit_and_clears_the_selection(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -414,7 +384,7 @@ fn deleting_a_notebook_saves_the_pending_edit_and_clears_the_selection(cx: &mut 
     assert_eq!(cx.read(|cx| view.read(cx).selected.clone()), None);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn declining_the_deletion_keeps_the_notebook(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -426,7 +396,7 @@ fn declining_the_deletion_keeps_the_notebook(cx: &mut TestAppContext) {
     assert!(!is_listed(cx, handle, "sidebar-prompt"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn deleting_the_selected_notebook_navigates_to_all_notes(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -439,7 +409,7 @@ fn deleting_the_selected_notebook_navigates_to_all_notes(cx: &mut TestAppContext
     assert_eq!(listed_titles(cx, &view), ["In inbox"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn deleting_a_parent_of_the_selected_notebook_navigates_to_all_notes(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -452,7 +422,7 @@ fn deleting_a_parent_of_the_selected_notebook_navigates_to_all_notes(cx: &mut Te
     assert_eq!(navigation(cx, &view), Navigation::AllNotes);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn deleting_another_notebook_keeps_the_navigation(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -469,7 +439,7 @@ fn deleting_another_notebook_keeps_the_navigation(cx: &mut TestAppContext) {
     assert_eq!(notebook_names(cx, &view), ["Inbox", "Work", "Sub"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_inbox_menu_has_no_delete_item(cx: &mut TestAppContext) {
     let tree = tree_store();
     let inbox = tree.store.default_notebook().unwrap();
@@ -481,7 +451,7 @@ fn the_inbox_menu_has_no_delete_item(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn other_notebook_menus_offer_sub_notebook_rename_default_and_delete(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -492,7 +462,7 @@ fn other_notebook_menus_offer_sub_notebook_rename_default_and_delete(cx: &mut Te
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_tag_menu_offers_rename_colour_and_delete(cx: &mut TestAppContext) {
     let tagged = tagged_store();
     let (handle, view) = open_view(cx, tagged.store);
@@ -532,7 +502,7 @@ fn tagged_store() -> Tagged {
     }
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_tag_selects_it_alone(cx: &mut TestAppContext) {
     let tagged = tagged_store();
     let (handle, view) = open_view(cx, tagged.store);
@@ -547,7 +517,7 @@ fn clicking_a_tag_selects_it_alone(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view), ["Only urgent", "Both"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_clicking_tags_lists_only_notes_with_all_of_them(cx: &mut TestAppContext) {
     let tagged = tagged_store();
     let (handle, view) = open_view(cx, tagged.store);
@@ -565,7 +535,7 @@ fn ctrl_clicking_tags_lists_only_notes_with_all_of_them(cx: &mut TestAppContext)
     assert_eq!(listed_titles(cx, &view), ["Only urgent", "Both"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_clicking_the_only_selected_tag_returns_to_all_notes(cx: &mut TestAppContext) {
     let tagged = tagged_store();
     let (handle, view) = open_view(cx, tagged.store);
@@ -576,7 +546,7 @@ fn ctrl_clicking_the_only_selected_tag_returns_to_all_notes(cx: &mut TestAppCont
     assert_eq!(navigation(cx, &view), Navigation::AllNotes);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_tag_menu_renames_a_tag(cx: &mut TestAppContext) {
     let tagged = tagged_store();
     let (handle, view) = open_view(cx, tagged.store);
@@ -590,7 +560,7 @@ fn the_tag_menu_renames_a_tag(cx: &mut TestAppContext) {
     assert!(!is_listed(cx, handle, "sidebar-prompt"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn renaming_a_tag_to_an_existing_name_is_refused(cx: &mut TestAppContext) {
     let tagged = tagged_store();
     let (handle, view) = open_view(cx, tagged.store);
@@ -603,7 +573,7 @@ fn renaming_a_tag_to_an_existing_name_is_refused(cx: &mut TestAppContext) {
     assert!(stored_tag(cx, &view, "idea").is_some());
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_tag_menu_changes_the_colour_through_a_submenu(cx: &mut TestAppContext) {
     let tagged = tagged_store();
     let (handle, view) = open_view(cx, tagged.store);
@@ -628,7 +598,7 @@ fn the_tag_menu_changes_the_colour_through_a_submenu(cx: &mut TestAppContext) {
     assert_eq!(shown, TagColor::Green);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn deleting_a_tag_asks_first_and_removes_it_from_the_notes(cx: &mut TestAppContext) {
     let tagged = tagged_store();
     let (handle, view) = open_view(cx, tagged.store);
@@ -642,7 +612,7 @@ fn deleting_a_tag_asks_first_and_removes_it_from_the_notes(cx: &mut TestAppConte
     assert_eq!(note_of(cx, &view, &tagged.both).tags.len(), 1);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn deleting_the_selected_tag_navigates_to_all_notes(cx: &mut TestAppContext) {
     let tagged = tagged_store();
     let (handle, view) = open_view(cx, tagged.store);
@@ -655,7 +625,7 @@ fn deleting_the_selected_tag_navigates_to_all_notes(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view).len(), 3);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn deleting_one_of_two_selected_tags_keeps_the_other(cx: &mut TestAppContext) {
     let tagged = tagged_store();
     let (handle, view) = open_view(cx, tagged.store);
@@ -672,7 +642,7 @@ fn deleting_one_of_two_selected_tags_keeps_the_other(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view), ["Only urgent", "Both"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn status_rows_and_trash_navigate(cx: &mut TestAppContext) {
     let tagged = tagged_store();
     let (handle, view) = open_view(cx, tagged.store);
@@ -688,7 +658,7 @@ fn status_rows_and_trash_navigate(cx: &mut TestAppContext) {
     assert_eq!(navigation(cx, &view), Navigation::AllNotes);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_slash_hides_and_shows_the_sidebar(cx: &mut TestAppContext) {
     let (handle, _) = open_view(cx, NoteStore::open_in_memory().unwrap());
     assert!(is_listed(cx, handle, "sidebar"));
@@ -701,7 +671,7 @@ fn ctrl_slash_hides_and_shows_the_sidebar(cx: &mut TestAppContext) {
     assert!(is_listed(cx, handle, "sidebar"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_slash_works_while_the_title_has_focus(cx: &mut TestAppContext) {
     let (store, _) = super::seeded_store();
     let (handle, _) = open_view(cx, store);
@@ -712,7 +682,7 @@ fn ctrl_slash_works_while_the_title_has_focus(cx: &mut TestAppContext) {
     assert!(!is_listed(cx, handle, "sidebar"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn making_a_notebook_the_default_sends_new_notes_there(cx: &mut TestAppContext) {
     let (store, _) = super::seeded_store();
     let work = store.create_notebook("Work", None, at(7)).unwrap();
@@ -729,7 +699,7 @@ fn making_a_notebook_the_default_sends_new_notes_there(cx: &mut TestAppContext) 
     assert_eq!(notebook, work.id);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn collapsing_a_section_hides_its_rows_and_expanding_brings_them_back(cx: &mut TestAppContext) {
     let (handle, _) = open_view(cx, NoteStore::open_in_memory().unwrap());
     assert!(is_listed(cx, handle, "nav-status-active"));
@@ -742,7 +712,7 @@ fn collapsing_a_section_hides_its_rows_and_expanding_brings_them_back(cx: &mut T
     assert!(is_listed(cx, handle, "nav-status-active"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_note_list_toggle_button_hides_and_shows_the_sidebar(cx: &mut TestAppContext) {
     let (handle, _) = open_view(cx, NoteStore::open_in_memory().unwrap());
 
@@ -753,7 +723,7 @@ fn the_note_list_toggle_button_hides_and_shows_the_sidebar(cx: &mut TestAppConte
     assert!(is_listed(cx, handle, "sidebar"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_context_menu_is_our_menu_and_closes_once_an_entry_ran(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -769,21 +739,20 @@ fn a_context_menu_is_our_menu_and_closes_once_an_entry_ran(cx: &mut TestAppConte
     assert!(is_listed(cx, handle, "sidebar-prompt"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn escape_closes_a_context_menu_without_running_anything(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
 
     open_menu(cx, handle, &row(&tree.work));
-    cx.update_window(handle, |_, window, cx| window.press("escape", cx))
-        .unwrap();
+    press(cx, handle, "escape");
     cx.run_until_parked();
 
     assert!(view.read_with(cx, |view, _| view.open_menu.is_none()));
     assert!(!is_listed(cx, handle, "sidebar-prompt"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_menu_hands_the_focus_back_to_the_sidebar_when_it_closes(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -800,7 +769,7 @@ fn the_menu_hands_the_focus_back_to_the_sidebar_when_it_closes(cx: &mut TestAppC
     assert!(focused);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn enter_confirms_the_deletion_dialog(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -812,7 +781,7 @@ fn enter_confirms_the_deletion_dialog(cx: &mut TestAppContext) {
     assert!(!is_listed(cx, handle, "sidebar-prompt"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn escape_declines_the_deletion_dialog(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
@@ -824,45 +793,39 @@ fn escape_declines_the_deletion_dialog(cx: &mut TestAppContext) {
     assert!(!is_listed(cx, handle, "sidebar-prompt"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_beside_the_deletion_dialog_declines_it(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
 
     choose_menu_item(cx, handle, &row(&tree.work), DELETE_NOTEBOOK);
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.click_at("sidebar-prompt", point(px(5.), px(5.)), cx);
-    })
-    .unwrap();
+    click_at(cx, handle, "sidebar-prompt", point(px(5.), px(5.)));
 
     assert_eq!(notebook_names(cx, &view), ["Inbox", "Other", "Work", "Sub"]);
     assert!(!is_listed(cx, handle, "sidebar-prompt"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn shortcuts_work_again_after_a_dialog_closes(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
 
     click(cx, handle, "new-notebook");
     VisualTestContext::from_window(handle, cx).simulate_keystrokes("escape");
-    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
-        .unwrap();
+    render(cx, handle);
     VisualTestContext::from_window(handle, cx).simulate_keystrokes("ctrl-,");
 
     assert!(view.read_with(cx, |view, _| view.settings_open));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn shortcuts_work_again_after_a_confirmation_closes(cx: &mut TestAppContext) {
     let tree = tree_store();
     let (handle, view) = open_view(cx, tree.store);
 
     choose_menu_item(cx, handle, &row(&tree.work), DELETE_NOTEBOOK);
     VisualTestContext::from_window(handle, cx).simulate_keystrokes("escape");
-    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
-        .unwrap();
+    render(cx, handle);
     VisualTestContext::from_window(handle, cx).simulate_keystrokes("ctrl-,");
 
     assert!(view.read_with(cx, |view, _| view.settings_open));

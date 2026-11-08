@@ -1,11 +1,11 @@
 use std::time::Duration;
 
 use bourbon_core::NoteStore;
+use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext, VisualTestContext};
 use gpui_kit::base::test_support::texts;
 use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext, VisualTestContext};
 
-use super::{click, open_view, seeded_store};
+use super::{click, is_listed, open_view, seeded_store};
 use crate::workspace::Workspace;
 use bourbon_core::ViewMode;
 
@@ -40,11 +40,7 @@ pub(super) fn type_into_body(
 }
 
 pub(super) fn is_rendered(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> bool {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.try_find(id.to_owned()).is_some()
-    })
-    .unwrap()
+    is_listed(cx, handle, id)
 }
 
 pub(super) fn painted_text(cx: &mut TestAppContext, handle: AnyWindowHandle) -> Vec<String> {
@@ -70,7 +66,7 @@ fn store_with_body(body: &str) -> (NoteStore, bourbon_core::NoteId) {
     (store, seeded.newer)
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_editor_starts_in_edit_mode_without_a_preview(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -80,7 +76,7 @@ fn the_editor_starts_in_edit_mode_without_a_preview(cx: &mut TestAppContext) {
     assert!(!is_rendered(cx, handle, "preview"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_switch_offers_the_three_modes(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -93,7 +89,7 @@ fn the_switch_offers_the_three_modes(cx: &mut TestAppContext) {
     assert_eq!(mode(cx, &view), ViewMode::Edit);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn preview_mode_shows_only_the_preview(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, _) = open_view(cx, store);
@@ -104,7 +100,7 @@ fn preview_mode_shows_only_the_preview(cx: &mut TestAppContext) {
     assert!(!is_rendered(cx, handle, "body-editor"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn side_by_side_shows_both_panes(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, _) = open_view(cx, store);
@@ -115,7 +111,7 @@ fn side_by_side_shows_both_panes(cx: &mut TestAppContext) {
     assert!(is_rendered(cx, handle, "body-editor"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_e_cycles_edit_side_by_side_preview_and_back(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -129,7 +125,7 @@ fn ctrl_e_cycles_edit_side_by_side_preview_and_back(cx: &mut TestAppContext) {
     assert_eq!(mode(cx, &view), ViewMode::Edit);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_e_cycles_even_from_the_title_field(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -140,7 +136,7 @@ fn ctrl_e_cycles_even_from_the_title_field(cx: &mut TestAppContext) {
     assert_eq!(mode(cx, &view), ViewMode::SideBySide);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_mode_is_app_wide_and_survives_switching_notes(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -151,7 +147,7 @@ fn the_mode_is_app_wide_and_survives_switching_notes(cx: &mut TestAppContext) {
     assert_eq!(mode(cx, &view), ViewMode::Preview);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_preview_renders_the_body(cx: &mut TestAppContext) {
     let (store, _) = store_with_body("# Big heading\n\nplain words");
     let (handle, _) = open_view(cx, store);
@@ -164,7 +160,7 @@ fn the_preview_renders_the_body(cx: &mut TestAppContext) {
     assert!(!painted.contains("# Big heading"), "{painted}");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_table_renders_its_cells_in_the_preview(cx: &mut TestAppContext) {
     let (store, _) = store_with_body("| Name | Qty |\n|---|---|\n| apple | 3 |");
     let (handle, _) = open_view(cx, store);
@@ -178,7 +174,7 @@ fn a_table_renders_its_cells_in_the_preview(cx: &mut TestAppContext) {
     assert!(!painted.contains("|---|"), "{painted}");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_side_by_side_preview_follows_typing(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -203,7 +199,7 @@ fn the_side_by_side_preview_follows_typing(cx: &mut TestAppContext) {
     assert!(in_preview.contains("zebra"), "{in_preview} / {painted:?}");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_footer_counts_words_and_characters_of_the_body(cx: &mut TestAppContext) {
     let (store, _) = store_with_body("one two\nthree");
     let (handle, view) = open_view(cx, store);
@@ -241,7 +237,7 @@ fn button_state(
     .unwrap()
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_switch_labels_its_modes_and_marks_only_the_current_one(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, _) = open_view(cx, store);

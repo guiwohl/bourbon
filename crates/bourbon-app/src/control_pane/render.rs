@@ -4,11 +4,11 @@ use gpui::{
     AnyElement, Context, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
     SharedString, StatefulInteractiveElement as _, Styled as _, Window, div, px,
 };
-use gpui_kit::TestSupportExt as _;
 
 use super::{ControlPane, HighlightNext, HighlightPrevious, KEY_CONTEXT, Mode, Results};
 use crate::overlay::{layer, tagged};
 use crate::presentation::display_title;
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::Workspace;
 
 const PANEL_WIDTH: f32 = 600.;
@@ -245,6 +245,7 @@ fn render_row(
         .when(is_highlighted, |row| {
             row.bg(colors.selection_list_active).child(
                 div()
+                    .debug_selector(|| format!("pane-row-{index}-highlight"))
                     .absolute()
                     .top_0()
                     .bottom_0()
