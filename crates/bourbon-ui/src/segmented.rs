@@ -9,6 +9,10 @@ use crate::icon::{Icon, IconName};
 use crate::theme::ThemeExt;
 use crate::tooltip::Tooltip;
 
+fn control_width(segment: gpui::Pixels, count: f32, border: gpui::Pixels) -> gpui::Pixels {
+    segment * count + border * 2.
+}
+
 fn is_selected(index: usize, selected: usize) -> bool {
     index == selected
 }
@@ -106,7 +110,7 @@ impl RenderOnce for SegmentedControl {
                     None => button,
                 }
             });
-        let width = tokens.scale.segment_width * count + tokens.scale.border * 2.;
+        let width = control_width(tokens.scale.segment_width, count, tokens.scale.border);
         div()
             .flex()
             .flex_none()
@@ -152,6 +156,12 @@ mod tests {
 
     fn segment_centre(index: u8) -> gpui::Point<gpui::Pixels> {
         point(px(1. + 44. * f32::from(index) + 22.), px(15.))
+    }
+
+    #[test]
+    fn the_control_is_as_wide_as_its_segments_plus_both_borders() {
+        assert_eq!(control_width(px(44.), 3., px(1.)), px(134.));
+        assert_eq!(control_width(px(44.), 1., px(1.)), px(46.));
     }
 
     #[test]
