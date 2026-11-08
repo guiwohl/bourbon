@@ -73,7 +73,7 @@ impl Gallery {
 
 impl Render for Gallery {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div().flex().size_full().children(
+        div().flex().size_full().overflow_hidden().children(
             [Appearance::Light, Appearance::Dark]
                 .into_iter()
                 .enumerate()
@@ -202,8 +202,7 @@ fn sidebar_rows(index: usize, cx: &App) -> gpui::Div {
             .child(
                 ListRow::new(("work", index), "Work")
                     .icon(IconName::Briefcase)
-                    .disclosure(true)
-                    .selected(true),
+                    .disclosure(true),
             )
             .child(
                 ListRow::new(("sub", index), "Projects")
@@ -266,6 +265,7 @@ impl RenderOnce for Column {
             .gap(px(18.))
             .flex_1()
             .h_full()
+            .min_h_0()
             .p(px(20.))
             .overflow_y_scroll()
             .bg(colors.page_background)

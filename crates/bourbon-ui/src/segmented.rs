@@ -64,6 +64,7 @@ impl RenderOnce for SegmentedControl {
         let colors = tokens.colors;
         let selected = self.selected;
         let on_change = self.on_change;
+        let count = f32::from(u8::try_from(self.segments.len()).unwrap_or(u8::MAX));
         let segments = self
             .segments
             .into_iter()
@@ -101,9 +102,11 @@ impl RenderOnce for SegmentedControl {
                     None => button,
                 }
             });
+        let width = tokens.scale.segment_width * count + tokens.scale.border * 2.;
         div()
             .flex()
             .flex_none()
+            .w(width)
             .overflow_hidden()
             .border_1()
             .border_color(colors.border)

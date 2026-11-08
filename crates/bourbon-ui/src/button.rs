@@ -2,12 +2,14 @@ use std::rc::Rc;
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    Action, App, ClickEvent, ElementId, InteractiveElement as _, IntoElement, ParentElement as _,
-    RenderOnce, SharedString, StatefulInteractiveElement as _, Styled as _, Window, div, px,
+    Action, App, ClickEvent, ElementId, Hsla, InteractiveElement as _, IntoElement,
+    ParentElement as _, RenderOnce, SharedString, StatefulInteractiveElement as _, Styled as _,
+    Window, div, px,
 };
 
 use crate::icon::{Icon, IconName};
 use crate::theme::ThemeExt;
+use crate::tokens::Colors;
 use crate::tooltip::Tooltip;
 
 pub(crate) type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
@@ -164,6 +166,15 @@ impl TooltipSpec {
     }
 }
 
+#[must_use]
+pub fn icon_button_background(selected: bool, colors: &Colors) -> Hsla {
+    if selected {
+        colors.button_active_background
+    } else {
+        gpui::transparent_black()
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IconButtonSize {
     Header,
@@ -266,9 +277,7 @@ impl RenderOnce for IconButton {
             .rounded(tokens.scale.radius_default)
             .text_color(idle)
             .child(Icon::new(self.icon).size(glyph));
-        if self.selected {
-            content = content.bg(colors.button_active_background);
-        }
+        content = content.bg(icon_button_background(self.selected, &colors));
         if self.disabled {
             return content.opacity(tokens.scale.disabled_opacity);
         }
@@ -303,6 +312,17 @@ mod tests {
     fn counter() -> (Rc<Cell<usize>>, Rc<Cell<usize>>) {
         let count = Rc::new(Cell::new(0));
         (count.clone(), count)
+    }
+
+    #[test]
+    fn an_icon_button_at_rest_has_no_background_and_only_selection_tints_it() {
+        for colors in [Colors::light(), Colors::dark()] {
+            assert!(icon_button_background(false, &colors).is_transparent());
+            assert_eq!(
+                icon_button_background(true, &colors),
+                colors.button_active_background
+            );
+        }
     }
 
     #[gpui::test]
