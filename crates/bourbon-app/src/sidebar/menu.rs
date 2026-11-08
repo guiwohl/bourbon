@@ -1,13 +1,11 @@
-use gpui_kit::assets::IconName;
-use gpui_kit::component::ActiveTheme as _;
-use gpui_kit::component::Sizable as _;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::{Context, Entity, IntoElement, ParentElement as _, Styled as _, div, px};
+use bourbon_ui::{IconButton, IconName, MenuItem, ThemeExt as _};
+use gpui_kit::{
+    Context, InteractiveElement as _, IntoElement, ParentElement as _, SharedString, Styled as _,
+    TestSupportExt as _, div, px,
+};
 
 use crate::control_pane::PaneAction;
-use crate::icons::glyph;
-use crate::workspace::Workspace;
+use crate::workspace::{MenuBuilder, Workspace};
 
 pub(super) const ENTRIES: [(&str, PaneAction); 4] = [
     ("Settings", PaneAction::OpenSettings),
@@ -16,56 +14,74 @@ pub(super) const ENTRIES: [(&str, PaneAction); 4] = [
     ("Export to Markdown\u{2026}", PaneAction::ExportToMarkdown),
 ];
 
-const TOP_ROW_HEIGHT: f32 = 40.;
-const EDGE_GAP: f32 = 12.;
+const TITLE: &str = "Bourbon";
+const TITLE_OPACITY: f32 = 0.6;
+const TITLE_GAP: f32 = 6.;
+const TITLE_MARGIN_LEFT: f32 = 11.;
+const TRAILING_PADDING: f32 = 2.;
 
-pub(super) fn render(cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
-    let workspace = cx.entity();
-    let muted = cx.theme().muted_foreground;
-    let gear = Button::new("app-menu")
-        .ghost()
-        .small()
-        .icon(glyph(IconName::Settings))
-        .dropdown_menu(move |menu, _, _| {
-            let shortcut_color = muted;
-            ENTRIES.iter().fold(menu, |menu, (label, action)| {
-                menu.item(entry(label, *action, shortcut_color, &workspace))
+pub(super) fn builder() -> MenuBuilder {
+    ENTRIES
+        .iter()
+        .fold(MenuBuilder::default(), |menu, (label, action)| {
+            let action = *action;
+            let item = action.shortcut().map_or_else(
+                || MenuItem::new(*label),
+                |shortcut| MenuItem::new(*label).shortcut(SharedString::from(shortcut)),
+            );
+            menu.item(item, move |workspace, window, cx| {
+                workspace.run_pane_action(action, window, cx);
             })
-        });
+        })
+}
+
+pub(super) fn control_strip(cx: &mut Context<Workspace>) -> impl IntoElement + use<> {
+    let tokens = cx.theme().tokens.clone();
+    let gear = div().id("app-menu").test_support().child(
+        IconButton::new("app-menu-button", IconName::Settings)
+            .tooltip("Settings")
+            .on_click(
+                cx.listener(|workspace, event: &gpui_kit::ClickEvent, window, cx| {
+                    workspace.open_menu(event.position(), builder(), window, cx);
+                }),
+            ),
+    );
     div()
-        .h(px(TOP_ROW_HEIGHT))
-        .flex_none()
         .flex()
-        .flex_row()
+        .flex_none()
         .items_center()
-        .justify_end()
-        .pr(px(EDGE_GAP))
+        .min_h(tokens.scale.header_height)
+        .pr(px(TRAILING_PADDING))
+        .font_family(tokens.fonts.ui_family.clone())
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .ml(px(TITLE_MARGIN_LEFT))
+                .mr(px(TITLE_GAP))
+                .opacity(TITLE_OPACITY)
+                .text_size(tokens.scale.medium)
+                .text_color(tokens.colors.text)
+                .child(TITLE),
+        )
         .child(gear)
 }
 
-fn entry(
-    label: &'static str,
-    action: PaneAction,
-    shortcut_color: gpui_kit::Hsla,
-    workspace: &Entity<Workspace>,
-) -> PopupMenuItem {
-    let workspace = workspace.clone();
-    PopupMenuItem::element(move |_, _| {
-        div()
-            .flex()
-            .flex_row()
-            .justify_between()
-            .gap_4()
-            .child(label)
-            .children(
-                action
-                    .shortcut()
-                    .map(|shortcut| div().text_xs().text_color(shortcut_color).child(shortcut)),
-            )
-    })
-    .on_click(move |_, window, cx| {
-        workspace.update(cx, |workspace, cx| {
-            workspace.run_pane_action(action, window, cx);
-        });
-    })
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_app_menu_offers_settings_backup_restore_and_export_in_order() {
+        let labels: Vec<_> = ENTRIES.iter().map(|(label, _)| *label).collect();
+        assert_eq!(
+            labels,
+            [
+                "Settings",
+                "Back up now",
+                "Restore from backup\u{2026}",
+                "Export to Markdown\u{2026}"
+            ]
+        );
+    }
 }

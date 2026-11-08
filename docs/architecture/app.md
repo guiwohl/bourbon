@@ -8,7 +8,7 @@ GPUI window over `bourbon-core`. Holds no business rule: it presents state and f
 |---|---|
 | Window | Title "Bourbon", Wayland `app_id` "bourbon" |
 | Startup | Opens `default_database_path()`; failure prints a message and exits 1. Purges expired trash once (errors go to the banner), loads the sidebar data and the list, selects the most recent note |
-| Layout | Three columns: sidebar (200 px) \| note list (260 px) \| editor (flex). Fixed widths; resizing is M5 |
+| Layout | Three columns: sidebar (200 px) \| note list (260 px) \| editor (flex), separated by `bourbon_ui::Splitter` (1 px border, invisible 10 px handle). Limits 170..500 and 220..500 (`Settings` clamps to the same range), saved when the drag ends |
 | Sidebar | See the Sidebar section. Clicking a row sets the navigation and reloads the list |
 | Note list | See the Note list section |
 | Editor | Title input and Markdown editor (soft wrap, no line numbers). Empty state: "No notes yet" with a "New note" button |
@@ -51,8 +51,10 @@ Each column is a module owned by one concern. Columns render from data the works
 | `workspace.rs` | Root view: owns `NoteStore`, listing, selection, autosave and flush, trash purge, error banner state; lays out the three columns |
 | `dragged_note.rs` | `DraggedNote` drag payload and preview, built from a `NoteSummary` |
 | `presentation.rs` | Labels and colours shared by the columns (pill text shade now comes from `bourbon_ui::pill_text_color`): `UNTITLED`, `display_title`, `status_label`, `chip_color` (`TagColor` to `ColorName`, note list and editor header chips), `dot_color`, `color_label`, `is_current_color` (sidebar) |
-| `sidebar/mod.rs` | `render(SidebarData, cx)`: navigation rows, notebook tree flattening, selection rule |
-| `note_list/mod.rs` | `render(notes, selected, cx)`: header with the New note button, note rows |
+| `sidebar/mod.rs` | `render(SidebarData, cx)`: control strip, `ScrollArea` with `ListRow` / `SectionHeader` rows from `bourbon-ui`, notebook tree flattening, selection rule |
+| `note_list/mod.rs` | `render(NoteListData, cx)`: header, filter, virtualised `list` of note rows, `adjacent_note` for arrow keys |
+| `assets.rs` | `AppAssets`: `bourbon_ui::IconAssets` first, the component assets as fallback for the editor column |
+| `workspace/menus.rs` | `MenuBuilder`, `Workspace::open_menu` / `close_menu`: every popup menu of the left columns is a `bourbon_ui::Menu` in a `Popover` at the pointer; Enter/click runs the entry after closing and restoring focus |
 | `editor/mod.rs` | `EditorPane` (title input, Markdown editor, load/read/focus, change subscriptions), empty state, error banner element |
 | `editor/{tasks,preview_blocks,link_trigger,link_picker,word_count}.rs` | Pure, unit-tested editor logic: task toggling, preview block splitting, `[[` detection, suggestion matching, counts, mode cycle |
 | `editor/{preview,toolbar}.rs` | Preview pane and the mode switch |
@@ -72,20 +74,20 @@ Implements decision rows 2, 4, 7, 11, 12 and 23 of [M2 organization](../decision
 
 | Topic | Behaviour |
 |---|---|
-| Sections | 40 px top row with the gear menu (`app-menu`: Settings Ctrl+, , Back up now, Restore from backup..., Export to Markdown...), All Notes, Note Templates (`nav-templates`), Notebooks (search, `new-notebook`), the notebook tree, Status (collapse), Tags (search, collapse), Trash. Rows are 30 px, 14 px text, 16 px muted icon (`icons.rs`: FileText, Copy, Notebook, Inbox for the default notebook, Trash; status rows use coloured CirclePlay/CirclePause/CircleCheck/CircleX), count 11 px right. Notebooks, Status and Tags collapse (`SidebarState::collapsed`, memory only; ids `<section>-collapse`, `<section>-search`, header click is not wired). Search icons open the control pane |
-| Tree | Depth-first rows indented per depth; each row shows name and `NotebookNode::note_count`. Rows with children have a disclosure triangle (`toggle-notebook-<id>`) that expands/collapses without navigating |
+| Sections | Control strip (min 40 px: "Bourbon" at 60% opacity, gear `app-menu` opening our `Menu`: Settings Ctrl+, , Back up now, Restore from backup..., Export to Markdown...), then a `ScrollArea` with All Notes, Note Templates (`nav-templates`), Notebooks (search, `new-notebook`), the notebook tree, Status (collapse), Tags (search, collapse), Trash. `bourbon_ui::ListRow` per research 3.2: 30 px, 14 px, 16 px icon, count 10 px at 60%, no hover background, selected tint, 5 px accent bar only while the sidebar has focus (`sidebar_focus`, `contains_focused`). Status rows use the token status colours; section collapse state is `SidebarState::collapsed` (memory only; header ids `status-header`, `tags-header`). Search icons open the control pane |
+| Tree | Depth-first rows indented per depth; each row shows name and `NotebookNode::note_count`. Rows with children have the animated chevron disclosure (`ListRow::disclosure`, `notebooks::disclosure_state`) that expands/collapses without navigating |
 | Expansion | `SidebarState::expanded` (set of `NotebookId`), all collapsed at startup, lives in the workspace |
 | Depth | `Navigation::Notebook(id, depth)`. Selecting an expanded notebook uses `DirectOnly`; a collapsed one `WithDescendants`. Toggling the disclosure of the selected notebook re-applies the depth and reloads the list |
-| Notebook menu | Right click: New sub-notebook (also expands the parent), Rename, Use for new notes (sets the default notebook), Delete. The Inbox (`default_notebook()`, read once at startup) has no Delete |
+| Notebook menu | Right click (our `Menu`, `notebooks::notebook_menu`): New sub-notebook (also expands the parent), Rename, Use for new notes (sets the default notebook), Delete. The Inbox (`default_notebook()`, read once at startup) has no Delete |
 | Tag rows | Colour dot (fixed palette in `presentation.rs`, independent of the theme), name, `TagSummary::note_count`. Click selects the tag alone; `Ctrl+click` toggles it in the `Navigation::Tags` selection (notes having all of them); removing the last tag goes to All Notes |
-| Tag menu | Rename, Change colour (submenu of the 14 `TagColor` values, current one checked), Delete |
-| Prompt | One inline panel at the top of the sidebar (`SidebarState::prompt`): a name field with Save/Cancel (Enter also saves) for create and rename, a question with Delete/Cancel for deletions ("Delete notebook X? Its notes move to Trash."). No dialog: the dialog layer needs `Root` as the window root view, which the app does not use. A core error (empty name, duplicate tag) goes to the banner and the prompt stays open; success clears the banner and the prompt |
+| Tag menu | Rename, Change colour (the owner replaces the menu with the 14 `TagColor` values, current one checked, at the same position), Delete |
+| Prompt | One inline panel at the top of the sidebar (`SidebarState::prompt`; the name field is still the component `Input` until the text-field slice, the buttons are `bourbon_ui::Button`): a name field with Save/Cancel (Enter also saves) for create and rename, a question with Delete/Cancel for deletions ("Delete notebook X? Its notes move to Trash."). No dialog: the dialog layer needs `Root` as the window root view, which the app does not use. A core error (empty name, duplicate tag) goes to the banner and the prompt stays open; success clears the banner and the prompt |
 | After a mutation | `refresh_listing` once (sidebar data and list). Deleting a notebook first flushes the pending save, and afterwards deselects the open note if it is now trashed or gone (empty state). Creating a sub-notebook re-applies the parent's depth to the navigation without reloading, so the single reload covers it. Deleting a notebook whose subtree contains the current notebook, or deleting a selected tag, adjusts the navigation first (All Notes, or the remaining tags) |
 | `Ctrl+/` | `ToggleSidebar` action bound in `window::bind_keys`; `SidebarState::is_visible`, the other two columns take the space |
-| Drop target | Notebook rows accept a dragged note (`on_drop::<DraggedNote>`) and highlight with the theme `drop_target` colour while one is over them. The drop calls `Workspace::drop_note_on_notebook` |
+| Drop target | Notebook rows accept a dragged note (`on_drop::<DraggedNote>`) and the row takes the active selection colour while one is over it. The drop calls `Workspace::drop_note_on_notebook` |
 | Not in this slice | Sidebar sorting |
 
-Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure clicks, `Ctrl+click`, right click plus keyboard choice in the popup menu, typing into the prompt, and `Ctrl+/` through the key binding. Counts are checked from painted text inside each row's bounds.
+Tests (`workspace/tests/sidebar.rs`) drive real elements: row clicks (wrapper ids `nav-*` carry `test_support`, since kit rows are not observable), the disclosure by clicking at its offset in the row, `Ctrl+click`, right click plus `down`/`enter` in our `Menu` (labels read from `Workspace::open_menu`), Escape closing the menu, focus returning to the sidebar, typing into the prompt, and `Ctrl+/`. The accent bar itself is tested in `bourbon-ui` with a debug selector; here the tests check which pane holds the focus that decides it.
 
 ## Note list
 
@@ -94,17 +96,17 @@ Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure cli
 | File | Responsibility |
 |---|---|
 | `note_list/mod.rs` | Column layout, the "No notes" empty state, selection rule |
-| `note_list/header.rs` | 40 px header: `toggle-sidebar` icon, title button (`note-list-title`) opening a menu (Sort by updated/created/title with check, then "New from template" and one item per template), compose icon (`new-note`; creates a template in Templates; in Trash it is `empty-trash`) |
-| `note_list/filter.rs` | "Filter" input under the header (`note-filter`); `narrow` intersects the listing with core `search_notes` ids (titles and bodies); empty means no filter; Esc clears (`ClearFilter`, key context `NoteFilter`). Search skips templates and trash, so the filter empties those views |
-| `note_list/date.rs` | `relative_age(updated, now)`: just now, N minute(s)/hour(s)/day(s)/week(s)/month(s)/year(s) ago (jiff) |
-| `icons.rs` | `glyph(IconName)` over an embedded subset of the lucide icons, `status_glyph` |
-| `note_list/row.rs` | Full-bleed row, 1 px separator: pin icon, status icon, bold title (2 lines), age in the accent colour, task progress (icon, 30x4 bar, "2 of 4"), tag pills (15% tint of the tag colour), 13 px excerpt, context menu |
+| `note_list/header.rs` | 40 px header: sidebar toggle `IconButton` (`toggle-sidebar`, tooltip with the live `Ctrl+/`), centred title with icon (`note-list-title`, 16.8 px, medium) opening our `Menu` (Sort by updated/created/title with check, then a disabled "New from template" label and one item per template), compose `IconButton` (`new-note`; creates a template in Templates; in Trash it is `empty-trash`, disabled when empty) |
+| `note_list/filter.rs` | 34 px bar, field with 1 px internal border, 7 px radius, search icon at 30% opacity; the text input is still the component `Input` (next slice). `narrow` intersects the listing with core `search_notes` ids (titles and bodies); empty means no filter; Esc clears (`ClearFilter`, key context `NoteFilter`). Search skips templates and trash, so the filter empties those views |
+| `note_list/date.rs` | `relative_age(updated, now)` (just now, N minute(s)/.../year(s) ago) and `date_label(stamp, now, zone)`: relative up to 37 days, then `YYYY-MM-DD` in the given zone (research 3.3). The stamp is the created time when sorting by created, else the updated time; templates show no date |
+| `note_list/row.rs` | Row per research 3.3: padding 2/0/10/14, 1 px separator, pin and status icons inline before the bold 2-line title (strike-through for Dropped), meta line (date in the date colour, 32x6 progress bar, green when complete, compact `bourbon_ui::Pill` per tag), muted one-line excerpt. Selected tint; 5 px bar only while the list has focus; no hover background. Right click opens the note menu |
 | `note_list/title.rs` | Pure view title: "All Notes", notebook name, status label (from `presentation.rs`), tag names, "Trash" |
-| `note_list/date.rs` | Pure `short_date(updated, now, zone)`: `14:30` today, `Nov 6` this year, `Nov 6, 2025` otherwise; the app passes `jiff::tz::TimeZone::system()` |
-| `workspace/note_list_intents.rs` | `sort_by`, `toggle_pin`, `duplicate`, `move_to_trash`, `restore`, `confirm_empty_trash`, `empty_trash` |
+| `workspace/note_list_intents.rs` | `sort_by`, `select_adjacent_note`, `toggle_pin`, `duplicate`, `move_to_trash`, `restore`, `confirm_empty_trash`, `empty_trash` |
 
 ### Behaviour
 
+- The rows live in a GPUI `list` (variable heights) driven by `Workspace::note_list_state`; `reload_list` splices it, opening a note scrolls it into view. The notes are an `Rc<[NoteSummary]>` shared with the row closure.
+- The list pane has its own focus handle and key context `NoteList`: `Up`/`Down` (`SelectPreviousNote`/`SelectNextNote`) open the neighbouring note through `select` and the focus stays in the list.
 - The sort selector sets `Listing::sort` and reloads; pinned notes stay on top because the core guarantees it (decision 16).
 - The context menu (right click) outside Trash offers Pin or Unpin, Duplicate, Move to Trash; in Trash only Restore.
 - Every change goes through one path (`change_notes`): `flush_then`, call the core, `refresh_listing`, report a store error in the banner. Pin uses the core `toggle_pin`; the app does not read its list to pick a direction. A tag chip click calls the sidebar's single-tag selection (`select_tag`).
@@ -118,7 +120,7 @@ Tests (`workspace/tests/sidebar.rs`) drive real elements: row and disclosure cli
 
 `workspace/tests/drag.rs`: real drags (`drag_to` from `note-<id>` to `nav-notebook-<id>`) check the move, the open note staying open, the list refresh, the header, the pending-edit flush and Trash rows not being draggable.
 
-`workspace/tests/note_list.rs`: the context menu and the sort dropdown are driven through the real popup (right click on `note-<id>`, then `down`/`enter` keystrokes; menu labels are checked with `find_by_label`), the dialog through `enter` and `escape`, chips through `chip-<note>-<tag>`, pins through `pin-<note>`. Date, title and prompt text are pure unit tests.
+`workspace/tests/note_list.rs`: the context menu and the sort menu are driven through our `Menu` (right click or click on `note-list-title`, then `down`/`enter`; labels come from the open menu), arrow keys with the list focus, which pane holds the focus, the dialog through `enter` and `escape`, chips through `chip-<note>-<tag>`, pins through `pin-<note>`. Dates (including the 37-day switch), titles, `adjacent_note` and prompt text are pure unit tests.
 
 ## Editor header
 
@@ -195,16 +197,16 @@ Tests: pure unit tests next to each file; `workspace/tests/control_pane.rs` driv
 ## Settings, themes and panes (M5)
 
 - `locations.rs`: `Locations` (settings file, Omarchy colors path) is injected into `Workspace::new`; tests pass temp paths.
-- `theme/`: `palette.rs` holds the Bourbon palettes as data, the Omarchy mapping and `resolve`; `watch.rs` is the mtime watch; `apply` paints gpui-component's `Theme`. `Workspace` polls the watch every 2 s.
+- `theme/`: `palette.rs` holds the Bourbon palettes as data, the Omarchy mapping and `resolve`; `tokens.rs` resolves the `bourbon_ui::Tokens` (Inkdrop light/dark, or `omarchy_tokens` for Omarchy) and `apply` installs them next to gpui-component's `Theme`, which still paints the editor column; `watch.rs` is the mtime watch. `Workspace` polls the watch every 2 s.
 - `settings_view.rs` replaces the editor column; `workspace/settings_intents.rs` holds the intents (`open_settings`, `set_theme_source`, `set_appearance`, `resize_*`, `finish_resizing`). Each change applies the theme and saves.
-- `panes.rs`: the draggable `Divider` handles; widths come from `Settings` and flow into `SidebarData` and `NoteListData`.
+- Column widths come from `Settings` and flow into `SidebarData` and `NoteListData`; `bourbon_ui::Splitter` reports them through `resize_sidebar` / `resize_note_list` and `finish_resizing` saves on release.
 - Keys: `Ctrl+,` opens settings; control pane action "Open settings".
 
 ## Data: backup, restore, export (M6)
 
 - `backup_runner.rs`: `BackupRunner` trait and `GitBackupRunner`; `Locations` carries the database path, token file, work dir and runner.
 - `workspace/data_intents.rs`: `DataState` (running, dirty, status, timers), `back_up_now`, the 5 minute timer (`note_data_changed`), `request_close` (bounded 20 s), `begin_restore`/`confirm_restore`/`cancel_restore`, `export_to_markdown`/`export_into`.
-- `sidebar/menu.rs`: the "⋯" menu; entries run `PaneAction`s through `run_pane_action`.
+- `sidebar/menu.rs`: the gear menu; entries run `PaneAction`s through `run_pane_action`.
 - `settings_view.rs`: Backup section, `restore_confirmation`, `notice_banner`. Tests: `workspace/tests/data.rs` with a recording fake runner. Details in [the M6 app decision](../decisions/2026-11-06-m6-data-app.md).
 
 ## Single instance

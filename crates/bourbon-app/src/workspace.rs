@@ -4,24 +4,28 @@ mod tests;
 mod control_pane_intents;
 mod data_intents;
 mod editor_intents;
+mod menus;
 mod note_list_intents;
 mod settings_intents;
 mod sidebar_intents;
 mod writing_intents;
 
+pub(crate) use menus::{MenuBuilder, OpenMenu};
+
+use std::rc::Rc;
 use std::time::Duration;
 
 use bourbon_core::{
     Note, NoteId, NoteQuery, NoteScope, NoteSeed, NoteStore, NoteSummary, NotebookId, NotebookNode,
     Settings, StoreError, TagSummary, TemplateTimeZone, Timestamp, ViewMode,
 };
-use gpui_kit::component::ActiveTheme as _;
+use bourbon_ui::{Splitter, ThemeExt as _};
 use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, AppContext as _, Context, DragMoveEvent, Entity, FocusHandle, Focusable,
-    InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Task, Window, div,
+    AnyElement, AppContext as _, Context, Entity, FocusHandle, Focusable, InteractiveElement as _,
+    IntoElement, ListState, ParentElement as _, Pixels, Point, Render, ScrollHandle, SharedString,
+    Styled as _, Subscription, Task, TestSupportExt as _, Window, div,
 };
 
 use crate::control_pane::{self, ControlPane};
@@ -29,7 +33,6 @@ use crate::editor::{self, EditorPane, EditorView, History};
 use crate::locations::Locations;
 use crate::navigation::{Listing, Navigation};
 use crate::note_list::NoteListData;
-use crate::panes::{self, Divider};
 use crate::settings_view::SettingsData;
 use crate::sidebar::{SidebarCounts, SidebarData};
 use crate::sidebar::{SidebarState, ToggleSidebar};
@@ -44,7 +47,8 @@ gpui_kit::actions!(
 pub struct Workspace {
     store: NoteStore,
     listing: Listing,
-    notes: Vec<NoteSummary>,
+    notes: Rc<[NoteSummary]>,
+    note_list_state: ListState,
     templates: Vec<NoteSummary>,
     counts: SidebarCounts,
     notebooks: Vec<NotebookNode>,
@@ -70,6 +74,11 @@ pub struct Workspace {
     token_input: Entity<InputState>,
     filter_input: Entity<InputState>,
     focus_handle: FocusHandle,
+    sidebar_focus: FocusHandle,
+    note_list_focus: FocusHandle,
+    sidebar_scroll: ScrollHandle,
+    open_menu: Option<OpenMenu>,
+    menu_origin: Point<Pixels>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -129,7 +138,8 @@ impl Workspace {
         let mut view = Self {
             store,
             listing: Listing::default(),
-            notes: Vec::new(),
+            notes: Rc::from(Vec::new()),
+            note_list_state: note_list::new_list_state(),
             templates: Vec::new(),
             counts: SidebarCounts::default(),
             notebooks: Vec::new(),
@@ -155,6 +165,11 @@ impl Workspace {
             token_input,
             filter_input,
             focus_handle: cx.focus_handle(),
+            sidebar_focus: cx.focus_handle(),
+            note_list_focus: cx.focus_handle(),
+            sidebar_scroll: ScrollHandle::new(),
+            open_menu: None,
+            menu_origin: Point::default(),
             _subscriptions: subscriptions,
         };
         view.purge_expired_trash(cx);
@@ -221,7 +236,11 @@ impl Workspace {
     fn reload_list(&mut self, cx: &mut Context<Self>) {
         let matching = self.filter_matches(cx);
         match self.store.list_notes(&self.listing.query()) {
-            Ok(notes) => self.notes = note_list::narrow(notes, matching.as_ref()),
+            Ok(notes) => {
+                let previous = self.notes.len();
+                self.notes = Rc::from(note_list::narrow(notes, matching.as_ref()));
+                self.note_list_state.splice(0..previous, self.notes.len());
+            }
             Err(error) => self.report(&error, cx),
         }
     }
@@ -375,6 +394,9 @@ impl Workspace {
         self.editor.link_picker = None;
         self.editor.load(note.clone(), window, cx);
         self.history.visit(&note.id);
+        if let Some(position) = self.notes.iter().position(|listed| listed.id == note.id) {
+            self.note_list_state.scroll_to_reveal_item(position);
+        }
         self.selected = Some(note.id);
         cx.notify();
     }
@@ -444,7 +466,11 @@ impl Focusable for Workspace {
 }
 
 impl Workspace {
-    fn sidebar_column(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+    fn sidebar_column(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Option<impl IntoElement + use<>> {
         if self.focus_mode {
             return None;
         }
@@ -456,12 +482,19 @@ impl Workspace {
                 counts: &self.counts,
                 state: &self.sidebar,
                 width: f32::from(self.settings.sidebar_width()),
+                is_focused: self.sidebar_focus.contains_focused(window, cx),
+                focus: &self.sidebar_focus,
+                scroll: &self.sidebar_scroll,
             },
             cx,
         )
     }
 
-    fn note_list_column(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+    fn note_list_column(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Option<impl IntoElement + use<>> {
         (!self.focus_mode).then(|| {
             note_list::render(
                 &NoteListData {
@@ -474,39 +507,76 @@ impl Workspace {
                     selected: self.selected.as_ref(),
                     filter: &self.filter_input,
                     width: f32::from(self.settings.note_list_width()),
+                    is_focused: self.note_list_focus.contains_focused(window, cx),
+                    focus: &self.note_list_focus,
+                    state: &self.note_list_state,
                 },
                 cx,
+            )
+        })
+    }
+
+    fn sidebar_splitter(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+        (!self.focus_mode && self.sidebar.is_visible).then(|| {
+            let limits = cx.theme().tokens.scale.sidebar_width;
+            let (resizing, finishing) = (cx.entity(), cx.entity());
+            div().id("sidebar-splitter").test_support().child(
+                Splitter::new(
+                    "sidebar-splitter-handle",
+                    gpui_kit::px(f32::from(self.settings.sidebar_width())),
+                    limits,
+                )
+                .on_resize(move |width, _, cx| {
+                    resizing.update(cx, |workspace, cx| {
+                        workspace.resize_sidebar(f32::from(width), cx);
+                    });
+                })
+                .on_resize_end(move |_, cx| {
+                    finishing.update(cx, Workspace::finish_resizing);
+                }),
+            )
+        })
+    }
+
+    fn note_list_splitter(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+        (!self.focus_mode).then(|| {
+            let limits = cx.theme().tokens.scale.note_list_width;
+            let (resizing, finishing) = (cx.entity(), cx.entity());
+            div().id("note-list-splitter").test_support().child(
+                Splitter::new(
+                    "note-list-splitter-handle",
+                    gpui_kit::px(f32::from(self.settings.note_list_width())),
+                    limits,
+                )
+                .on_resize(move |width, _, cx| {
+                    resizing.update(cx, |workspace, cx| {
+                        workspace.resize_note_list(f32::from(width), cx);
+                    });
+                })
+                .on_resize_end(move |_, cx| {
+                    finishing.update(cx, Workspace::finish_resizing);
+                }),
             )
         })
     }
 }
 
 impl Render for Workspace {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pane = self.open_pane(cx);
-        let sidebar = self.sidebar_column(cx);
-        let note_list = self.note_list_column(cx);
+        let sidebar = self.sidebar_column(window, cx);
+        let sidebar_splitter = self.sidebar_splitter(cx);
+        let note_list = self.note_list_column(window, cx);
+        let note_list_splitter = self.note_list_splitter(cx);
+        let menu = self.menu_popover(cx);
         div()
             .track_focus(&self.focus_handle)
             .relative()
             .size_full()
             .flex()
             .flex_col()
-            .bg(cx.theme().background)
-            .text_color(cx.theme().foreground)
-            .on_drag_move::<Divider>(cx.listener(|view, event: &DragMoveEvent<Divider>, _, cx| {
-                let pointer = f32::from(event.event.position.x);
-                match event.drag(cx) {
-                    Divider::AfterSidebar => view.resize_sidebar(pointer, cx),
-                    Divider::AfterNoteList => {
-                        view.resize_note_list_to_pointer(pointer, cx);
-                    }
-                }
-            }))
-            .on_mouse_up(
-                MouseButton::Left,
-                cx.listener(|view, _, _, cx| view.finish_resizing(cx)),
-            )
+            .bg(gpui_kit::component::ActiveTheme::theme(&**cx).background)
+            .text_color(gpui_kit::component::ActiveTheme::theme(&**cx).foreground)
             .on_action(cx.listener(|view, _: &NewNote, window, cx| view.create_note(window, cx)))
             .on_action(cx.listener(|view, _: &ToggleSidebar, _, cx| view.toggle_sidebar(cx)))
             .on_action(cx.listener(|view, _: &OpenSettings, _, cx| view.open_settings(cx)))
@@ -532,20 +602,10 @@ impl Render for Workspace {
                     .flex_1()
                     .min_h_0()
                     .flex()
-                    .children(sidebar.map(|sidebar| {
-                        div().flex().child(sidebar).child(panes::divider(
-                            "sidebar-divider",
-                            Divider::AfterSidebar,
-                            cx,
-                        ))
-                    }))
-                    .children(note_list.map(|note_list| {
-                        div().flex().child(note_list).child(panes::divider(
-                            "note-list-divider",
-                            Divider::AfterNoteList,
-                            cx,
-                        ))
-                    }))
+                    .children(sidebar)
+                    .children(sidebar_splitter)
+                    .children(note_list)
+                    .children(note_list_splitter)
                     .child(pane),
             )
             .children(
@@ -553,5 +613,6 @@ impl Render for Workspace {
                     .as_ref()
                     .map(|open_pane| control_pane::render(open_pane, cx)),
             )
+            .children(menu)
     }
 }

@@ -12,3 +12,7 @@ Decided with the user. Research: [inkdrop-ui-shell.md](../research/inkdrop-ui-sh
 | 6 | Phases | **0** text core → **1** minimal editor + minimal preview → **2** `bourbon-ui` + Inkdrop shell → **3** editor/preview behaviours, three modes, scroll sync → **4** fine parity (cards, folding, `[[` completion), verified by screenshot diff against Inkdrop at identical sizes | Each phase is usable and testable |
 | 7 | Known differences | Icons are free line icons in the same style (Inkdrop's set is licensed); text rendering is GPUI's, not Chromium's; squircle corners approximated; context menus drawn by us; math and mermaid later | Honest limits |
 | 8 | Open PRs | **#29 merged** (core counts, task progress, stripped excerpts, relative dates, Inter font); **#30 closed** (editor rebuilt from scratch) | Keep the core work, drop the throwaway UI |
+
+## Progress
+
+- Phase 2 slice 1 (sidebar and note list on `bourbon-ui`, Inkdrop-identical, splitters, our menus): done; editor column, control pane and settings follow.

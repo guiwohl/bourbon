@@ -3,7 +3,10 @@ use gpui_kit::VisualTestContext;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
 
-use super::{at, choose_popup_item, click, listed_titles, note_in, open_view, popup_labels};
+use super::{
+    at, choose_menu_entry, choose_popup_item, click, listed_titles, menu_labels, note_in,
+    open_view, popup_labels,
+};
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
 
@@ -61,11 +64,12 @@ fn title_is_focused(cx: &mut TestAppContext, handle: AnyWindowHandle) -> bool {
     .unwrap()
 }
 
-const FIRST_TEMPLATE_ITEM: usize = 5;
+const FIRST_TEMPLATE_ITEM: usize = 4;
+const SORT_ENTRIES: usize = 3;
 
 fn new_from_template(cx: &mut TestAppContext, handle: AnyWindowHandle, index: usize) {
     click(cx, handle, "note-list-title");
-    choose_popup_item(cx, handle, FIRST_TEMPLATE_ITEM + index);
+    choose_menu_entry(cx, handle, SORT_ENTRIES + index);
 }
 
 #[gpui_kit::test]
@@ -140,12 +144,12 @@ fn the_new_note_button_in_the_templates_view_creates_a_template(cx: &mut TestApp
 fn new_from_template_is_hidden_without_templates(cx: &mut TestAppContext) {
     let fixture = fixture();
     note_in(&fixture.store, &fixture.inbox, "Plain", 2);
-    let (handle, _) = open_view(cx, fixture.store);
+    let (handle, view) = open_view(cx, fixture.store);
 
     click(cx, handle, "note-list-title");
 
     assert_eq!(
-        popup_labels(cx, handle),
+        menu_labels(cx, &view),
         ["Sort by updated", "Sort by created", "Sort by title"]
     );
 }
@@ -155,11 +159,11 @@ fn the_menu_lists_templates_by_title_with_untitled_for_blank_ones(cx: &mut TestA
     let fixture = fixture();
     template_in(&fixture.store, &fixture.inbox, "Meeting", 3);
     template_in(&fixture.store, &fixture.inbox, "", 4);
-    let (handle, _) = open_view(cx, fixture.store);
+    let (handle, view) = open_view(cx, fixture.store);
 
     click(cx, handle, "note-list-title");
 
-    let labels = popup_labels(cx, handle);
+    let labels = menu_labels(cx, &view);
     assert_eq!(labels[FIRST_TEMPLATE_ITEM - 1], "New from template");
     assert_eq!(labels[FIRST_TEMPLATE_ITEM..], ["Untitled", "Meeting"]);
 }

@@ -7,6 +7,7 @@ use gpui_kit::{
     WindowOptions,
 };
 
+use crate::assets::AppAssets;
 use crate::editor::actions::{
     CycleViewMode, ExitFocusMode, FindInNote, HistoryBack, HistoryForward, LinkPickCancel,
     LinkPickConfirm, LinkPickNext, LinkPickPrevious, OpenNotebookSelector, ReplaceInNote,
@@ -15,7 +16,7 @@ use crate::editor::actions::{
 };
 use crate::fonts;
 use crate::locations::Locations;
-use crate::note_list::ClearFilter;
+use crate::note_list::{ClearFilter, SelectNextNote, SelectPreviousNote};
 use crate::sidebar::ToggleSidebar;
 use crate::workspace::{NewNote, OpenActionSearch, OpenNoteSearch, OpenSettings, Workspace};
 
@@ -48,7 +49,7 @@ pub(crate) fn app_id() -> &'static str {
 
 pub(crate) fn run(store: NoteStore, locations: Locations, focus_requests: Receiver<()>) {
     gpui_kit::application()
-        .with_assets(gpui_kit::assets::Assets)
+        .with_assets(AppAssets)
         .run(move |cx| {
             gpui_kit::init(cx);
             fonts::register(cx);
@@ -83,6 +84,7 @@ fn forward_focus_requests(window: AnyWindowHandle, focus_requests: Receiver<()>,
 }
 
 pub(crate) fn bind_keys(cx: &mut App) {
+    bourbon_ui::init(cx);
     cx.bind_keys([
         KeyBinding::new("ctrl-n", NewNote, None),
         KeyBinding::new("ctrl-/", ToggleSidebar, None),
@@ -114,6 +116,8 @@ pub(crate) fn bind_keys(cx: &mut App) {
         KeyBinding::new("enter", LinkPickConfirm, Some("LinkPicker > Input")),
         KeyBinding::new("escape", LinkPickCancel, Some("LinkPicker > Input")),
         KeyBinding::new("escape", ClearFilter, Some("NoteFilter > Input")),
+        KeyBinding::new("up", SelectPreviousNote, Some("NoteList")),
+        KeyBinding::new("down", SelectNextNote, Some("NoteList")),
     ]);
 }
 

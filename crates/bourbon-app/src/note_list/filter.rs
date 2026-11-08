@@ -1,21 +1,23 @@
 use std::collections::HashSet;
 
 use bourbon_core::{NoteId, NoteSummary};
-use gpui_kit::assets::IconName;
-use gpui_kit::component::ActiveTheme as _;
+use bourbon_ui::{Icon, IconName, ThemeExt as _};
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::{
     Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Styled as _,
     TestSupportExt as _, div, px,
 };
 
-use crate::icons::glyph;
 use crate::workspace::Workspace;
 
 gpui_kit::actions!(bourbon, [ClearFilter]);
 
-const FILTER_HEIGHT: f32 = 32.;
 const SIDE_MARGIN: f32 = 12.;
+const VERTICAL_MARGIN: f32 = 2.;
+const HORIZONTAL_PADDING: f32 = 8.;
+const VERTICAL_PADDING: f32 = 4.;
+const ICON_OPACITY: f32 = 0.3;
+const ICON_SIZE: f32 = 16.;
 
 pub(crate) fn narrow(
     notes: Vec<NoteSummary>,
@@ -34,36 +36,50 @@ pub(crate) fn render(
     input: &Entity<InputState>,
     cx: &mut Context<Workspace>,
 ) -> impl IntoElement + use<> {
-    let theme = cx.theme();
+    let tokens = cx.theme().tokens.clone();
+    let colors = tokens.colors;
     div()
-        .id("note-filter")
-        .test_support()
-        .key_context("NoteFilter")
-        .on_action(cx.listener(|workspace, _: &ClearFilter, window, cx| {
-            workspace.clear_filter(window, cx);
-        }))
-        .mx(px(SIDE_MARGIN))
-        .mb_2()
-        .h(px(FILTER_HEIGHT))
+        .h(tokens.scale.search_bar_height)
         .flex_none()
         .flex()
-        .flex_row()
         .items_center()
-        .gap_2()
-        .px_2()
-        .rounded(px(6.))
-        .border_1()
-        .border_color(theme.border)
-        .bg(theme.background)
-        .text_color(theme.muted_foreground)
-        .child(glyph(IconName::Funnel))
         .child(
-            div().flex_1().child(
-                Input::new(input)
-                    .id("note-filter-input")
-                    .appearance(false)
-                    .bordered(false),
-            ),
+            div()
+                .id("note-filter")
+                .test_support()
+                .key_context("NoteFilter")
+                .on_action(cx.listener(|workspace, _: &ClearFilter, window, cx| {
+                    workspace.clear_filter(window, cx);
+                }))
+                .flex_1()
+                .min_w_0()
+                .mx(px(SIDE_MARGIN))
+                .my(px(VERTICAL_MARGIN))
+                .px(px(HORIZONTAL_PADDING))
+                .py(px(VERTICAL_PADDING))
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(HORIZONTAL_PADDING))
+                .rounded(tokens.scale.radius_default)
+                .border_1()
+                .border_color(colors.internal_border)
+                .text_color(colors.text)
+                .child(
+                    div().flex_none().opacity(ICON_OPACITY).child(
+                        Icon::new(IconName::Search)
+                            .size(px(ICON_SIZE))
+                            .color(colors.text),
+                    ),
+                )
+                .child(
+                    div().flex_1().child(
+                        Input::new(input)
+                            .id("note-filter-input")
+                            .appearance(false)
+                            .bordered(false),
+                    ),
+                ),
         )
 }
 

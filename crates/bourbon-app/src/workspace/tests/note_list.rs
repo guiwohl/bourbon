@@ -1,8 +1,11 @@
 use bourbon_core::{NoteId, NoteSort, NoteStore, TagColor, Timestamp};
-use gpui_kit::test::{TestQueryExt as _, TestWindowExt as _};
+use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
 
-use super::{at, click, listed_titles, note_in, open_view};
+use super::{
+    at, choose_menu_entry as choose_menu_item, click, listed_titles, menu_labels, note_in,
+    open_view,
+};
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
 
@@ -13,18 +16,6 @@ fn right_click(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) {
         window.render_frame(cx);
     })
     .unwrap();
-}
-
-fn choose_menu_item(cx: &mut TestAppContext, handle: AnyWindowHandle, position: usize) {
-    cx.update_window(handle, |_, window, cx| {
-        for _ in 0..=position {
-            window.press("down", cx);
-        }
-        window.press("enter", cx);
-        window.render_frame(cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
 }
 
 fn no_titles() -> Vec<String> {
@@ -218,42 +209,30 @@ fn the_trash_context_menu_restores_a_note_out_of_the_trash_list(cx: &mut TestApp
     assert_eq!(listed_titles(cx, &view).len(), 3);
 }
 
-fn is_labelled(cx: &mut TestAppContext, handle: AnyWindowHandle, label: &str) -> bool {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.try_find_by_label(label).is_some()
-    })
-    .unwrap()
-}
-
 #[gpui_kit::test]
 fn the_trash_context_menu_offers_only_restore(cx: &mut TestAppContext) {
     let (store, [_, zebra, _]) = three_notes();
     store.trash_note(&zebra, Timestamp::now()).unwrap();
-    let (handle, _) = open_view(cx, store);
+    let (handle, view) = open_view(cx, store);
     click(cx, handle, "nav-trash");
 
     right_click(cx, handle, &format!("note-{zebra}"));
 
-    assert!(is_labelled(cx, handle, "Restore"));
-    for label in ["Pin", "Unpin", "Duplicate", "Move to Trash"] {
-        assert!(!is_labelled(cx, handle, label), "{label}");
-    }
+    assert_eq!(menu_labels(cx, &view), ["Restore"]);
 }
 
 #[gpui_kit::test]
 fn the_list_context_menu_offers_pin_duplicate_and_trash(cx: &mut TestAppContext) {
     let (store, [mango, _, _]) = three_notes();
     store.pin_note(&mango).unwrap();
-    let (handle, _) = open_view(cx, store);
+    let (handle, view) = open_view(cx, store);
 
     right_click(cx, handle, &format!("note-{mango}"));
 
-    for label in ["Unpin", "Duplicate", "Move to Trash"] {
-        assert!(is_labelled(cx, handle, label), "{label}");
-    }
-    assert!(!is_labelled(cx, handle, "Restore"));
-    assert!(!is_labelled(cx, handle, "Pin"));
+    assert_eq!(
+        menu_labels(cx, &view),
+        ["Unpin", "Duplicate", "Move to Trash"]
+    );
 }
 
 #[gpui_kit::test]
@@ -456,4 +435,89 @@ fn press_escape_in_filter(cx: &mut TestAppContext, handle: AnyWindowHandle) {
         window.render_frame(cx);
     })
     .unwrap();
+}
+
+fn list_has_focus(
+    cx: &mut TestAppContext,
+    handle: AnyWindowHandle,
+    view: &Entity<Workspace>,
+) -> bool {
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        view.read(cx).note_list_focus.contains_focused(window, cx)
+    })
+    .unwrap()
+}
+
+fn sidebar_has_focus(
+    cx: &mut TestAppContext,
+    handle: AnyWindowHandle,
+    view: &Entity<Workspace>,
+) -> bool {
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        view.read(cx).sidebar_focus.contains_focused(window, cx)
+    })
+    .unwrap()
+}
+
+fn press_key(cx: &mut TestAppContext, handle: AnyWindowHandle, key: &str) {
+    cx.update_window(handle, |_, window, cx| window.press(key, cx))
+        .unwrap();
+    cx.run_until_parked();
+}
+
+#[gpui_kit::test]
+fn clicking_a_sidebar_row_focuses_the_sidebar_and_clicking_a_note_focuses_the_list(
+    cx: &mut TestAppContext,
+) {
+    let (store, [mango, _, _]) = three_notes();
+    let (handle, view) = open_view(cx, store);
+    assert!(!sidebar_has_focus(cx, handle, &view));
+    assert!(!list_has_focus(cx, handle, &view));
+
+    click(cx, handle, "nav-all-notes");
+    assert!(sidebar_has_focus(cx, handle, &view));
+    assert!(!list_has_focus(cx, handle, &view));
+
+    click(cx, handle, &format!("note-{mango}"));
+    assert!(list_has_focus(cx, handle, &view));
+    assert!(!sidebar_has_focus(cx, handle, &view));
+}
+
+#[gpui_kit::test]
+fn arrow_keys_open_the_neighbouring_notes_while_the_list_keeps_the_focus(cx: &mut TestAppContext) {
+    let (store, [mango, zebra, apple]) = three_notes();
+    let (handle, view) = open_view(cx, store);
+    click(cx, handle, &format!("note-{mango}"));
+    assert_eq!(listed_titles(cx, &view), ["Mango", "Apple", "Zebra"]);
+
+    press_key(cx, handle, "down");
+    assert_eq!(selected_title(cx, &view).as_deref(), Some("Apple"));
+    assert_eq!(cx.read(|cx| view.read(cx).selected.clone()), Some(apple));
+    assert!(list_has_focus(cx, handle, &view));
+
+    press_key(cx, handle, "down");
+    assert_eq!(cx.read(|cx| view.read(cx).selected.clone()), Some(zebra));
+    assert_eq!(cx.read(|cx| view.read(cx).editor.title(cx)), "Zebra");
+    assert!(list_has_focus(cx, handle, &view));
+
+    press_key(cx, handle, "down");
+    assert_eq!(selected_title(cx, &view).as_deref(), Some("Zebra"));
+
+    press_key(cx, handle, "up");
+    press_key(cx, handle, "up");
+    assert_eq!(cx.read(|cx| view.read(cx).selected.clone()), Some(mango));
+    assert!(list_has_focus(cx, handle, &view));
+}
+
+#[gpui_kit::test]
+fn arrow_keys_outside_the_list_do_not_change_the_open_note(cx: &mut TestAppContext) {
+    let (store, [mango, _, _]) = three_notes();
+    let (handle, view) = open_view(cx, store);
+    click(cx, handle, "nav-all-notes");
+
+    press_key(cx, handle, "down");
+
+    assert_eq!(cx.read(|cx| view.read(cx).selected.clone()), Some(mango));
 }

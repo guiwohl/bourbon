@@ -74,15 +74,6 @@ impl Workspace {
         cx.notify();
     }
 
-    pub(crate) fn resize_note_list_to_pointer(&mut self, pointer: f32, cx: &mut Context<Self>) {
-        let sidebar_edge = if self.sidebar.is_visible {
-            f32::from(self.settings.sidebar_width())
-        } else {
-            0.
-        };
-        self.resize_note_list(pointer - sidebar_edge, cx);
-    }
-
     pub(crate) fn finish_resizing(&mut self, cx: &mut Context<Self>) {
         if std::mem::take(&mut self.widths_changed) {
             self.persist_settings(cx);

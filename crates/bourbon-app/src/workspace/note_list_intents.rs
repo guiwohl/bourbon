@@ -5,6 +5,7 @@ use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::button::ButtonVariant;
 use gpui_kit::{Context, Window};
 
+use crate::note_list::{Step, adjacent_note};
 use crate::workspace::Workspace;
 
 pub(crate) fn empty_trash_prompt(count: usize) -> String {
@@ -37,6 +38,17 @@ impl Workspace {
                 self.report(&error, cx);
                 None
             }
+        }
+    }
+
+    pub(crate) fn select_adjacent_note(
+        &mut self,
+        step: Step,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(target) = adjacent_note(&self.notes, self.selected.as_ref(), step) {
+            self.select(&target, window, cx);
         }
     }
 

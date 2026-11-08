@@ -4,7 +4,9 @@ use std::time::{Duration, SystemTime};
 use bourbon_core::{Appearance, NoteStore, Settings, ThemeSource};
 use gpui_kit::component::{ActiveTheme as _, Theme};
 use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, Hsla, TestAppContext, VisualTestContext};
+use gpui_kit::{
+    AnyWindowHandle, AppContext as _, Entity, Hsla, TestAppContext, VisualTestContext, point, px,
+};
 
 use super::{click, isolated_locations, open_view, open_view_with};
 use crate::locations::Locations;
@@ -246,29 +248,72 @@ fn resizing_clamps_the_widths_and_saves_only_when_the_drag_ends(cx: &mut TestApp
         view.resize_note_list(5000., cx);
     });
     view.read_with(cx, |view, _| {
-        assert_eq!(view.settings.sidebar_width(), 160);
-        assert_eq!(view.settings.note_list_width(), 560);
+        assert_eq!(view.settings.sidebar_width(), 170);
+        assert_eq!(view.settings.note_list_width(), 500);
     });
     assert_eq!(saved(&locations).sidebar_width(), 200);
 
     view.update(cx, Workspace::finish_resizing);
-    assert_eq!(saved(&locations).sidebar_width(), 160);
-    assert_eq!(saved(&locations).note_list_width(), 560);
+    assert_eq!(saved(&locations).sidebar_width(), 170);
+    assert_eq!(saved(&locations).note_list_width(), 500);
+}
+
+fn drag_splitter(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str, distance: f32) {
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let start = window.find(id.to_owned()).bounds().center();
+        window.drag(start, point(start.x + px(distance), start.y), cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
 }
 
 #[gpui_kit::test]
-fn dragging_the_note_list_divider_measures_from_the_sidebar_edge(cx: &mut TestAppContext) {
-    let (handle, view) = open_view(cx, NoteStore::open_in_memory().unwrap());
+fn dragging_the_sidebar_splitter_resizes_the_sidebar_within_its_limits_and_saves_on_release(
+    cx: &mut TestAppContext,
+) {
+    let locations = isolated_locations();
+    let (handle, view) = open_view_with(
+        cx,
+        NoteStore::open_in_memory().unwrap(),
+        copy_of(&locations),
+    );
 
-    view.update(cx, |view, cx| view.resize_note_list_to_pointer(540., cx));
-    view.read_with(cx, |view, _| {
-        assert_eq!(view.settings.note_list_width(), 340);
+    drag_splitter(cx, handle, "sidebar-splitter", 60.);
+    let widened = view.read_with(cx, |view, _| view.settings.sidebar_width());
+    assert!((201..=260).contains(&widened));
+    assert_eq!(saved(&locations).sidebar_width(), widened);
+
+    drag_splitter(cx, handle, "sidebar-splitter", 1000.);
+    view.read_with(cx, |view, _| assert_eq!(view.settings.sidebar_width(), 500));
+    assert_eq!(saved(&locations).sidebar_width(), 500);
+
+    drag_splitter(cx, handle, "sidebar-splitter", -1000.);
+    view.read_with(cx, |view, _| assert_eq!(view.settings.sidebar_width(), 170));
+    assert_eq!(saved(&locations).sidebar_width(), 170);
+}
+
+#[gpui_kit::test]
+fn dragging_the_note_list_splitter_resizes_only_the_note_list(cx: &mut TestAppContext) {
+    let locations = isolated_locations();
+    let (handle, view) = open_view_with(
+        cx,
+        NoteStore::open_in_memory().unwrap(),
+        copy_of(&locations),
+    );
+
+    drag_splitter(cx, handle, "note-list-splitter", 40.);
+    let widened = view.read_with(cx, |view, _| {
+        assert_eq!(view.settings.sidebar_width(), 200);
+        view.settings.note_list_width()
     });
+    assert!((261..=300).contains(&widened));
+    assert_eq!(saved(&locations).note_list_width(), widened);
 
-    press(cx, handle, "ctrl-/");
-    view.update(cx, |view, cx| view.resize_note_list_to_pointer(540., cx));
+    drag_splitter(cx, handle, "note-list-splitter", -1000.);
     view.read_with(cx, |view, _| {
-        assert_eq!(view.settings.note_list_width(), 540);
+        assert_eq!(view.settings.note_list_width(), 220);
     });
 }
 

@@ -1,5 +1,6 @@
 use bourbon_core::Timestamp;
 use jiff::SignedDuration;
+use jiff::tz::TimeZone;
 
 const MINUTE: i64 = 60;
 const HOUR: i64 = 60 * MINUTE;
@@ -7,6 +8,27 @@ const DAY: i64 = 24 * HOUR;
 const WEEK: i64 = 7 * DAY;
 const MONTH: i64 = 30 * DAY;
 const YEAR: i64 = 365 * DAY;
+
+const ABSOLUTE_AFTER: i64 = 37 * DAY;
+
+pub(crate) fn date_label(stamp: Timestamp, now: Timestamp, zone: &TimeZone) -> String {
+    let elapsed = SignedDuration::from_millis(now.as_millis() - stamp.as_millis()).as_secs();
+    if elapsed > ABSOLUTE_AFTER {
+        return absolute_date(stamp, zone);
+    }
+    relative_age(stamp, now)
+}
+
+fn absolute_date(stamp: Timestamp, zone: &TimeZone) -> String {
+    jiff::Timestamp::from_millisecond(stamp.as_millis())
+        .map(|instant| {
+            instant
+                .to_zoned(zone.clone())
+                .strftime("%Y-%m-%d")
+                .to_string()
+        })
+        .unwrap_or_default()
+}
 
 pub(crate) fn relative_age(updated: Timestamp, now: Timestamp) -> String {
     let elapsed = SignedDuration::from_millis(now.as_millis() - updated.as_millis()).as_secs();
@@ -91,5 +113,35 @@ mod tests {
         assert_eq!(age(90 * 86_400), "3 months ago");
         assert_eq!(age(365 * 86_400), "1 year ago");
         assert_eq!(age(800 * 86_400), "2 years ago");
+    }
+
+    fn label(days: i64, extra_seconds: i64) -> String {
+        date_label(
+            Timestamp::from_millis(NOW - (days * 86_400 + extra_seconds) * 1000),
+            Timestamp::from_millis(NOW),
+            &TimeZone::UTC,
+        )
+    }
+
+    #[test]
+    fn a_note_up_to_thirty_seven_days_old_keeps_the_relative_date() {
+        assert_eq!(label(0, 5 * 60), "5 minutes ago");
+        assert_eq!(label(37, 0), "1 month ago");
+    }
+
+    #[test]
+    fn a_note_older_than_thirty_seven_days_shows_the_calendar_date() {
+        assert_eq!(label(37, 1), "2033-04-11");
+        assert_eq!(label(400, 0), "2032-04-13");
+    }
+
+    #[test]
+    fn the_calendar_date_is_read_in_the_given_time_zone() {
+        let stamp = Timestamp::from_millis(NOW - 100 * 86_400 * 1000);
+        let now = Timestamp::from_millis(NOW);
+        let utc = date_label(stamp, now, &TimeZone::UTC);
+        let behind = date_label(stamp, now, &TimeZone::fixed(jiff::tz::offset(-5)));
+        assert_eq!(utc, "2033-02-07");
+        assert_eq!(behind, "2033-02-06");
     }
 }

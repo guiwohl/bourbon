@@ -9,7 +9,7 @@ use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext, VisualT
 use jiff::civil::date;
 
 use super::{
-    choose_popup_item, click, locations_with_runner, note_in, open_view_with, popup_labels,
+    choose_menu_entry, click, locations_with_runner, menu_labels, note_in, open_view_with,
     seeded_store, type_into_title,
 };
 use crate::backup_runner::{BackupJob, BackupRunner};
@@ -154,7 +154,7 @@ fn the_app_menu_lists_its_four_entries_once_opened(cx: &mut TestAppContext) {
 
     click(cx, setup.handle, "app-menu");
 
-    assert_eq!(popup_labels(cx, setup.handle).len(), 4);
+    assert_eq!(menu_labels(cx, &setup.view).len(), 4);
 }
 
 #[gpui_kit::test]
@@ -162,7 +162,7 @@ fn the_menu_settings_entry_opens_settings(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     click(cx, setup.handle, "app-menu");
 
-    choose_popup_item(cx, setup.handle, 0);
+    choose_menu_entry(cx, setup.handle, 0);
 
     assert!(setup.view.read_with(cx, |view, _| view.settings_open));
 }
@@ -172,7 +172,7 @@ fn the_menu_back_up_entry_runs_a_backup_of_the_configured_repository(cx: &mut Te
     let setup = open_default(cx);
     click(cx, setup.handle, "app-menu");
 
-    choose_popup_item(cx, setup.handle, 1);
+    choose_menu_entry(cx, setup.handle, 1);
     cx.run_until_parked();
 
     let jobs = setup.runner.backups.lock().unwrap();
@@ -187,7 +187,7 @@ fn the_menu_restore_entry_asks_before_replacing_anything(cx: &mut TestAppContext
     let setup = open_default(cx);
     click(cx, setup.handle, "app-menu");
 
-    choose_popup_item(cx, setup.handle, 2);
+    choose_menu_entry(cx, setup.handle, 2);
 
     assert_eq!(
         setup.view.read_with(cx, |view, _| view.restore_question()),

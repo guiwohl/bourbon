@@ -13,6 +13,7 @@ type ResizeHandler = Rc<dyn Fn(Pixels, &mut Window, &mut App)>;
 type EndHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
 struct SplitterDrag {
+    owner: ElementId,
     grab_offset: Rc<Cell<Pixels>>,
 }
 
@@ -88,6 +89,7 @@ impl RenderOnce for Splitter {
         let handle = tokens.scale.splitter_handle;
         let border = tokens.scale.border;
         let (width, limits) = (self.width, self.limits);
+        let owner = self.id.clone();
         let grab_offset = Rc::new(Cell::new(px(0.)));
         let remembered_grab = grab_offset.clone();
         let on_resize = self.on_resize;
@@ -109,12 +111,22 @@ impl RenderOnce for Splitter {
                     .left((border - handle) / 2.)
                     .w(handle)
                     .cursor_col_resize()
-                    .on_drag(SplitterDrag { grab_offset }, move |_, offset, _, cx| {
-                        remembered_grab.set(offset.x);
-                        cx.new(|_| DragGhost)
-                    })
+                    .on_drag(
+                        SplitterDrag {
+                            owner: owner.clone(),
+                            grab_offset,
+                        },
+                        move |_, offset, _, cx| {
+                            remembered_grab.set(offset.x);
+                            cx.new(|_| DragGhost)
+                        },
+                    )
                     .on_drag_move(move |event: &DragMoveEvent<SplitterDrag>, window, cx| {
-                        let grab = event.drag(cx).grab_offset.get();
+                        let drag = event.drag(cx);
+                        if drag.owner != owner {
+                            return;
+                        }
+                        let grab = drag.grab_offset.get();
                         let handle_pointer = event.bounds.origin.x + grab;
                         let resized =
                             dragged_width(width, handle_pointer, event.event.position.x, limits);
@@ -191,6 +203,52 @@ mod tests {
             dragged_width(px(200.), px(205.), px(215.), LIMITS),
             px(210.)
         );
+    }
+
+    #[gpui::test]
+    fn dragging_one_splitter_never_resizes_another(cx: &mut TestAppContext) {
+        let resized = Rc::new(Cell::new((0, 0)));
+        let counts = resized.clone();
+        let visual = host(cx, move || {
+            let (first, second) = (counts.clone(), counts.clone());
+            div()
+                .flex()
+                .size_full()
+                .child(div().flex_none().h_full().w(px(200.)))
+                .child(
+                    Splitter::new("first", px(200.), LIMITS).on_resize(move |_, _, _| {
+                        first.set((first.get().0 + 1, first.get().1));
+                    }),
+                )
+                .child(div().flex_none().h_full().w(px(260.)))
+                .child(
+                    Splitter::new("second", px(260.), LIMITS).on_resize(move |_, _, _| {
+                        second.set((second.get().0, second.get().1 + 1));
+                    }),
+                )
+                .into_any_element()
+        });
+
+        visual.simulate_mouse_down(
+            point(px(200.5), px(100.)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        visual.simulate_mouse_move(
+            point(px(204.), px(100.)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        visual.simulate_mouse_move(
+            point(px(230.), px(100.)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        visual.run_until_parked();
+
+        let (first, second) = resized.get();
+        assert!(first > 0);
+        assert_eq!(second, 0);
     }
 
     #[gpui::test]
