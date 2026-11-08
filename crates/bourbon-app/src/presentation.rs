@@ -22,7 +22,7 @@ pub(crate) fn status_label(status: NoteStatus) -> &'static str {
 pub(crate) fn status_icon(status: NoteStatus, colors: &Colors) -> Option<(IconName, Hsla)> {
     match status {
         NoteStatus::None => None,
-        NoteStatus::Active => Some((IconName::CirclePlay, colors.status_active)),
+        NoteStatus::Active => Some((IconName::CirclePlay, colors.primary)),
         NoteStatus::OnHold => Some((IconName::CirclePause, colors.status_on_hold)),
         NoteStatus::Completed => Some((IconName::CircleCheck, colors.status_completed)),
         NoteStatus::Dropped => Some((IconName::CircleX, colors.status_dropped)),
@@ -88,6 +88,10 @@ mod tests {
     fn only_notes_with_a_status_get_a_status_icon_in_the_status_colour() {
         let colors = bourbon_ui::Tokens::light().colors;
         assert!(status_icon(NoteStatus::None, &colors).is_none());
+        assert_eq!(
+            status_icon(NoteStatus::Active, &colors),
+            Some((IconName::CirclePlay, colors.primary))
+        );
         assert_eq!(
             status_icon(NoteStatus::Completed, &colors),
             Some((IconName::CircleCheck, colors.status_completed))

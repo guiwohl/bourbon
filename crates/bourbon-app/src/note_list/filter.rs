@@ -15,7 +15,8 @@ gpui_kit::actions!(bourbon, [ClearFilter]);
 const SIDE_MARGIN: f32 = 12.;
 const VERTICAL_MARGIN: f32 = 2.;
 const HORIZONTAL_PADDING: f32 = 8.;
-const VERTICAL_PADDING: f32 = 4.;
+const FIELD_HEIGHT: f32 = 30.;
+const GAP_BELOW: f32 = 4.;
 const ICON_OPACITY: f32 = 0.3;
 const ICON_SIZE: f32 = 16.;
 
@@ -40,6 +41,7 @@ pub(crate) fn render(
     let colors = tokens.colors;
     div()
         .h(tokens.scale.search_bar_height)
+        .mb(px(GAP_BELOW))
         .flex_none()
         .flex()
         .items_center()
@@ -56,7 +58,8 @@ pub(crate) fn render(
                 .mx(px(SIDE_MARGIN))
                 .my(px(VERTICAL_MARGIN))
                 .px(px(HORIZONTAL_PADDING))
-                .py(px(VERTICAL_PADDING))
+                .h(px(FIELD_HEIGHT))
+                .overflow_hidden()
                 .flex()
                 .flex_row()
                 .items_center()
