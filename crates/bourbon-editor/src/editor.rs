@@ -383,6 +383,9 @@ mod tests {
             editor.invalidate_layouts();
             let fresh = editor.layout_for_line(0, window);
             assert!(!Rc::ptr_eq(&first, &fresh));
+            let second = editor.layout_for_line(1, window);
+            assert!(Rc::ptr_eq(&fresh, &editor.layout_for_line(0, window)));
+            assert!(Rc::ptr_eq(&second, &editor.layout_for_line(1, window)));
         });
     }
 
@@ -455,7 +458,7 @@ mod tests {
 
     #[gpui::test]
     fn changing_the_theme_remeasures_every_line(cx: &mut TestAppContext) {
-        let (editor, cx) = open(cx, &"x\n".repeat(20));
+        let (editor, cx) = open(cx, &"x\n".repeat(120));
         cx.run_until_parked();
         let mut theme = EditorTheme::light();
         theme.line_height = 3.0;
@@ -466,7 +469,7 @@ mod tests {
         });
         assert_eq!(stored, theme);
         let viewport = cx.update(|window, _| f32::from(window.viewport_size().height));
-        assert!((total - (21.0 * 39.0 - viewport).max(0.0)).abs() < 0.5);
+        assert!((total - (121.0 * 39.0 - viewport).max(0.0)).abs() < 0.5);
     }
 
     #[gpui::test]

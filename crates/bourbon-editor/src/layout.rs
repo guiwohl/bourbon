@@ -604,4 +604,11 @@ mod tests {
         assert_eq!(plain.weight, FontWeight::NORMAL);
         assert_eq!(plain.style, FontStyle::Normal);
     }
+
+    #[gpui::test]
+    fn a_selection_beyond_the_line_adds_nothing_even_through_the_break(cx: &mut TestAppContext) {
+        let layout = shape(cx, "hello", None);
+        assert_eq!(layout.selection_rects(&(10..12), true, px(6.0)), vec![]);
+        assert_eq!(layout.selection_rects(&(0..0), true, px(6.0)).len(), 1);
+    }
 }

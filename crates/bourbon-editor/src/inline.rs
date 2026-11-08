@@ -49,10 +49,10 @@ fn append(flat: &mut FlatText, inlines: &[Inline], flags: u8) {
     for inline in inlines {
         match inline {
             Inline::Text(text) => flat.push(text, flags),
-            Inline::Emphasis(children) => append(flat, children, flags | ITALIC),
-            Inline::Strong(children) => append(flat, children, flags | BOLD),
-            Inline::Strikethrough(children) => append(flat, children, flags | STRIKE),
-            Inline::Code(code) | Inline::InlineMath(code) => flat.push(code, flags | CODE),
+            Inline::Emphasis(children) => append(flat, children, with(flags, ITALIC)),
+            Inline::Strong(children) => append(flat, children, with(flags, BOLD)),
+            Inline::Strikethrough(children) => append(flat, children, with(flags, STRIKE)),
+            Inline::Code(code) | Inline::InlineMath(code) => flat.push(code, with(flags, CODE)),
             Inline::Link { href, children } => {
                 append_link(flat, children, flags, LinkTarget::Url(href.clone()));
             }
@@ -67,9 +67,13 @@ fn append(flat: &mut FlatText, inlines: &[Inline], flags: u8) {
     }
 }
 
+fn with(flags: u8, flag: u8) -> u8 {
+    flags | flag
+}
+
 fn append_link(flat: &mut FlatText, children: &[Inline], flags: u8, target: LinkTarget) {
     let start = flat.text.len();
-    append(flat, children, flags | LINK);
+    append(flat, children, with(flags, LINK));
     let end = flat.text.len();
     if end > start {
         flat.links.push((start..end, target));
