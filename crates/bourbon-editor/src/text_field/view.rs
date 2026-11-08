@@ -64,7 +64,7 @@ pub(super) fn render(
                 .bottom(ring_inset)
                 .left(ring_inset)
                 .right(ring_inset)
-                .rounded(tokens.scale.radius_default - ring_inset)
+                .rounded(ring_radius(&tokens.scale))
                 .border(tokens.scale.focus_ring_width)
                 .border_color(colors.focus_outline)
         }))
@@ -80,6 +80,10 @@ fn border_color(focused: bool, colors: &Colors) -> Hsla {
 
 fn ring_inset(scale: &Scale) -> Pixels {
     -(scale.border + scale.focus_ring_width)
+}
+
+fn ring_radius(scale: &Scale) -> Pixels {
+    scale.radius_default - ring_inset(scale)
 }
 
 fn with_actions(root: Div, cx: &mut Context<TextField>) -> Div {
@@ -153,5 +157,6 @@ mod tests {
     #[test]
     fn the_focus_ring_sits_just_outside_the_border() {
         assert_eq!(ring_inset(&Tokens::light().scale), px(-3.0));
+        assert_eq!(ring_radius(&Tokens::light().scale), px(10.0));
     }
 }

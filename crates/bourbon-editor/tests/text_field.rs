@@ -297,6 +297,7 @@ fn ime_composition_marks_then_commits(cx: &mut TestAppContext) {
         field.marked_text_range(window, cx)
     });
     assert_eq!(marked, Some(1..3));
+    assert_eq!(field.selection(), 3..3);
     field.field.update_in(field.cx, |field, window, cx| {
         field.replace_text_in_range(None, "你", window, cx);
     });
@@ -426,4 +427,36 @@ fn a_long_text_scrolls_to_keep_the_caret_visible(cx: &mut TestAppContext) {
     assert!(at_end > FIELD_WIDTH - TEXT_LEFT - CHAR_WIDTH);
     field.keys("home");
     assert!((caret_x(&mut field) - TEXT_LEFT).abs() < 0.05);
+}
+
+#[gpui::test]
+fn the_composition_selection_lands_inside_the_marked_text(cx: &mut TestAppContext) {
+    let mut field = open(cx, "abc");
+    field.keys("left left");
+    field.field.update_in(field.cx, |field, window, cx| {
+        field.replace_and_mark_text_in_range(None, "xyz", Some(1..2), window, cx);
+    });
+    assert_eq!(field.text(), "axyzbc");
+    assert_eq!(field.selection(), 2..3);
+}
+
+#[gpui::test]
+fn unmarking_ends_the_composition_and_keeps_its_text(cx: &mut TestAppContext) {
+    let mut field = open(cx, "");
+    let marked = field.field.update_in(field.cx, |field, window, cx| {
+        field.replace_and_mark_text_in_range(None, "ni", None, window, cx);
+        field.unmark_text(window, cx);
+        field.marked_text_range(window, cx)
+    });
+    assert_eq!(marked, None);
+    assert_eq!(field.text(), "ni");
+}
+
+#[gpui::test]
+fn clicking_a_scrolled_field_counts_the_hidden_text(cx: &mut TestAppContext) {
+    let mut field = open(cx, &"x".repeat(60));
+    field.cx.run_until_parked();
+    field.mouse_down(column_x(0.0), 1, false);
+    let offset = field.selection().start;
+    assert!((38..=39).contains(&offset), "offset {offset}");
 }
