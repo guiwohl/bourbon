@@ -1,5 +1,6 @@
 use bourbon_markdown::{
-    Anchor, PreviewDoc, highlight, line_decorations, line_for_preview_offset, preview_offset_for_line, task_lines,
+    Anchor, PreviewDoc, highlight, line_decorations, line_for_preview_offset,
+    preview_offset_for_line, task_lines,
 };
 use proptest::prelude::*;
 
