@@ -2,15 +2,14 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use bourbon_core::{Appearance, NoteStore, Settings, ThemeSource};
+use bourbon_ui::{ThemeExt as _, Tokens};
 use gpui::{AnyWindowHandle, AppContext as _, Entity, Hsla, TestAppContext, point, px};
-use gpui_kit::component::{ActiveTheme as _, Theme};
 
 use super::{
     choose_setting, click, drag_by, is_listed, isolated_locations, open_view, open_view_with,
     press, type_text,
 };
 use crate::locations::Locations;
-use crate::theme::BOURBON_LIGHT_BACKGROUND;
 use crate::workspace::Workspace;
 
 const LIGHT_SCHEME: &str = "background = \"#fdf6e3\"\nforeground = \"#586e75\"\naccent = \"#268bd2\"\nselection = \"#93a1a1\"\ncolor1 = \"#dc322f\"\ncolor8 = \"#839496\"\n";
@@ -19,11 +18,16 @@ const DARK_SCHEME: &str = "background = \"#001c2b\"\nforeground = \"#6c7c81\"\na
 const TAMPERED: u32 = 0x00ff_0000;
 
 fn tamper_with_the_background(cx: &mut TestAppContext) {
-    cx.update(|cx| Theme::update(cx, |theme| theme.colors.background = color(TAMPERED)));
+    cx.update(|cx| {
+        let mut tokens = cx.theme().tokens.clone();
+        tokens.colors.page_background = color(TAMPERED);
+        let appearance = cx.theme().appearance;
+        bourbon_ui::Theme::install_tokens(tokens, appearance, cx);
+    });
 }
 
 fn background(cx: &mut TestAppContext) -> Hsla {
-    cx.read(|cx| cx.theme().background)
+    cx.read(|cx| cx.theme().tokens.colors.page_background)
 }
 
 fn color(hex: u32) -> Hsla {
@@ -96,7 +100,7 @@ fn the_back_button_closes_the_settings_view(cx: &mut TestAppContext) {
 fn the_app_starts_in_the_light_bourbon_theme_by_default(cx: &mut TestAppContext) {
     open_view(cx, NoteStore::open_in_memory().unwrap());
 
-    assert_eq!(background(cx), color(BOURBON_LIGHT_BACKGROUND));
+    assert_eq!(background(cx), Tokens::light().colors.page_background);
     assert!(!cx.read(|cx| cx.theme().is_dark()));
 }
 
@@ -183,7 +187,7 @@ fn an_unreadable_omarchy_file_falls_back_to_bourbon_without_an_error(cx: &mut Te
     press(cx, handle, "ctrl-,");
     choose_setting(cx, handle, "settings-theme", 1);
 
-    assert_eq!(background(cx), color(BOURBON_LIGHT_BACKGROUND));
+    assert_eq!(background(cx), Tokens::light().colors.page_background);
     view.read_with(cx, |view, _| assert!(view.error_message.is_none()));
 }
 

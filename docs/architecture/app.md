@@ -1,6 +1,6 @@
 # bourbon-app
 
-GPUI window over `bourbon-core`. Holds no business rule: it presents state and forwards intent. Built on `gpui-kit` 0.9 (re-exports GPUI and gpui-component, still used by the control pane and settings), `bourbon-ui`, `bourbon-editor` and `bourbon-markdown`.
+GPUI window over `bourbon-core`. Holds no business rule: it presents state and forwards intent. Built on `gpui-pre` (`gpui`) and `gpui-pre-platform` only, with `bourbon-ui`, `bourbon-editor` and `bourbon-markdown`; no `gpui-kit` / `gpui-component` in the tree.
 
 ## Behaviour
 
@@ -69,7 +69,7 @@ Headless, through GPUI's own `test-support` (`#[gpui::test]`, `TestAppContext`, 
 
 ## Dependency guard
 
-`just architecture` fails if `cargo tree -p bourbon-core -e normal --prefix none` lists any crate starting with `gpui`, so it cannot go stale as GPUI crates are added. Proven by adding `gpui-pre-util` to `bourbon-core`: the recipe failed; reverted, it passed. `deny.toml` bans `gpui-kit`, `gpui-component`, `gpui-base` and `gpui-pre`, each with `wrappers` listing its exact direct parents (from `cargo tree -i`). Only `bourbon-app` may depend on `gpui-kit`, the entry point of the whole chain. `bourbon-app` also depends on `gpui-pre` directly (`gpui` in code), so the overlays use GPUI without the kit. Proven by adding `gpui-kit` to `bourbon-core`: `error[banned]`. `just deny` also prints many `duplicate` warnings from GPUI; they are expected.
+`just architecture` fails if `cargo tree -p bourbon-core -e normal --prefix none` lists any crate starting with `gpui`, so it cannot go stale as GPUI crates are added. Proven by adding `gpui-pre-util` to `bourbon-core`: the recipe failed; reverted, it passed. `deny.toml` bans `gpui-kit`, `gpui-component` and `gpui-base` outright, and `gpui-pre` outside its listed direct parents (`bourbon-app`, `bourbon-ui`, `bourbon-editor` and the GPUI platform crates). `just architecture` also fails if `gpui-kit`, `gpui-component` or `gpui-base` show up anywhere in `cargo tree --workspace -e normal,dev`. `just deny` also prints many `duplicate` warnings from GPUI; they are expected.
 
 ## Sidebar
 
@@ -217,7 +217,7 @@ Tests: pure unit tests next to each file; `workspace/tests/control_pane.rs` driv
 ## Settings, themes and panes (M5)
 
 - `locations.rs`: `Locations` (settings file, Omarchy colors path) is injected into `Workspace::new`; tests pass temp paths.
-- `theme/`: `palette.rs` holds the Bourbon palettes as data, the Omarchy mapping and `resolve`; `tokens.rs` resolves the `bourbon_ui::Tokens` (Inkdrop light/dark, or `omarchy_tokens` for Omarchy) and `apply` installs them next to gpui-component's `Theme`, which still paints what is left on gpui-kit; `watch.rs` is the mtime watch. `Workspace` polls the watch every 2 s.
+- `theme/`: `tokens.rs` resolves the `bourbon_ui::Tokens` (Inkdrop light/dark, or `omarchy_tokens` for Omarchy) and `apply` installs them as the only theme; `watch.rs` is the mtime watch. `Workspace` polls the watch every 2 s.
 - `settings_view.rs` is the Inkdrop preferences layout and replaces the three columns while open (Inkdrop uses a separate window): a 160 px page menu (`settings-page-general`, `settings-page-backup`; inactive items at 60 %, active one tinted with a 3 px primary bar) and a scrolling content pane (12 px padding, max 640 px, close button `settings-close`). General: Theme and Appearance `bourbon_ui::Select`s (ids `settings-theme`, `settings-appearance`; Appearance disabled with a hint while following Omarchy) opening our `Menu` under the trigger with the current choice checked. Backup: repository and (token login only, masked) token `TextField`s, Sign in with select (`settings-backup-auth`), "Back up automatically" `Checkbox` (`settings-backup-enabled`), Back up now / Restore buttons right-aligned. `workspace/settings_intents.rs` holds the intents (`open_settings`, `show_settings_page`, `set_theme_source`, `set_appearance`, `resize_*`, `finish_resizing`). Each change applies the theme and saves.
 - Column widths come from `Settings` and flow into `SidebarData` and `NoteListData`; `bourbon_ui::Splitter` reports them through `resize_sidebar` / `resize_note_list` and `finish_resizing` saves on release.
 - Keys: `Ctrl+,` opens settings; control pane action "Open settings".
@@ -254,4 +254,4 @@ Tests: `workspace/tests/{view_modes,tasks,links,find,focus}.rs` (real key bindin
 
 Editor-column observation without gpui-kit: element ids through `test_id`; highlighted suggestions add a `<id>-highlight` marker child; picker texts and the word count carry `picker-label: <text>` / `word-count: <label>` debug selectors; focus is read from the entity focus handles (`EditorPane::title_is_focused`, the body's `focus_handle`); menus are read from the open `bourbon_ui::Menu`.
 
-Still on `gpui-kit` (follow-up): the window is opened through `gpui_kit::open_window` after `gpui_kit::init` (gpui-component setup), `assets.rs` still serves gpui-component icons, `theme/` still paints gpui-component's `Theme`, and `tests/settings.rs` reads that `Theme`. The editor column itself uses no gpui-kit item. The app is started with `gpui_platform::application()` and the root background and text use the `bourbon-ui` tokens.
+Window: opened with plain `cx.open_window` (no root wrapper) after `bourbon_ui::register_fonts` and `bourbon_editor::register_editor_fonts`; assets are `bourbon_ui::IconAssets`. GPUI clears its debug-bounds map every frame, so an element that leaves the tree is no longer found (`an_element_that_leaves_the_tree_is_no_longer_found`); the stale ids seen with gpui-kit came from its own observation registry, which only its `Root` reset.

@@ -58,8 +58,8 @@ architecture:
         rg '^gpui' <<< "$dependencies"
         [ $? -eq 1 ] || exit 1
     done
-    ui_dependencies=$(cargo tree -p bourbon-ui -e normal --prefix none) || exit 1
-    rg '^gpui-(kit|component)' <<< "$ui_dependencies"
+    workspace_dependencies=$(cargo tree --workspace -e normal,dev --prefix none) || exit 1
+    rg '^gpui-(kit|component|base) ' <<< "$workspace_dependencies"
     [ $? -eq 1 ] || exit 1
 
 quick:
