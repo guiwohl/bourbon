@@ -214,6 +214,10 @@ impl LineLayout {
         self.text_origin() + point(self.x_in_row(row, index), self.rows[row].top)
     }
 
+    pub fn end_position(&self) -> Point<Pixels> {
+        self.position_for_index(self.len)
+    }
+
     pub fn index_for_position(&self, position: Point<Pixels>) -> usize {
         let position = position - self.text_origin();
         let row = &self.rows[self.row_of_y(position.y + self.box_model.padding_top)];
@@ -422,6 +426,13 @@ mod tests {
         assert_eq!(rows[0].end, rows[1].start);
         assert_eq!(rows[1].end, 19);
         assert!(close(layout.height(), 2.0 * LINE));
+    }
+
+    #[gpui::test]
+    fn the_end_position_follows_the_last_character(cx: &mut TestAppContext) {
+        let layout = shape_boxed(cx, "hello", None, card_box());
+        assert_eq!(layout.end_position(), layout.position_for_index(5));
+        assert!(close(layout.end_position().x, 2.0 + 5.0 * CHAR));
     }
 
     #[gpui::test]
