@@ -1,6 +1,6 @@
 # bourbon-ui
 
-Our own GPUI component kit and Inkdrop-faithful theme tokens (decision: `docs/decisions/2026-11-07-ui-rebuild.md`, values: `docs/research/inkdrop-ui-shell.md`). Depends only on `gpui-pre` (lib name `gpui`); `just architecture` fails if `gpui-kit` or `gpui-component` appear in its tree. `bourbon-app` renders its sidebar, note list, control pane, settings screen, dialogs and menus with this crate; and its editor column.
+Our own GPUI component kit and Inkdrop-faithful theme tokens (decision: `docs/decisions/2026-11-07-ui-rebuild.md`, values: `docs/research/inkdrop-ui-shell.md`). Depends only on `gpui-pre` (lib name `gpui`); `just architecture` fails if `gpui-kit`, `gpui-component` or `gpui-base` appear anywhere in the workspace tree. `bourbon-app` renders its sidebar, note list, control pane, settings screen, dialogs and menus with this crate; and its editor column.
 
 ## Modules
 

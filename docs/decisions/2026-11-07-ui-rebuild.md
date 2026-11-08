@@ -19,3 +19,4 @@ Decided with the user. Research: [inkdrop-ui-shell.md](../research/inkdrop-ui-sh
 - Text field (`bourbon_editor::TextField`, in `bourbon-editor` so it reuses the text core; `bourbon-editor` depends on `bourbon-ui` for tokens and icons): done for the note-list filter and the sidebar name prompt. Text selection uses `focus_outline` (no selection token in Inkdrop inputs: the browser default applies).
 - Phase 2 slice 2 (editor column on `bourbon-ui` + `bourbon-editor` + `bourbon-markdown`, scroll sync): done, choices in [editor column](2026-11-07-editor-column.md).
 - Overlays (control pane, settings, dialogs, notice) on `bourbon-ui` and `TextField`: done, see [2026-11-08-overlays.md](2026-11-08-overlays.md).
+- `gpui-kit` and `gpui-component` removed from the workspace: see [2026-11-08-overlays.md](2026-11-08-overlays.md#gpui-kit-removed).

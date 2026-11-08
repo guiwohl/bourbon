@@ -82,24 +82,28 @@ fn open_view_with(
     locations: Locations,
 ) -> (AnyWindowHandle, Entity<Workspace>) {
     cx.update(|cx| {
-        gpui_kit::init(cx);
         crate::window::bind_keys(cx);
     });
     let bounds = Bounds {
         origin: Point::default(),
         size: size(px(900.), px(600.)),
     };
-    cx.update(|cx| {
-        gpui_kit::open_window(
+    let mut view = None;
+    let window = cx.update(|cx| {
+        cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..WindowOptions::default()
             },
-            cx,
-            |window, cx| crate::window::build_workspace(store, locations, window, cx),
+            |window, cx| {
+                let built = crate::window::build_workspace(store, locations, window, cx);
+                view = Some(built.clone());
+                built
+            },
         )
         .unwrap()
-    })
+    });
+    (window.into(), view.unwrap())
 }
 
 fn stored_title(cx: &mut TestAppContext, view: &Entity<Workspace>, id: &NoteId) -> String {
@@ -689,3 +693,15 @@ mod note_list;
 mod settings;
 mod sidebar;
 mod templates;
+
+#[gpui::test]
+fn an_element_that_leaves_the_tree_is_no_longer_found(cx: &mut TestAppContext) {
+    let (store, _) = seeded_store();
+    let (handle, _) = open_view(cx, store);
+
+    press(cx, handle, "ctrl-o");
+    assert!(is_listed(cx, handle, "pane-panel"));
+
+    press(cx, handle, "escape");
+    assert!(!is_listed(cx, handle, "pane-panel"));
+}

@@ -1,11 +1,9 @@
-mod assets;
 mod autosave;
 mod backup_runner;
 mod cli_command;
 mod control_pane;
 mod dragged_note;
 mod editor;
-mod fonts;
 mod locations;
 mod navigation;
 mod note_list;

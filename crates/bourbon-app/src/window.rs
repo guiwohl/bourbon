@@ -7,7 +7,6 @@ use gpui::{
     WindowOptions,
 };
 
-use crate::assets::AppAssets;
 use crate::control_pane::{self, HighlightNext, HighlightPrevious};
 use crate::editor::actions::{
     CycleViewMode, ExitFocusMode, FindInNote, HistoryBack, HistoryForward, LinkPickCancel,
@@ -15,7 +14,6 @@ use crate::editor::actions::{
     SetStatusActive, SetStatusCompleted, SetStatusDropped, SetStatusNone, SetStatusOnHold,
     TagSuggestionNext, TagSuggestionPrevious, ToggleFocusMode,
 };
-use crate::fonts;
 use crate::locations::Locations;
 use crate::note_list::{SelectNextNote, SelectPreviousNote};
 use crate::sidebar::ToggleSidebar;
@@ -50,17 +48,16 @@ pub(crate) fn app_id() -> &'static str {
 
 pub(crate) fn run(store: NoteStore, locations: Locations, focus_requests: Receiver<()>) {
     gpui_platform::application()
-        .with_assets(AppAssets)
+        .with_assets(bourbon_ui::IconAssets)
         .run(move |cx| {
-            gpui_kit::init(cx);
-            fonts::register(cx);
+            bourbon_ui::register_fonts(cx);
             bourbon_editor::register_editor_fonts(cx);
             bind_keys(cx);
-            let opened = gpui_kit::open_window(window_options(&CURRENT), cx, |window, cx| {
+            let opened = cx.open_window(window_options(&CURRENT), |window, cx| {
                 build_workspace(store, locations, window, cx)
             });
             match opened {
-                Ok((window, _)) => forward_focus_requests(window, focus_requests, cx),
+                Ok(window) => forward_focus_requests(window.into(), focus_requests, cx),
                 Err(error) => {
                     eprintln!("bourbon: cannot open the window: {error}");
                     cx.quit();
