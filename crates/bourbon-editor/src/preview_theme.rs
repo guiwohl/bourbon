@@ -10,6 +10,7 @@ pub struct PreviewTheme {
     pub font_size: Pixels,
     pub code_font_size: Pixels,
     pub line_height: f32,
+    pub heading_base_size: Pixels,
     pub heading_scales: [f32; 6],
     pub heading_line_height: f32,
     pub code_line_height: f32,
@@ -84,9 +85,10 @@ impl PreviewTheme {
             mono_fallbacks: ["DejaVu Sans Mono", "Liberation Mono", "monospace"]
                 .map(str::to_owned)
                 .to_vec(),
-            font_size: px(16.0),
-            code_font_size: px(12.0),
-            line_height: 1.6,
+            font_size: px(15.0),
+            code_font_size: px(14.0),
+            line_height: 1.55,
+            heading_base_size: px(16.0),
             heading_scales: [2.0, 1.5, 1.25, 1.0, 0.875, 0.85],
             heading_line_height: 1.25,
             code_line_height: 1.45,
@@ -134,10 +136,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn defaults_follow_the_researched_typography() {
+    fn defaults_follow_the_measured_reference() {
         let theme = PreviewTheme::light();
-        assert_eq!(theme.font_size, px(16.0));
-        assert_eq!(theme.line_height, 1.6);
+        assert_eq!(theme.font_size, px(15.0));
+        assert_eq!(theme.line_height, 1.55);
+        assert_eq!(theme.code_font_size, px(14.0));
+        assert_eq!(theme.code_line_height, 1.45);
+        assert_eq!(theme.heading_base_size, px(16.0));
         assert_eq!(theme.block_gap, px(16.0));
         assert_eq!(theme.heading_top_gap, px(24.0));
         assert_eq!(theme.list_indent_em, 2.0);

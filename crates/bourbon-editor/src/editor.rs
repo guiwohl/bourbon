@@ -3,7 +3,7 @@ use std::ops::Range;
 use std::rc::Rc;
 use std::time::Instant;
 
-use bourbon_markdown::{HighlightSpan, highlight};
+use bourbon_markdown::{HighlightSpan, LineDecoration, highlight, line_decorations};
 use bourbon_text::{
     EditorState, History, Selection, SelectionRange, Text, Transaction, TransactionKind,
 };
@@ -13,6 +13,7 @@ use gpui::{
 
 use crate::blink::schedule_blink;
 use crate::layout::{LineLayout, ShapeRequest};
+use crate::line_decor::{LineDecor, decor_of, line_box};
 use crate::line_heights::LineHeights;
 use crate::segments::{hanging_prefix_len, heading_level, line_segments};
 use crate::theme::EditorTheme;
@@ -31,6 +32,7 @@ pub struct Editor {
     pub(crate) state: EditorState,
     pub(crate) history: History,
     pub(crate) spans: Vec<HighlightSpan>,
+    decorations: Vec<LineDecoration>,
     pub(crate) theme: Rc<EditorTheme>,
     pub(crate) heights: LineHeights,
     pub(crate) scroll_top: Pixels,
@@ -65,6 +67,7 @@ impl Editor {
         let estimate = line_height_of(&theme, theme.font_size);
         let mut editor = Self {
             spans: highlight(text),
+            decorations: line_decorations(text),
             heights: LineHeights::new(state.text.line_count(), f32::from(estimate)),
             state,
             history: History::new(),
@@ -234,7 +237,9 @@ impl Editor {
     }
 
     fn refresh_after_text_change(&mut self, _cx: &mut Context<Self>) {
-        self.spans = highlight(&self.state.text.to_string());
+        let source = self.state.text.to_string();
+        self.spans = highlight(&source);
+        self.decorations = line_decorations(&source);
         if self.heights.line_count() != self.state.text.line_count() {
             let estimate = line_height_of(&self.theme, self.theme.font_size);
             self.heights = LineHeights::new(self.state.text.line_count(), f32::from(estimate));
@@ -285,6 +290,7 @@ impl Editor {
         let scale = level.map_or(1.0, |level| self.theme.heading_scale(level));
         let font_size = self.theme.font_size * scale;
         let segments = line_segments(start..end, &self.spans, self.marked.as_ref());
+        let box_model = line_box(self.line_decor(line), &self.theme);
         LineLayout::shape(
             &ShapeRequest {
                 text: &content,
@@ -294,10 +300,15 @@ impl Editor {
                 line_height: line_height_of(&self.theme, font_size),
                 wrap_width: self.wrap_width,
                 bold: level.is_some(),
+                box_model,
                 theme: &self.theme,
             },
             window,
         )
+    }
+
+    pub(crate) fn line_decor(&self, line: usize) -> LineDecor {
+        decor_of(line, &self.decorations)
     }
 
     pub(crate) fn layout_for_line(&mut self, line: usize, window: &mut Window) -> Rc<LineLayout> {
@@ -427,8 +438,8 @@ mod tests {
                 f32::from(editor.shape_line(1, window).height()),
             )
         });
-        assert!((heading - 39.0).abs() < 0.05);
-        assert!((plain - 19.5).abs() < 0.05);
+        assert!((heading - 33.64).abs() < 0.05);
+        assert!((plain - 16.82).abs() < 0.05);
     }
 
     #[gpui::test]
@@ -436,7 +447,7 @@ mod tests {
         let (editor, cx) = open(cx, &"x\n".repeat(99));
         let (max, expected) = editor.update_in(cx, |editor, window, _| {
             let viewport = f32::from(window.viewport_size().height);
-            (f32::from(editor.max_scroll()), 100.0 * 19.5 - viewport)
+            (f32::from(editor.max_scroll()), 100.0 * 16.82 - viewport)
         });
         assert!((max - expected).abs() < 0.05);
     }
@@ -484,7 +495,7 @@ mod tests {
         });
         assert_eq!(stored, theme);
         let viewport = cx.update(|window, _| f32::from(window.viewport_size().height));
-        assert!((total - (121.0 * 39.0 - viewport).max(0.0)).abs() < 0.5);
+        assert!((total - (121.0 * 14.5 * 3.0 - viewport).max(0.0)).abs() < 0.5);
     }
 
     #[gpui::test]

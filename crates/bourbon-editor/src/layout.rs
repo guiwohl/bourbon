@@ -17,7 +17,15 @@ pub struct ShapeRequest<'a> {
     pub line_height: Pixels,
     pub wrap_width: Option<Pixels>,
     pub bold: bool,
+    pub box_model: LineBox,
     pub theme: &'a EditorTheme,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct LineBox {
+    pub inset: Pixels,
+    pub padding_top: Pixels,
+    pub padding_bottom: Pixels,
 }
 
 pub struct LineLayout {
@@ -27,12 +35,13 @@ pub struct LineLayout {
     body: WrappedLine,
     line_height: Pixels,
     len: usize,
+    box_model: LineBox,
 }
 
 pub fn editor_font(theme: &EditorTheme, bold: bool, italic: bool) -> Font {
     Font {
         family: theme.font_family.clone().into(),
-        features: gpui::FontFeatures::default(),
+        features: crate::fonts::without_ligatures(),
         fallbacks: Some(FontFallbacks::from_fonts(theme.font_fallbacks.clone())),
         weight: if bold {
             FontWeight::BOLD
@@ -65,7 +74,7 @@ pub fn text_runs(segments: &[Segment], theme: &EditorTheme, force_bold: bool) ->
                 len: segment.len,
                 font: editor_font(theme, style.bold || force_bold, style.italic),
                 color: style.color,
-                background_color: style.background,
+                background_color: None,
                 underline,
                 strikethrough,
             }
@@ -86,7 +95,7 @@ impl LineLayout {
         let indent = prefix.width;
         let body_wrap = request
             .wrap_width
-            .map(|width| (width - indent).max(request.font_size));
+            .map(|width| (width - request.box_model.inset * 2.0 - indent).max(request.font_size));
         let body = window
             .text_system()
             .shape_text(
@@ -107,7 +116,21 @@ impl LineLayout {
             body,
             line_height: request.line_height,
             len: request.text.len(),
+            box_model: request.box_model,
         }
+    }
+
+    fn text_origin(&self) -> Point<Pixels> {
+        point(self.box_model.inset, self.box_model.padding_top)
+    }
+
+    pub fn row_of_y(&self, y: Pixels) -> usize {
+        row_from_ratio((y - self.box_model.padding_top) / self.line_height)
+            .min(self.row_count() - 1)
+    }
+
+    pub fn row_middle(&self, row: usize) -> Pixels {
+        self.box_model.padding_top + self.line_height * (count_f32(row) + 0.5)
     }
 
     pub fn line_height(&self) -> Pixels {
@@ -120,6 +143,8 @@ impl LineLayout {
 
     pub fn height(&self) -> Pixels {
         self.line_height * count_f32(self.row_count())
+            + self.box_model.padding_top
+            + self.box_model.padding_bottom
     }
 
     pub fn rows(&self) -> Vec<Range<usize>> {
@@ -165,13 +190,15 @@ impl LineLayout {
     pub fn position_for_index(&self, index: usize) -> Point<Pixels> {
         let rows = self.rows();
         let row = Self::row_of(index.min(self.len), &rows);
-        point(
-            self.x_in_row(row, index, &rows),
-            self.line_height * count_f32(row),
-        )
+        self.text_origin()
+            + point(
+                self.x_in_row(row, index, &rows),
+                self.line_height * count_f32(row),
+            )
     }
 
     pub fn index_for_position(&self, position: Point<Pixels>) -> usize {
+        let position = position - self.text_origin();
         let rows = self.rows();
         let row = row_from_ratio(position.y / self.line_height).min(rows.len() - 1);
         let prefix_index = if row == 0 {
@@ -193,6 +220,7 @@ impl LineLayout {
     }
 
     pub fn glyph_index_at(&self, position: Point<Pixels>) -> Option<usize> {
+        let position = position - self.text_origin();
         let row_count = self.row_count();
         let row = row_from_ratio(position.y / self.line_height).min(row_count - 1);
         let prefix_hit = (row == 0)
@@ -233,7 +261,7 @@ impl LineLayout {
             }
             if right > left {
                 rects.push(Bounds::new(
-                    point(left, self.line_height * count_f32(row)),
+                    self.text_origin() + point(left, self.line_height * count_f32(row)),
                     size(right - left, self.line_height),
                 ));
             }
@@ -242,6 +270,7 @@ impl LineLayout {
     }
 
     pub fn paint(&self, origin: Point<Pixels>, window: &mut Window, cx: &mut App) {
+        let origin = origin + self.text_origin();
         self.prefix
             .paint_background(origin, self.line_height, TextAlign::Left, None, window, cx)
             .ok();
@@ -281,6 +310,15 @@ mod tests {
     const LINE: f32 = 19.5;
 
     fn shape(cx: &mut TestAppContext, text: &str, wrap_chars: Option<f32>) -> LineLayout {
+        shape_boxed(cx, text, wrap_chars, LineBox::default())
+    }
+
+    fn shape_boxed(
+        cx: &mut TestAppContext,
+        text: &str,
+        wrap_chars: Option<f32>,
+        box_model: LineBox,
+    ) -> LineLayout {
         let theme = EditorTheme::light();
         let segments = [Segment {
             len: text.len(),
@@ -299,6 +337,7 @@ mod tests {
                     line_height: px(LINE),
                     wrap_width: wrap_chars.map(|chars| px(chars * CHAR + 0.5)),
                     bold: false,
+                    box_model,
                     theme: &theme,
                 },
                 window,
@@ -316,6 +355,52 @@ mod tests {
         assert_eq!(layout.row_count(), 1);
         assert_eq!(layout.rows(), vec![0..5]);
         assert!(close(layout.height(), LINE));
+    }
+
+    fn card_box() -> LineBox {
+        LineBox {
+            inset: px(2.0),
+            padding_top: px(4.0),
+            padding_bottom: px(3.0),
+        }
+    }
+
+    #[gpui::test]
+    fn a_boxed_line_adds_its_padding_and_shifts_its_text(cx: &mut TestAppContext) {
+        let layout = shape_boxed(cx, "hello", None, card_box());
+        assert!(close(layout.height(), LINE + 7.0));
+        let position = layout.position_for_index(3);
+        assert!(close(position.x, 2.0 + 3.0 * CHAR));
+        assert!(close(position.y, 4.0));
+        assert_eq!(
+            layout.index_for_position(point(px(2.0 + 3.0 * CHAR + 1.0), px(9.0))),
+            3
+        );
+        assert_eq!(
+            layout.glyph_index_at(point(px(2.0 + 0.5 * CHAR), px(9.0))),
+            Some(0)
+        );
+        let rects = layout.selection_rects(&(1..3), false, px(6.0));
+        assert!(close(rects[0].origin.x, 2.0 + CHAR));
+        assert!(close(rects[0].origin.y, 4.0));
+    }
+
+    #[gpui::test]
+    fn a_boxed_line_wraps_inside_its_inset(cx: &mut TestAppContext) {
+        let plain = shape(cx, "aaaa bbbb", Some(9.0));
+        assert_eq!(plain.row_count(), 1);
+        let boxed = shape_boxed(cx, "aaaa bbbb", Some(9.0), card_box());
+        assert_eq!(boxed.row_count(), 2);
+    }
+
+    #[gpui::test]
+    fn rows_are_found_below_the_top_padding(cx: &mut TestAppContext) {
+        let layout = shape_boxed(cx, "aaaa bbbb cccc dddd", Some(10.0), card_box());
+        assert_eq!(layout.row_of_y(px(0.0)), 0);
+        assert_eq!(layout.row_of_y(px(4.0 + LINE - 0.5)), 0);
+        assert_eq!(layout.row_of_y(px(4.0 + LINE + 0.5)), 1);
+        assert_eq!(layout.row_of_y(px(500.0)), layout.row_count() - 1);
+        assert!(close(layout.row_middle(1), 4.0 + 1.5 * LINE));
     }
 
     #[gpui::test]
@@ -600,6 +685,7 @@ mod tests {
                 .map(|fallbacks| fallbacks.fallback_list().to_vec()),
             Some(theme.font_fallbacks.clone())
         );
+        assert_eq!(font.features, crate::fonts::without_ligatures());
         let plain = editor_font(&theme, false, false);
         assert_eq!(plain.weight, FontWeight::NORMAL);
         assert_eq!(plain.style, FontStyle::Normal);

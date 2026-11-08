@@ -8,9 +8,9 @@ use gpui::{
     px,
 };
 
-const CHAR_WIDTH: f32 = 7.8;
-const LINE_HEIGHT: f32 = 19.5;
-const TEXT_LEFT: f32 = 16.0;
+const CHAR_WIDTH: f32 = 8.7;
+const LINE_HEIGHT: f32 = 16.82;
+const TEXT_LEFT: f32 = 8.0;
 
 fn open<'a>(cx: &'a mut TestAppContext, text: &str) -> (Entity<Editor>, &'a mut VisualTestContext) {
     cx.update(bind_editor_keys);
@@ -537,7 +537,7 @@ fn clicks_after_scrolling_hit_the_scrolled_line(cx: &mut TestAppContext) {
     let (editor, cx) = open_offset(cx, &"line\n".repeat(200));
     cx.simulate_event(ScrollEvent {
         position: point(px(100.), px(100.)),
-        delta: ScrollDelta::Pixels(point(px(0.), px(-195.))),
+        delta: ScrollDelta::Pixels(point(px(0.), px(-10.0 * LINE_HEIGHT))),
         modifiers: Modifiers::none(),
         touch_phase: gpui::TouchPhase::Moved,
         source: ScrollSource::Pointer,
@@ -583,10 +583,8 @@ fn scrolling_by_lines_moves_by_the_line_height(cx: &mut TestAppContext) {
         touch_phase: gpui::TouchPhase::Moved,
         source: ScrollSource::Pointer,
     });
-    assert_eq!(
-        editor.read_with(cx, |editor, _| editor.scroll_top()),
-        px(58.5)
-    );
+    let scrolled = editor.read_with(cx, |editor, _| editor.scroll_top());
+    assert!((f32::from(scrolled) - 3.0 * LINE_HEIGHT).abs() < 1e-3);
 }
 
 #[gpui::test]
@@ -785,9 +783,9 @@ fn input_bounds_account_for_scrolling_and_the_element_origin(cx: &mut TestAppCon
 #[gpui::test]
 fn input_bounds_on_a_wrapped_row_sit_below_the_first_row(cx: &mut TestAppContext) {
     let (editor, cx) = open(cx, &"word ".repeat(30));
-    cx.simulate_resize(gpui::size(px(232.0), px(400.0)));
+    cx.simulate_resize(gpui::size(px(257.0), px(400.0)));
     cx.run_until_parked();
-    let element = gpui::Bounds::new(point(px(0.0), px(0.0)), gpui::size(px(232.0), px(400.0)));
+    let element = gpui::Bounds::new(point(px(0.0), px(0.0)), gpui::size(px(257.0), px(400.0)));
     let found = editor
         .update_in(cx, |editor, window, cx| {
             editor.bounds_for_range(110..111, element, window, cx)
@@ -834,10 +832,8 @@ fn scrolling_to_a_line_puts_it_at_the_top(cx: &mut TestAppContext) {
     let seen = record_events(&editor, cx);
     editor.update(cx, |editor, cx| editor.scroll_to_line(10.25, cx));
     cx.run_until_parked();
-    assert_eq!(
-        editor.read_with(cx, |editor, _| editor.scroll_top()),
-        px(LINE_HEIGHT * 10.25)
-    );
+    let scrolled = editor.read_with(cx, |editor, _| editor.scroll_top());
+    assert!((f32::from(scrolled) - LINE_HEIGHT * 10.25).abs() < 1e-3);
     assert_eq!(seen.borrow().as_slice(), [EditorEvent::Scrolled]);
 }
 

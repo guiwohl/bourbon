@@ -49,9 +49,7 @@ impl<'a> Walk<'a> {
                 self.canvas.paint(body, TokenClass::CodeBlockText);
             }
             Event::Code(_) => self.inline_code(&body),
-            Event::InlineMath(_) | Event::DisplayMath(_) => {
-                self.canvas.paint(body, TokenClass::Math);
-            }
+            Event::InlineMath(_) | Event::DisplayMath(_) => self.math(&body),
             Event::Html(_) | Event::InlineHtml(_) => self.canvas.paint(body, TokenClass::HtmlTag),
             Event::Rule => self.canvas.paint(body, TokenClass::HorizontalRule),
             Event::TaskListMarker(checked) => {
@@ -114,6 +112,12 @@ impl<'a> Walk<'a> {
         self.canvas.paint(body.clone(), TokenClass::InlineCode);
         let delimiters = marks::code_delimiters(self.source, body);
         self.mark_all(delimiters, TokenClass::CodeMark);
+    }
+
+    fn math(&mut self, body: &Range<usize>) {
+        self.canvas.paint(body.clone(), TokenClass::Math);
+        let math_marks = marks::math_marks(self.source, body);
+        self.mark_all(math_marks, TokenClass::MathMark);
     }
 
     fn block_quote(&mut self, body: &Range<usize>, alert: bool) {

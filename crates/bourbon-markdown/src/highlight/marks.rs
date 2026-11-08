@@ -44,6 +44,35 @@ pub fn list_marker(source: &str, range: &Range<usize>) -> Range<usize> {
     start..start + digits + 1
 }
 
+pub fn math_marks(source: &str, range: &Range<usize>) -> Vec<Range<usize>> {
+    let delimiter = run_length(source, range.start, b'$').min(range.len() / 2);
+    let inner = range.start + delimiter..range.end - delimiter;
+    let mut marks = Vec::new();
+    marks.push(range.start..inner.start);
+    let mut position = inner.start;
+    for _ in 0..inner.len() {
+        let Some(offset) = source[position..inner.end].find('\\') else {
+            break;
+        };
+        let start = position + offset;
+        position = start + 1 + command_name_len(&source[start + 1..inner.end]);
+        marks.push(start..position);
+    }
+    marks.push(inner.end..range.end);
+    marks
+}
+
+fn command_name_len(after_backslash: &str) -> usize {
+    let letters = after_backslash
+        .bytes()
+        .take_while(u8::is_ascii_alphabetic)
+        .count();
+    if letters > 0 {
+        return letters;
+    }
+    after_backslash.chars().next().map_or(0, char::len_utf8)
+}
+
 pub fn quote_marks(source: &str, range: &Range<usize>) -> Vec<Range<usize>> {
     let mut marks = Vec::new();
     let mut line_start = range.start;

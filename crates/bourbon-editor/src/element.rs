@@ -6,6 +6,7 @@ use gpui::{
 
 use crate::editor::Editor;
 use crate::frame::{Frame, FrameLine};
+use crate::theme::EditorTheme;
 
 pub fn active_line_bounds(bounds: Bounds<Pixels>, line: &FrameLine) -> Bounds<Pixels> {
     Bounds::new(
@@ -24,6 +25,33 @@ pub fn gutter_border_bounds(
             size(px(1.0), bounds.size.height),
         )
     })
+}
+
+fn paint_decorations(line: &FrameLine, theme: &EditorTheme, window: &mut Window) {
+    if let Some(card) = &line.card {
+        window.paint_quad(quad(
+            card.bounds,
+            card.radii,
+            theme.code_background,
+            card.borders,
+            theme.code_border,
+            BorderStyle::default(),
+        ));
+    }
+    if let Some(bar) = line.quote_bar {
+        window.paint_quad(fill(bar, theme.quote_bar));
+    }
+    let radius = theme.font_size * theme.card_radius_em;
+    for code_box in &line.code_boxes {
+        window.paint_quad(quad(
+            *code_box,
+            radius,
+            theme.code_background,
+            px(1.0),
+            theme.code_border,
+            BorderStyle::default(),
+        ));
+    }
 }
 
 pub struct EditorElement {
@@ -117,6 +145,9 @@ impl Element for EditorElement {
             for line in frame.lines.iter().filter(|line| line.active) {
                 window.paint_quad(fill(active_line_bounds(bounds, line), theme.active_line));
             }
+            for line in &frame.lines {
+                paint_decorations(line, &theme, window);
+            }
             if let Some(border) = gutter_border_bounds(bounds, frame.gutter_width) {
                 window.paint_quad(fill(border, theme.gutter_border));
             }
@@ -197,6 +228,7 @@ mod tests {
                     line_height: px(19.5),
                     wrap_width: None,
                     bold: false,
+                    box_model: crate::layout::LineBox::default(),
                     theme: &theme,
                 },
                 window,
@@ -209,6 +241,9 @@ mod tests {
             active: true,
             selections: Vec::new(),
             number: None,
+            card: None,
+            quote_bar: None,
+            code_boxes: Vec::new(),
         };
         let active = active_line_bounds(bounds(), &line);
         assert_eq!(active.origin, point(px(100.0), px(80.0)));

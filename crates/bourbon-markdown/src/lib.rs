@@ -1,4 +1,5 @@
 mod build;
+mod decorations;
 mod doc;
 #[cfg(test)]
 mod fixture;
@@ -12,6 +13,7 @@ mod tasks;
 mod token;
 mod url;
 
+pub use decorations::{DecorationKind, LineDecoration, line_decorations};
 pub use doc::{AlertKind, Alignment, Block, BlockKind, Inline, ListItem, PreviewDoc, SourceLines};
 pub use highlight::highlight;
 pub use scroll::{Anchor, line_for_preview_offset, preview_offset_for_line};

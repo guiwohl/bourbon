@@ -9,11 +9,12 @@ Parser options: tables, task lists, strikethrough, footnotes, math, GFM alerts, 
 | Item | Role |
 |---|---|
 | `highlight(source) -> Vec<HighlightSpan>` | Editor tokens: `{ range: Range<usize>, class: TokenClass }`, byte ranges, sorted, disjoint, on char boundaries, inner construct wins |
-| `TokenClass` | Heading(1-6), header/emphasis/strong/strikethrough/code/link marks, emphasis, strong, strikethrough, inline code, code block info/text, link text, URL, image, note link, list mark, task marker (checked), quote mark/text, alert marker, rule, table header/delimiter, frontmatter, math, HTML tag |
+| `TokenClass` | Heading(1-6), header/emphasis/strong/strikethrough/code/link marks, emphasis, strong, strikethrough, inline code, code block info/text, link text, URL, image, note link, list mark, task marker (checked), quote mark/text, alert marker, rule, table header/delimiter, frontmatter, math, math mark (`$`, `$$` and `\command`), HTML tag |
 | `PreviewDoc::parse(source)` | `PreviewDoc { blocks }`; `Block { source_lines, kind }`; `ListItem { source_lines, task, children }` |
 | `BlockKind` | Heading{level, slug, inlines}, Paragraph, List{ordered, start, tight, items}, BlockQuote, Alert{kind}, CodeBlock{lang, meta, text}, Table{alignments, head, rows}, ThematicBreak, Html, Math, Frontmatter, FootnoteDefinition |
 | `Inline` | Text, Emphasis, Strong, Strikethrough, Code, Link, NoteLink, Image, SoftBreak, HardBreak, FootnoteRef, InlineMath |
 | `task_lines(source) -> Vec<(line, checked)>` | Source line of every task marker, for preview checkboxes |
+| `line_decorations(source) -> Vec<LineDecoration>` | `{ lines: RangeInclusive<usize>, kind }` with `DecorationKind::Card` (code block, table) or `QuoteBar` (block quote; nested quotes are not repeated), 0-based lines, for the editor block decorations |
 | `Anchor`, `preview_offset_for_line`, `line_for_preview_offset` | Scroll-sync math (research 4.6 / 6.6) |
 | `SyncGuard`, `Pane`, `SyncState` | Echo-suppression state machine |
 

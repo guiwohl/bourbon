@@ -11,7 +11,7 @@ use gpui::{ClipboardItem, Context, Pixels, Window, point, px};
 
 use crate::editor::{Editor, line_height_of};
 use crate::motion::{Motion, extend_to, move_range, walk_rows};
-use crate::numeric::{count_f32, row_from_ratio, signed};
+use crate::numeric::{row_from_ratio, signed};
 use crate::task_click::toggle_task_at;
 
 const INDENT: &str = "  ";
@@ -57,7 +57,7 @@ impl Editor {
         let layout = self.layout_for_line(line, window);
         let local = layout.position_for_index(main.head - line_start);
         let goal_x = self.goal_x.unwrap_or(local.x);
-        let row = row_from_ratio(local.y / layout.line_height());
+        let row = layout.row_of_y(local.y);
         let line_count = self.state.text.line_count();
         let target = walk_rows(line, row, rows, line_count, |candidate| {
             self.layout_for_line(candidate, window).row_count()
@@ -70,8 +70,7 @@ impl Editor {
             }
         } else {
             let target_layout = self.layout_for_line(target.0, window);
-            let height = target_layout.line_height();
-            let probe = point(goal_x, height * count_f32(target.1) + height * 0.5);
+            let probe = point(goal_x, target_layout.row_middle(target.1));
             self.state.text.line_start(target.0) + target_layout.index_for_position(probe)
         };
         let moved = if extend {

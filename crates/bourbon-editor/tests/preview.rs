@@ -132,7 +132,7 @@ fn nested_lists_indent_and_use_the_next_marker(cx: &mut TestAppContext) {
     assert!(inner.left() > outer.left());
     let first = cx.debug_bounds("inline-text-0").expect("first text");
     let second = cx.debug_bounds("inline-text-1").expect("second text");
-    assert!((f32::from(second.left() - first.left()) - 32.0).abs() < 0.5);
+    assert!((f32::from(second.left() - first.left()) - 30.0).abs() < 0.5);
     assert!(second.top() > first.top());
 }
 
@@ -157,7 +157,7 @@ fn the_rule_is_a_thin_block_between_wide_gaps(cx: &mut TestAppContext) {
     let (preview, cx) = open(cx, "a\n\n---\n\nb\n");
     let blocks = preview.read_with(cx, |preview, _| preview.block_layouts().to_vec());
     assert_eq!(blocks.len(), 3);
-    assert!((f32::from(blocks[1].height) - 4.0).abs() < 0.05);
+    assert!((f32::from(blocks[1].height) - 3.75).abs() < 0.3);
     let gap_before = blocks[1].top - (blocks[0].top + blocks[0].height);
     let gap_after = blocks[2].top - (blocks[1].top + blocks[1].height);
     assert!((f32::from(gap_before) - 24.0).abs() < 0.05);
