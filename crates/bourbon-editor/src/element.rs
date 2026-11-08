@@ -1,7 +1,7 @@
 use gpui::{
     App, BorderStyle, Bounds, ContentMask, Element, ElementId, ElementInputHandler, Entity,
-    GlobalElementId, InspectorElementId, IntoElement, LayoutId, PaintQuad, Pixels, Style, Window, fill, point,
-    px, quad, relative, size,
+    GlobalElementId, InspectorElementId, IntoElement, LayoutId, PaintQuad, Pixels, Style, Window,
+    fill, point, px, quad, relative, size,
 };
 
 use crate::editor::Editor;
