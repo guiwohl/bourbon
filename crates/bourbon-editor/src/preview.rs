@@ -10,6 +10,7 @@ use gpui::{
     StyledText, Window, div, point, prelude::*, px, relative,
 };
 
+use crate::fonts::without_ligatures;
 use crate::inline::{LinkTarget, flatten_inlines};
 use crate::preview_style::{
     alert_title, alert_vertical_padding, cell_alignment, checkbox_size, checkbox_tick_size,
@@ -400,9 +401,9 @@ impl Renderer {
             .bg(theme.code_background)
             .overflow_hidden()
             .font_family(theme.mono_family.clone())
+            .font_features(without_ligatures())
             .text_size(theme.code_font_size)
             .line_height(relative(theme.code_line_height))
-            .whitespace_nowrap()
             .child(text.trim_end_matches('\n').to_owned())
             .into_any_element()
     }

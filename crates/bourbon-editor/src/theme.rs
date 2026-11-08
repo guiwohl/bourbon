@@ -11,7 +11,6 @@ pub struct TokenStyle {
     pub italic: bool,
     pub underline: bool,
     pub strikethrough: bool,
-    pub background: Option<Hsla>,
 }
 
 impl TokenStyle {
@@ -22,7 +21,6 @@ impl TokenStyle {
             italic: false,
             underline: false,
             strikethrough: false,
-            background: None,
         }
     }
 
@@ -56,6 +54,11 @@ pub struct EditorTheme {
     pub line_height: f32,
     pub heading_scales: [f32; 6],
     pub line_padding: Pixels,
+    pub block_padding: Pixels,
+    pub card_inset: Pixels,
+    pub card_padding_y: Pixels,
+    pub card_radius_em: f32,
+    pub quote_bar_em: f32,
     pub caret_width: Pixels,
     pub gutter_font_scale: f32,
     pub gutter_min_width_em: f32,
@@ -74,8 +77,9 @@ pub struct EditorTheme {
     pub quote: Hsla,
     pub link: Hsla,
     pub comment: Hsla,
-    pub math: Hsla,
-    pub inline_code_background: Hsla,
+    pub code_background: Hsla,
+    pub code_border: Hsla,
+    pub quote_bar: Hsla,
 }
 
 fn hsl(hue: f32, saturation: f32, lightness: f32) -> Hsla {
@@ -103,8 +107,9 @@ impl EditorTheme {
             quote: hsl(215.0, 19.0, 35.0),
             link: hsl(175.0, 84.0, 32.0),
             comment: hsl(215.0, 20.0, 65.0),
-            math: hsl(192.0, 91.0, 36.0),
-            inline_code_background: hsl_alpha(214.0, 32.0, 91.0, 0.10),
+            code_background: hsl_alpha(214.0, 32.0, 91.0, 0.50),
+            code_border: hsl_alpha(213.0, 27.0, 84.0, 0.50),
+            quote_bar: hsl(215.0, 20.0, 65.0),
             ..Self::base()
         }
     }
@@ -125,8 +130,9 @@ impl EditorTheme {
             quote: hsl(218.0, 11.0, 65.0),
             link: hsl(173.0, 80.0, 40.0),
             comment: hsl(218.0, 11.0, 65.0),
-            math: hsl(187.0, 92.0, 69.0),
-            inline_code_background: hsl_alpha(0.0, 0.0, 32.0, 0.20),
+            code_background: hsl_alpha(0.0, 0.0, 25.0, 0.20),
+            code_border: hsl_alpha(213.0, 97.0, 87.0, 0.10),
+            quote_bar: hsl(0.0, 0.0, 45.0),
             ..Self::base()
         }
     }
@@ -138,14 +144,19 @@ impl EditorTheme {
             font_fallbacks: ["DejaVu Sans Mono", "Liberation Mono", "monospace"]
                 .map(str::to_owned)
                 .to_vec(),
-            font_size: px(13.0),
-            line_height: 1.5,
+            font_size: px(14.5),
+            line_height: 1.16,
             heading_scales: HEADING_SCALES,
-            line_padding: px(16.0),
+            line_padding: px(8.0),
+            block_padding: px(10.0),
+            card_inset: px(3.0),
+            card_padding_y: px(4.0),
+            card_radius_em: 0.4,
+            quote_bar_em: 0.3,
             caret_width: px(2.0),
             gutter_font_scale: 0.7,
-            gutter_min_width_em: 3.0,
-            gutter_padding_em: 1.0,
+            gutter_min_width_em: 4.5,
+            gutter_padding_em: 2.6,
             foreground: placeholder,
             background: placeholder,
             caret: placeholder,
@@ -160,8 +171,9 @@ impl EditorTheme {
             quote: placeholder,
             link: placeholder,
             comment: placeholder,
-            math: placeholder,
-            inline_code_background: placeholder,
+            code_background: placeholder,
+            code_border: placeholder,
+            quote_bar: placeholder,
         }
     }
 
@@ -185,6 +197,7 @@ impl EditorTheme {
             | TokenClass::QuoteMark
             | TokenClass::TableDelimiter
             | TokenClass::AlertMarker
+            | TokenClass::MathMark
             | TokenClass::HtmlTag => TokenStyle::plain(self.mark),
             TokenClass::ListMark => TokenStyle::plain(self.list_mark),
             TokenClass::Emphasis => TokenStyle::italic(self.foreground),
@@ -193,16 +206,13 @@ impl EditorTheme {
                 strikethrough: true,
                 ..TokenStyle::plain(self.foreground)
             },
-            TokenClass::InlineCode => TokenStyle {
-                background: Some(self.inline_code_background),
-                ..TokenStyle::plain(self.foreground)
-            },
             TokenClass::CodeBlockInfo | TokenClass::Frontmatter => TokenStyle::italic(self.comment),
             TokenClass::LinkText | TokenClass::NoteLink => TokenStyle::underlined(self.link),
             TokenClass::Url | TokenClass::Image => TokenStyle::plain(self.link),
             TokenClass::QuoteText => TokenStyle::italic(self.quote),
-            TokenClass::CodeBlockText => TokenStyle::plain(self.foreground),
-            TokenClass::Math => TokenStyle::plain(self.math),
+            TokenClass::CodeBlockText | TokenClass::InlineCode | TokenClass::Math => {
+                TokenStyle::plain(self.foreground)
+            }
         }
     }
 }
@@ -212,12 +222,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn defaults_follow_the_researched_metrics() {
+    fn defaults_follow_the_measured_reference() {
         let theme = EditorTheme::light();
-        assert_eq!(theme.font_size, px(13.0));
-        assert_eq!(theme.line_height, 1.5);
+        assert_eq!(theme.font_size, px(14.5));
+        assert_eq!(theme.line_height, 1.16);
         assert_eq!(theme.caret_width, px(2.0));
-        assert_eq!(theme.line_padding, px(16.0));
+        assert_eq!(theme.line_padding, px(8.0));
+        assert_eq!(theme.block_padding, px(10.0));
+        assert_eq!(theme.card_inset, px(3.0));
+        assert_eq!(theme.card_padding_y, px(4.0));
         assert_ne!(theme.font_fallbacks, [] as [std::string::String; 0]);
     }
 
@@ -265,15 +278,20 @@ mod tests {
     }
 
     #[test]
-    fn inline_code_has_a_background_and_plain_text_none() {
+    fn code_and_math_text_keep_the_foreground_and_their_marks_are_blue() {
         let theme = EditorTheme::light();
-        assert!(
-            theme
-                .token_style(Some(TokenClass::InlineCode))
-                .background
-                .is_some()
+        for class in [
+            TokenClass::InlineCode,
+            TokenClass::Math,
+            TokenClass::CodeBlockText,
+        ] {
+            let style = theme.token_style(Some(class));
+            assert_eq!(style, TokenStyle::plain(theme.foreground));
+        }
+        assert_eq!(
+            theme.token_style(Some(TokenClass::MathMark)).color,
+            theme.mark
         );
-        assert_eq!(theme.token_style(None).background, None);
         assert_eq!(theme.token_style(None).color, theme.foreground);
     }
 
@@ -308,8 +326,9 @@ mod tests {
             theme.quote,
             theme.link,
             theme.comment,
-            theme.math,
-            theme.inline_code_background,
+            theme.code_background,
+            theme.code_border,
+            theme.quote_bar,
         ]
     }
 

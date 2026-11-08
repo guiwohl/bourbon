@@ -8,6 +8,7 @@ mod frame;
 mod inline;
 mod input;
 mod layout;
+mod line_decor;
 mod line_heights;
 mod motion;
 mod mouse;

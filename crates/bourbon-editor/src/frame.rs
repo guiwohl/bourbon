@@ -4,6 +4,8 @@ use gpui::{Bounds, Pixels, Point, ShapedLine, TextRun, Window, point, px, size};
 
 use crate::editor::{Editor, line_height_of};
 use crate::layout::{LineLayout, editor_font};
+use crate::line_decor::{CardShape, card_shape, quote_bar};
+use crate::segments::{inline_code_ranges, line_segments};
 
 const MEASURE_BUDGET: usize = 400;
 
@@ -14,6 +16,9 @@ pub struct FrameLine {
     pub active: bool,
     pub selections: Vec<Bounds<Pixels>>,
     pub number: Option<(ShapedLine, Point<Pixels>)>,
+    pub card: Option<CardShape>,
+    pub quote_bar: Option<Bounds<Pixels>>,
+    pub code_boxes: Vec<Bounds<Pixels>>,
 }
 
 pub struct Frame {
@@ -48,6 +53,25 @@ impl Editor {
             underline: None,
             strikethrough: None,
         }
+    }
+
+    fn inline_code_boxes(
+        &self,
+        line: std::ops::Range<usize>,
+        layout: &LineLayout,
+        origin: Point<Pixels>,
+    ) -> Vec<Bounds<Pixels>> {
+        let outset = point(px(1.0), px(0.0));
+        inline_code_ranges(&line_segments(line, &self.spans, None))
+            .iter()
+            .flat_map(|range| layout.selection_rects(range, false, px(0.0)))
+            .map(|rect| {
+                Bounds::new(
+                    origin + rect.origin - outset,
+                    size(rect.size.width + px(2.0), rect.size.height),
+                )
+            })
+            .collect()
     }
 
     pub(crate) fn build_frame(&mut self, bounds: Bounds<Pixels>, window: &mut Window) -> Frame {
@@ -175,8 +199,13 @@ impl Editor {
                     - number_size * self.theme.gutter_padding_em
                     - shaped.width
                     - px(1.0);
-                (shaped, point(x, line_top))
+                (shaped, point(x, line_top + layout.position_for_index(0).y))
             });
+            let line_box = Bounds::new(
+                point(bounds.left() + gutter_width, line_top),
+                size(bounds.size.width - gutter_width, layout.height()),
+            );
+            let decor = self.line_decor(*line);
             lines.push(FrameLine {
                 origin,
                 height: layout.height(),
@@ -184,6 +213,11 @@ impl Editor {
                 active: *line == head_line,
                 selections,
                 number,
+                card: decor
+                    .card
+                    .map(|edges| card_shape(line_box, edges, &self.theme)),
+                quote_bar: decor.quote.then(|| quote_bar(line_box, &self.theme)),
+                code_boxes: self.inline_code_boxes(start..end, layout, origin),
             });
         }
         Frame {
@@ -201,8 +235,9 @@ mod tests {
     use crate::theme::EditorTheme;
     use gpui::{TestAppContext, VisualTestContext};
 
-    const CHAR: f32 = 7.8;
-    const LINE: f32 = 19.5;
+    const CHAR: f32 = 8.7;
+    const LINE: f32 = 16.82;
+    const NUMBER: f32 = 14.5 * 0.7;
 
     fn bounds(width: f32, height: f32) -> Bounds<Pixels> {
         Bounds::new(point(px(100.0), px(50.0)), size(px(width), px(height)))
@@ -233,7 +268,7 @@ mod tests {
         });
         assert_eq!(origins.len(), 3);
         for (index, (origin, height, active)) in origins.iter().enumerate() {
-            assert!(near(origin.x, 116.0));
+            assert!(near(origin.x, 108.0));
             assert!(near(
                 origin.y,
                 50.0 + LINE * crate::numeric::count_f32(index)
@@ -251,7 +286,7 @@ mod tests {
             editor.build_frame(bounds(400.0, 200.0), window).caret
         });
         let caret = caret.expect("caret");
-        assert!(near(caret.origin.x, 116.0 + CHAR));
+        assert!(near(caret.origin.x, 108.0 + CHAR));
         assert!(near(caret.origin.y, 50.0 + LINE));
         assert!(near(caret.size.width, 2.0));
         assert!(near(caret.size.height, LINE));
@@ -270,12 +305,12 @@ mod tests {
                 .collect::<Vec<_>>()
         });
         assert_eq!(rects[0].len(), 1);
-        assert!(near(rects[0][0].origin.x, 116.0 + CHAR));
-        assert!(near(rects[0][0].size.width, CHAR + 6.5));
+        assert!(near(rects[0][0].origin.x, 108.0 + CHAR));
+        assert!(near(rects[0][0].size.width, CHAR + 7.25));
         assert_eq!(rects[1].len(), 1);
-        assert!(near(rects[1][0].origin.x, 116.0));
+        assert!(near(rects[1][0].origin.x, 108.0));
         assert!(near(rects[1][0].origin.y, 50.0 + LINE));
-        assert!(near(rects[1][0].size.width, 2.0 * CHAR + 6.5));
+        assert!(near(rects[1][0].size.width, 2.0 * CHAR + 7.25));
         assert_eq!(rects[2].len(), 1);
         assert!(near(rects[2][0].size.width, CHAR));
     }
@@ -351,12 +386,12 @@ mod tests {
                 (shaped.width, origin.x, origin.y),
             )
         });
-        assert!(near(gutter, 9.1 * 3.0 + 1.0));
-        assert!(near(line_x, 100.0 + 9.1 * 3.0 + 1.0 + 16.0));
-        assert!(near(number.0, 9.1 * 0.6));
+        assert!(near(gutter, NUMBER * 4.5 + 1.0));
+        assert!(near(line_x, 100.0 + NUMBER * 4.5 + 1.0 + 8.0));
+        assert!(near(number.0, NUMBER * 0.6));
         assert!(near(
             number.1,
-            100.0 + f32::from(gutter) - 9.1 - 9.1 * 0.6 - 1.0
+            100.0 + f32::from(gutter) - 2.6 * NUMBER - NUMBER * 0.6 - 1.0
         ));
         assert!(near(number.2, 50.0 + LINE));
     }
@@ -370,7 +405,7 @@ mod tests {
                 .build_frame(bounds(400.0, 200.0), window)
                 .gutter_width
         });
-        assert!(near(gutter, 4.0 * 9.1 * 0.6 + 9.1 + 1.0));
+        assert!(near(gutter, 4.0 * NUMBER * 0.6 + 2.6 * NUMBER + 1.0));
     }
 
     #[gpui::test]
@@ -387,8 +422,8 @@ mod tests {
             )
         });
         assert!(near(first, 50.0 + 5.0 * LINE - 100.0));
-        assert_eq!(count, 11);
-        assert!(near(y, 50.0 + 15.0 * LINE - 100.0));
+        assert_eq!(count, 13);
+        assert!(near(y, 50.0 + 17.0 * LINE - 100.0));
     }
 
     #[gpui::test]
@@ -495,7 +530,7 @@ mod tests {
             (before, editor.wrap_width)
         });
         assert!(measured.0);
-        assert!(near(measured.1.expect("wrap width"), 300.0 - 32.0));
+        assert!(near(measured.1.expect("wrap width"), 300.0 - 16.0));
     }
 
     #[gpui::test]
@@ -528,7 +563,7 @@ mod tests {
         let (editor, cx) = open(cx, &format!("x\n{}", "word ".repeat(30)));
         let scroll = editor.update_in(cx, |editor, window, cx| {
             editor.set_selection(2 + 110, 2 + 110, cx);
-            editor.build_frame(bounds(232.0, 60.0), window);
+            editor.build_frame(bounds(257.0, 60.0), window);
             editor.scroll_top
         });
         assert!(near(scroll, 6.0 * LINE - 60.0), "{scroll:?}");
@@ -605,10 +640,10 @@ mod tests {
             let (shaped, origin) = frame.lines[0].number.as_ref().expect("number");
             (frame.gutter_width, (shaped.width, origin.x))
         });
-        assert!(near(gutter, 9.1 * 0.6 + 2.0 * 9.1 + 1.0));
+        assert!(near(gutter, NUMBER * 0.6 + 2.0 * NUMBER + 1.0));
         assert!(near(
             number_x.1,
-            100.0 + f32::from(gutter) - 2.0 * 9.1 - 9.1 * 0.6 - 1.0
+            100.0 + f32::from(gutter) - 2.0 * NUMBER - NUMBER * 0.6 - 1.0
         ));
     }
 
@@ -629,9 +664,107 @@ mod tests {
         let (editor, cx) = open(cx, &format!("x\n{}", "word ".repeat(30)));
         let scroll = editor.update_in(cx, |editor, window, cx| {
             editor.set_selection(2 + 23, 2 + 23, cx);
-            editor.build_frame(bounds(232.0, 30.0), window);
+            editor.build_frame(bounds(257.0, 30.0), window);
             editor.scroll_top
         });
         assert!(near(scroll, 2.0 * LINE - 30.0), "{scroll:?}");
+    }
+
+    #[gpui::test]
+    fn fenced_code_lines_carry_one_card_and_padded_ends(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "a\n```\nx\n```\nb");
+        let lines = editor.update_in(cx, |editor, window, _| {
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            frame
+                .lines
+                .iter()
+                .map(|line| {
+                    (
+                        line.origin,
+                        line.height,
+                        line.card
+                            .as_ref()
+                            .map(|card| (card.bounds, card.borders.top, card.borders.bottom)),
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
+        assert!(lines[0].2.is_none() && lines[4].2.is_none());
+        let (_, first_height, first) = &lines[1];
+        let (first_bounds, top, bottom) = first.expect("card");
+        assert!(near(*first_height, LINE + 4.0));
+        assert!(near(first_bounds.origin.x, 103.0));
+        assert!(near(first_bounds.size.width, 394.0));
+        assert!(near(first_bounds.size.height, LINE + 4.0));
+        assert_eq!((top, bottom), (px(1.0), px(0.0)));
+        let (_, _, middle) = &lines[2];
+        assert_eq!(
+            middle.map(|card| (card.1, card.2)),
+            Some((px(0.0), px(0.0)))
+        );
+        let (last_origin, last_height, last) = &lines[3];
+        assert!(near(*last_height, LINE + 4.0));
+        assert_eq!(last.map(|card| (card.1, card.2)), Some((px(0.0), px(1.0))));
+        assert!(near(last_origin.y, 50.0 + 3.0 * LINE + 4.0));
+        assert!(near(lines[4].0.y, 50.0 + 4.0 * LINE + 8.0));
+    }
+
+    #[gpui::test]
+    fn the_caret_in_a_card_follows_the_block_padding(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "```\nx\n```");
+        let caret = editor.update_in(cx, |editor, window, cx| {
+            editor.set_selection(1, 1, cx);
+            editor.build_frame(bounds(400.0, 200.0), window).caret
+        });
+        let caret = caret.expect("caret");
+        assert!(near(caret.origin.x, 110.0 + CHAR));
+        assert!(near(caret.origin.y, 54.0));
+    }
+
+    #[gpui::test]
+    fn quoted_lines_get_a_bar_at_the_line_box_edge(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "> a\n\nb");
+        let bars = editor.update_in(cx, |editor, window, _| {
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            frame
+                .lines
+                .iter()
+                .map(|line| line.quote_bar)
+                .collect::<Vec<_>>()
+        });
+        let bar = bars[0].expect("bar");
+        assert!(near(bar.origin.x, 100.0));
+        assert!(near(bar.size.width, 14.5 * 0.3));
+        assert!(near(bar.size.height, LINE));
+        assert_eq!(bars[1..], [None, None]);
+    }
+
+    #[gpui::test]
+    fn inline_code_gets_a_box_around_code_and_backticks(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "a `bc` d\n```\nx\n```");
+        let boxes = editor.update_in(cx, |editor, window, _| {
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            frame
+                .lines
+                .iter()
+                .map(|line| line.code_boxes.clone())
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(boxes[0].len(), 1);
+        assert!(near(boxes[0][0].origin.x, 108.0 + 2.0 * CHAR - 1.0));
+        assert!(near(boxes[0][0].size.width, 4.0 * CHAR + 2.0));
+        assert!(near(boxes[0][0].size.height, LINE));
+        assert!(boxes[1..].iter().all(Vec::is_empty));
+    }
+
+    #[gpui::test]
+    fn line_numbers_sit_on_the_text_row_of_padded_lines(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, "```\nx\n```");
+        let number_y = editor.update_in(cx, |editor, window, cx| {
+            editor.set_line_numbers(true, cx);
+            let frame = editor.build_frame(bounds(400.0, 200.0), window);
+            frame.lines[0].number.as_ref().expect("number").1.y
+        });
+        assert!(near(number_y, 54.0));
     }
 }

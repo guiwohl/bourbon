@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use gpui::App;
+use gpui::{App, FontFeatures};
 
 pub const MONO_FAMILY: &str = "JetBrains Mono";
 
@@ -10,6 +10,13 @@ const FACES: [&[u8]; 4] = [
     include_bytes!("../assets/fonts/JetBrainsMono-Bold.ttf"),
     include_bytes!("../assets/fonts/JetBrainsMono-BoldItalic.ttf"),
 ];
+
+pub fn without_ligatures() -> FontFeatures {
+    FontFeatures(std::sync::Arc::new(vec![
+        ("calt".to_owned(), 0),
+        ("liga".to_owned(), 0),
+    ]))
+}
 
 pub fn register_editor_fonts(cx: &App) -> usize {
     let faces = FACES.iter().map(|face| Cow::Borrowed(*face)).collect();
@@ -35,6 +42,15 @@ mod tests {
     #[gpui::test]
     fn registering_reports_every_face(cx: &mut gpui::TestAppContext) {
         assert_eq!(cx.update(|cx| register_editor_fonts(cx)), 4);
+    }
+
+    #[test]
+    fn ligatures_are_switched_off() {
+        let features = without_ligatures();
+        assert_eq!(
+            features.tag_value_list(),
+            [("calt".to_owned(), 0), ("liga".to_owned(), 0)]
+        );
     }
 
     #[test]

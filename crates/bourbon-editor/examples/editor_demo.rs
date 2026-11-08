@@ -13,31 +13,34 @@ use gpui_platform::application;
 actions!(editor_demo, [ToggleTheme, ToggleLineNumbers]);
 
 const NOTE: &str = "\
-# App hangs when pasting a 5,000-row table
-
-Pasting a large table into a note freezes the editor. See [[perf budget]] and [the budget](bourbon://note/abcdefghij12).
+Pasting a large Markdown table into the editor freezes the window for 10+ seconds.
 
 ## Repro
 
-1. Copy 5,000 rows from a spreadsheet.
-2. Open a **new** note.
-3. Paste with `Ctrl+V`.
+1. Copy a 5,000-row table out of Numbers
+2. Paste it into an empty note
+3. The window stops responding; the beachball shows up after ~2s
 
 ## Environment
 
-- Linux, Wayland
-- *Release* build
-- ~~debug~~ build
+- macOS 26.2, M4 Pro
+- Inkdrop 6.1.2
+- Desktop only — the mobile app pastes as plain text and is fine
 
 ## What the profiler says
 
-> Most of the time is spent in `reflow`.
+The main thread is parked in the table formatter:
 
-```rust
-fn reflow(rows: &[Row]) -> usize {
-    rows.len()
-}
 ```
+formatTable (table-editor/src/formatter.ts:118)
+  computeWidths (table-editor/src/formatter.ts:64)
+    stringWidth (node_modules/string-width/index.js:12)
+```
+
+`computeWidths` is $O(rows \\times cols)$ and calls `stringWidth` once per cell — 5,000 × 8 =
+40,000 calls, each compiling a fresh regex.
+
+> Most of the time is spent in **reflow**.
 
 | Rows | Time |
 |:-----|-----:|
@@ -59,11 +62,16 @@ struct Demo {
     editor: Entity<Editor>,
     preview: Entity<PreviewView>,
     dark: bool,
+    canvas: Option<(f32, f32)>,
 }
 
 impl Demo {
-    fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let editor = cx.new(|cx| Editor::new(NOTE, EditorTheme::light(), cx));
+    fn new(canvas: Option<(f32, f32)>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let editor = cx.new(|cx| {
+            let mut editor = Editor::new(NOTE, EditorTheme::light(), cx);
+            editor.set_line_numbers(true, cx);
+            editor
+        });
         let preview = cx.new(|cx| PreviewView::new(NOTE, PreviewTheme::light(), cx));
         cx.subscribe(&editor, |demo, _, event: &EditorEvent, cx| {
             if let EditorEvent::Changed(text) = event {
@@ -86,6 +94,7 @@ impl Demo {
             editor,
             preview,
             dark: false,
+            canvas,
         }
     }
 
@@ -129,9 +138,11 @@ impl Render for Demo {
         } else {
             PreviewTheme::light().border
         };
-        div()
-            .size_full()
-            .flex()
+        let root = match self.canvas {
+            Some((width, height)) => div().w(px(width)).h(px(height)),
+            None => div().size_full(),
+        };
+        root.flex()
             .flex_row()
             .on_action(cx.listener(Self::toggle_theme))
             .on_action(cx.listener(Self::toggle_line_numbers))
@@ -147,6 +158,19 @@ impl Render for Demo {
     }
 }
 
+const WINDOW_SIZE_VARIABLE: &str = "BOURBON_DEMO_WINDOW_SIZE";
+
+fn requested_window_size() -> Option<(f32, f32)> {
+    std::env::var(WINDOW_SIZE_VARIABLE)
+        .ok()
+        .and_then(|value| parse_window_size(&value))
+}
+
+fn parse_window_size(value: &str) -> Option<(f32, f32)> {
+    let (width, height) = value.split_once('x')?;
+    Some((width.trim().parse().ok()?, height.trim().parse().ok()?))
+}
+
 fn main() {
     application().run(|cx: &mut App| {
         let faces = FONTS.iter().map(|face| Cow::Borrowed(*face)).collect();
@@ -159,7 +183,9 @@ fn main() {
             KeyBinding::new("ctrl-shift-l", ToggleTheme, None),
             KeyBinding::new("ctrl-shift-n", ToggleLineNumbers, None),
         ]);
-        let bounds = Bounds::centered(None, size(px(1280.0), px(800.0)), cx);
+        let requested = requested_window_size();
+        let (width, height) = requested.unwrap_or((1280.0, 800.0));
+        let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
@@ -170,7 +196,7 @@ fn main() {
                 }),
                 ..WindowOptions::default()
             },
-            |window, cx| cx.new(|cx| Demo::new(window, cx)),
+            |window, cx| cx.new(|cx| Demo::new(requested, window, cx)),
         )
         .expect("demo window opens");
         cx.activate(true);

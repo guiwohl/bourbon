@@ -347,9 +347,47 @@ fn frontmatter_block() {
 
 #[test]
 fn math_and_html() {
-    assert_eq!(spans("$a$ and $$b$$"), [("$a$", Math), ("$$b$$", Math)]);
+    assert_eq!(
+        spans("$a$ and $$b$$"),
+        [
+            ("$", MathMark),
+            ("a", Math),
+            ("$", MathMark),
+            ("$$", MathMark),
+            ("b", Math),
+            ("$$", MathMark),
+        ]
+    );
     assert_eq!(spans("a <b>x</b>"), [("<b>", HtmlTag), ("</b>", HtmlTag)]);
     assert_eq!(spans("<div>x</div>\n"), [("<div>x</div>", HtmlTag)]);
+}
+
+#[test]
+fn math_commands_are_marked_inside_the_formula() {
+    assert_eq!(
+        spans(r"$O(n \times m)$"),
+        [
+            ("$", MathMark),
+            ("O(n ", Math),
+            (r"\times", MathMark),
+            (" m)", Math),
+            ("$", MathMark),
+        ]
+    );
+    assert_eq!(
+        spans(r"$a\\b$"),
+        [
+            ("$", MathMark),
+            ("a", Math),
+            (r"\\", MathMark),
+            ("b", Math),
+            ("$", MathMark),
+        ]
+    );
+    assert_eq!(
+        spans(r"$a\é$"),
+        [("$", MathMark), ("a", Math), (r"\é$", MathMark)]
+    );
 }
 
 #[test]

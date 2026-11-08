@@ -27,6 +27,7 @@ pub enum TokenClass {
     TableHeader,
     Frontmatter,
     Math,
+    MathMark,
     AlertMarker,
     HtmlTag,
     NoteLink,

@@ -17,7 +17,7 @@ pub struct HeadingStyle {
 }
 
 pub fn heading_style(level: u8, theme: &PreviewTheme) -> HeadingStyle {
-    let size = theme.font_size * theme.heading_scale(level);
+    let size = theme.heading_base_size * theme.heading_scale(level);
     let rule = match level {
         1 => Some(px(2.0)),
         2 => Some(px(1.0)),
@@ -162,7 +162,10 @@ mod tests {
     use bourbon_markdown::PreviewDoc;
 
     fn theme() -> PreviewTheme {
-        PreviewTheme::light()
+        PreviewTheme {
+            font_size: px(16.0),
+            ..PreviewTheme::light()
+        }
     }
 
     #[test]
@@ -181,6 +184,16 @@ mod tests {
         assert_eq!(h3.size, px(20.0));
         assert_eq!(h3.rule, None);
         assert_eq!(h3.padding_bottom, px(0.0));
+    }
+
+    #[test]
+    fn headings_scale_from_their_own_base_not_the_body_size() {
+        let theme = PreviewTheme {
+            font_size: px(15.0),
+            heading_base_size: px(16.0),
+            ..PreviewTheme::light()
+        };
+        assert_eq!(heading_style(2, &theme).size, px(24.0));
     }
 
     #[test]

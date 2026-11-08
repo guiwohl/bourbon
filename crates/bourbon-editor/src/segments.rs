@@ -112,6 +112,35 @@ pub fn heading_level(line: Range<usize>, spans: &[HighlightSpan]) -> Option<u8> 
         })
 }
 
+pub fn inline_code_ranges(segments: &[Segment]) -> Vec<Range<usize>> {
+    let is_mark = |index: usize| {
+        segments
+            .get(index)
+            .is_some_and(|segment| segment.class == Some(TokenClass::CodeMark))
+    };
+    let mut starts = Vec::with_capacity(segments.len() + 1);
+    let mut offset = 0;
+    for segment in segments {
+        starts.push(offset);
+        offset += segment.len;
+    }
+    starts.push(offset);
+    segments
+        .iter()
+        .enumerate()
+        .filter(|(_, segment)| segment.class == Some(TokenClass::InlineCode))
+        .map(|(index, _)| {
+            let first = if index > 0 && is_mark(index - 1) {
+                index - 1
+            } else {
+                index
+            };
+            let last = if is_mark(index + 1) { index + 1 } else { index };
+            starts[first]..starts[last + 1]
+        })
+        .collect()
+}
+
 pub fn hanging_prefix_len(line: &str) -> usize {
     let bytes = line.as_bytes();
     let mut index = skip_blanks(bytes, 0);
@@ -191,6 +220,43 @@ mod tests {
             class,
             marked: false,
         }
+    }
+
+    #[test]
+    fn inline_code_boxes_cover_the_code_and_its_backticks() {
+        let segments = [
+            segment(2, None),
+            segment(1, Some(TokenClass::CodeMark)),
+            segment(4, Some(TokenClass::InlineCode)),
+            segment(1, Some(TokenClass::CodeMark)),
+            segment(3, None),
+            segment(2, Some(TokenClass::CodeMark)),
+            segment(1, Some(TokenClass::InlineCode)),
+            segment(2, Some(TokenClass::CodeMark)),
+        ];
+        assert_eq!(inline_code_ranges(&segments), vec![2..8, 11..16]);
+    }
+
+    #[test]
+    fn fence_marks_and_code_cut_by_the_line_are_boxed_alone() {
+        assert_eq!(
+            inline_code_ranges(&[segment(3, Some(TokenClass::CodeMark))]),
+            Vec::<Range<usize>>::new()
+        );
+        assert_eq!(
+            inline_code_ranges(&[
+                segment(4, Some(TokenClass::InlineCode)),
+                segment(1, Some(TokenClass::CodeMark)),
+            ]),
+            vec![0..5]
+        );
+        assert_eq!(
+            inline_code_ranges(&[
+                segment(1, Some(TokenClass::CodeMark)),
+                segment(4, Some(TokenClass::InlineCode)),
+            ]),
+            vec![0..5]
+        );
     }
 
     #[test]
