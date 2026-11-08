@@ -1,11 +1,11 @@
 use gpui::{
     App, BorderStyle, Bounds, ContentMask, Element, ElementId, ElementInputHandler, Entity,
     GlobalElementId, InspectorElementId, IntoElement, LayoutId, PaintQuad, Path, PathBuilder,
-    Pixels, Style, Window, fill, point, px, quad, relative, size,
+    Pixels, Point, Style, Window, fill, point, px, quad, relative, size,
 };
 
 use crate::editor::Editor;
-use crate::folding::{Chevron, chevron_points};
+use crate::folding::{Chevron, FoldPlaceholder, chevron_points};
 use crate::frame::{Frame, FrameLine};
 use crate::search::match_quad;
 use crate::theme::EditorTheme;
@@ -64,29 +64,16 @@ pub fn chevron_path(chevron: &Chevron) -> Option<Path<Pixels>> {
     builder.build().ok()
 }
 
-fn paint_fold_markers(line: &FrameLine, theme: &EditorTheme, window: &mut Window, cx: &mut App) {
-    if let Some(path) = line.chevron.as_ref().and_then(chevron_path) {
-        window.paint_path(path, theme.gutter_text);
-    }
-    if let Some(placeholder) = line.fold_placeholder.as_ref() {
-        let radius = theme.font_size * theme.fold_placeholder_radius_em;
-        window.paint_quad(fill(placeholder.bounds, theme.fold_placeholder).corner_radii(radius));
-        let label_origin = point(
-            placeholder.bounds.center().x - placeholder.label.width / 2.0,
-            placeholder.bounds.top(),
-        );
-        placeholder
-            .label
-            .paint(
-                label_origin,
-                placeholder.bounds.size.height,
-                gpui::TextAlign::Left,
-                None,
-                window,
-                cx,
-            )
-            .ok();
-    }
+pub fn placeholder_quad(placeholder: &FoldPlaceholder, theme: &EditorTheme) -> PaintQuad {
+    let radius = theme.font_size * theme.fold_placeholder_radius_em;
+    fill(placeholder.bounds, theme.fold_placeholder).corner_radii(radius)
+}
+
+pub fn placeholder_label_origin(placeholder: &FoldPlaceholder) -> Point<Pixels> {
+    point(
+        placeholder.bounds.center().x - placeholder.label.width / 2.0,
+        placeholder.bounds.top(),
+    )
 }
 
 pub struct EditorElement {
@@ -203,7 +190,23 @@ impl Element for EditorElement {
             }
             for line in &frame.lines {
                 line.layout.paint(line.origin, window, cx);
-                paint_fold_markers(line, &theme, window, cx);
+                if let Some(path) = line.chevron.as_ref().and_then(chevron_path) {
+                    window.paint_path(path, theme.gutter_text);
+                }
+                if let Some(placeholder) = line.fold_placeholder.as_ref() {
+                    window.paint_quad(placeholder_quad(placeholder, &theme));
+                    placeholder
+                        .label
+                        .paint(
+                            placeholder_label_origin(placeholder),
+                            placeholder.bounds.size.height,
+                            gpui::TextAlign::Left,
+                            None,
+                            window,
+                            cx,
+                        )
+                        .ok();
+                }
                 if let Some((number, origin)) = line.number.as_ref() {
                     number
                         .paint(
@@ -253,13 +256,52 @@ mod tests {
     }
 
     #[test]
-    fn a_chevron_becomes_a_stroked_path() {
+    fn a_chevron_becomes_a_stroked_path_around_its_points() {
         let chevron = Chevron {
             center: point(px(30.0), px(40.0)),
             width: px(9.0),
             folded: false,
         };
-        assert!(chevron_path(&chevron).is_some());
+        let path = chevron_path(&chevron).expect("path");
+        let close = |actual: Pixels, expected: f32| (f32::from(actual) - expected).abs() < 1.0;
+        assert!(close(path.bounds.left(), 25.5));
+        assert!(close(path.bounds.right(), 34.5));
+        assert!(close(path.bounds.top(), 37.75));
+        assert!(close(path.bounds.bottom(), 42.25));
+    }
+
+    #[gpui::test]
+    fn the_placeholder_is_a_rounded_pill_with_a_centred_label(cx: &mut gpui::TestAppContext) {
+        let theme = crate::theme::EditorTheme::light();
+        let window = cx.add_empty_window();
+        let label = window.update(|window, _| {
+            window.text_system().shape_line(
+                "x".into(),
+                px(10.0),
+                &[gpui::TextRun {
+                    len: 1,
+                    font: crate::layout::editor_font(&theme, false, false),
+                    color: theme.background,
+                    background_color: None,
+                    underline: None,
+                    strikethrough: None,
+                }],
+                None,
+            )
+        });
+        let label_width = label.width;
+        let placeholder = FoldPlaceholder {
+            bounds: Bounds::new(point(px(100.0), px(20.0)), size(px(20.0), px(14.0))),
+            label,
+        };
+        let pill = placeholder_quad(&placeholder, &theme);
+        assert_eq!(pill.bounds, placeholder.bounds);
+        assert_eq!(pill.corner_radii.top_left, px(14.5 * 0.2));
+        assert_eq!(pill.background, theme.fold_placeholder.into());
+        assert_eq!(
+            placeholder_label_origin(&placeholder),
+            point(px(110.0) - label_width / 2.0, px(20.0))
+        );
     }
 
     #[test]

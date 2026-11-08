@@ -266,10 +266,16 @@ impl LineLayout {
         line_origin + self.text_origin()
     }
 
+    pub fn row_paint_origins(&self, line_origin: Point<Pixels>) -> Vec<Point<Pixels>> {
+        let origin = self.text_paint_origin(line_origin);
+        self.rows
+            .iter()
+            .map(|row| point(origin.x, origin.y + row.top))
+            .collect()
+    }
+
     pub fn paint(&self, origin: Point<Pixels>, window: &mut Window, cx: &mut App) {
-        let origin = self.text_paint_origin(origin);
-        for row in &self.rows {
-            let row_origin = point(origin.x, origin.y + row.top);
+        for (row, row_origin) in self.rows.iter().zip(self.row_paint_origins(origin)) {
             row.shaped
                 .paint(row_origin, row.height, TextAlign::Left, None, window, cx)
                 .ok();
@@ -480,6 +486,47 @@ mod tests {
         let rects = layout.selection_rects(&(0..15), false, px(6.0));
         assert!(close(rects[1].size.height, TALL));
         assert!(close(rects[1].origin.y, LINE));
+    }
+
+    #[gpui::test]
+    fn rows_are_painted_below_each_other_from_the_box_offset(cx: &mut TestAppContext) {
+        let layout = shape_boxed(cx, "aaaa bbbb cccc dddd", Some(10.0), card_box());
+        let origins = layout.row_paint_origins(point(px(10.0), px(20.0)));
+        assert_eq!(origins.len(), layout.row_count());
+        assert_eq!(origins[0], point(px(12.0), px(24.0)));
+        assert_eq!(origins[1], point(px(12.0), px(24.0 + LINE)));
+    }
+
+    #[gpui::test]
+    fn hit_tests_on_padded_rows_find_the_row_under_the_point(cx: &mut TestAppContext) {
+        let layout = shape_boxed(cx, "aaaa bbbb cccc dddd", Some(10.0), card_box());
+        let second = layout.rows()[1].start;
+        let just_inside = point(px(2.0 + 1.0), px(4.0 + LINE + 2.0));
+        assert_eq!(layout.index_for_position(just_inside), second);
+        assert_eq!(layout.glyph_index_at(just_inside), Some(second));
+    }
+
+    #[gpui::test]
+    fn a_tall_range_touching_a_row_edge_leaves_that_row_alone(cx: &mut TestAppContext) {
+        let text = "aaaa bbbb cccc dddd";
+        let first_end = shape(cx, text, Some(10.0)).rows()[0].end;
+        let ending_at_the_break = shape_with_tall(
+            cx,
+            text,
+            Some(10.0),
+            LineBox::default(),
+            std::slice::from_ref(&(first_end - 2..first_end)),
+        );
+        assert!(close(ending_at_the_break.height(), TALL + LINE));
+        let starting_at_the_break = shape_with_tall(
+            cx,
+            text,
+            Some(10.0),
+            LineBox::default(),
+            std::slice::from_ref(&(first_end..first_end + 2)),
+        );
+        assert!(close(starting_at_the_break.first_row_height(), LINE));
+        assert!(close(starting_at_the_break.height(), LINE + TALL));
     }
 
     #[gpui::test]

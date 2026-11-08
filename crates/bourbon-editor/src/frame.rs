@@ -903,7 +903,9 @@ mod tests {
         let source = tall_first_row_document();
         let (editor, cx) = open(cx, &source);
         let height = editor.update_in(cx, |editor, window, cx| {
+            editor.build_frame(bounds(400.0, 100.0), window);
             let start = editor.state.text.line_start(30);
+            assert!(editor.layout_for_line(30, window).row_count() > 1);
             editor
                 .bounds_for_range(start + 1..start + 2, bounds(400.0, 100.0), window, cx)
                 .expect("bounds")
@@ -943,9 +945,9 @@ mod tests {
 
     #[gpui::test]
     fn a_folded_header_gets_a_placeholder_after_its_text(cx: &mut TestAppContext) {
-        let (editor, cx) = open(cx, "## A\none\n## B");
+        let (editor, cx) = open(cx, "x\n## A\none\n## B");
         let placeholders = editor.update_in(cx, |editor, window, cx| {
-            editor.toggle_fold(0, cx);
+            editor.toggle_fold(1, cx);
             editor
                 .build_frame(bounds(400.0, 200.0), window)
                 .lines
@@ -957,7 +959,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>()
         });
-        let (placeholder, label_width) = placeholders[0].expect("placeholder");
+        let (placeholder, label_width) = placeholders[1].expect("placeholder");
         let heading_char = 21.75 * 0.6;
         assert!(near(
             placeholder.origin.x,
@@ -965,13 +967,14 @@ mod tests {
         ));
         assert!(near(
             placeholder.origin.y,
-            50.0 + 21.75 * 1.16 / 2.0 - 14.5 / 2.0
+            50.0 + LINE + 21.75 * 1.16 / 2.0 - 14.5 / 2.0
         ));
         assert!(near(
             placeholder.size.width,
             f32::from(label_width) + 14.5 * 0.5
         ));
         assert!(label_width > px(0.0));
-        assert_eq!(placeholders[1], None);
+        assert_eq!(placeholders[0], None);
+        assert_eq!(placeholders[2], None);
     }
 }
