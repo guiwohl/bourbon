@@ -1,11 +1,11 @@
 use bourbon_core::{Note, NoteId, NoteStore, NotebookId, TagColor};
-use gpui_kit::VisualTestContext;
+use gpui::VisualTestContext;
+use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
 use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
 
 use super::{
-    at, choose_menu_entry, choose_popup_item, click, listed_titles, menu_labels, note_in,
-    open_view, popup_labels,
+    at, choose_menu_entry, choose_popup_item, click, is_listed, listed_titles, menu_labels,
+    note_in, open_view, popup_labels, type_text,
 };
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
@@ -49,11 +49,7 @@ fn navigation(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Navigation {
 }
 
 fn is_present(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> bool {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.try_find(id.to_owned()).is_some()
-    })
-    .unwrap()
+    is_listed(cx, handle, id)
 }
 
 fn title_is_focused(cx: &mut TestAppContext, handle: AnyWindowHandle) -> bool {
@@ -72,7 +68,7 @@ fn new_from_template(cx: &mut TestAppContext, handle: AnyWindowHandle, index: us
     choose_menu_entry(cx, handle, SORT_ENTRIES + index);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_templates_row_lists_only_templates(cx: &mut TestAppContext) {
     let fixture = fixture();
     note_in(&fixture.store, &fixture.inbox, "Plain", 2);
@@ -86,7 +82,7 @@ fn the_templates_row_lists_only_templates(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view), ["Meeting"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn new_template_creates_selects_and_focuses_a_template(cx: &mut TestAppContext) {
     let fixture = fixture();
     note_in(&fixture.store, &fixture.inbox, "Plain", 2);
@@ -103,7 +99,7 @@ fn new_template_creates_selects_and_focuses_a_template(cx: &mut TestAppContext) 
     assert!(title_is_focused(cx, handle));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_n_in_the_templates_view_creates_a_template(cx: &mut TestAppContext) {
     let fixture = fixture();
     note_in(&fixture.store, &fixture.inbox, "Plain", 2);
@@ -117,7 +113,7 @@ fn ctrl_n_in_the_templates_view_creates_a_template(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view).len(), 1);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_n_outside_the_templates_view_still_creates_a_plain_note(cx: &mut TestAppContext) {
     let fixture = fixture();
     note_in(&fixture.store, &fixture.inbox, "Plain", 2);
@@ -128,7 +124,7 @@ fn ctrl_n_outside_the_templates_view_still_creates_a_plain_note(cx: &mut TestApp
     assert!(!selected_note(cx, &view).is_template);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_new_note_button_in_the_templates_view_creates_a_template(cx: &mut TestAppContext) {
     let fixture = fixture();
     let (handle, view) = open_view(cx, fixture.store);
@@ -140,7 +136,7 @@ fn the_new_note_button_in_the_templates_view_creates_a_template(cx: &mut TestApp
     assert_eq!(navigation(cx, &view), Navigation::Templates);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn new_from_template_is_hidden_without_templates(cx: &mut TestAppContext) {
     let fixture = fixture();
     note_in(&fixture.store, &fixture.inbox, "Plain", 2);
@@ -154,7 +150,7 @@ fn new_from_template_is_hidden_without_templates(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_menu_lists_templates_by_title_with_untitled_for_blank_ones(cx: &mut TestAppContext) {
     let fixture = fixture();
     template_in(&fixture.store, &fixture.inbox, "Meeting", 3);
@@ -168,7 +164,7 @@ fn the_menu_lists_templates_by_title_with_untitled_for_blank_ones(cx: &mut TestA
     assert_eq!(labels[FIRST_TEMPLATE_ITEM..], ["Untitled", "Meeting"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn picking_a_template_in_a_notebook_creates_the_note_there(cx: &mut TestAppContext) {
     let fixture = fixture();
     template_in(&fixture.store, &fixture.inbox, "Meeting", 3);
@@ -187,7 +183,7 @@ fn picking_a_template_in_a_notebook_creates_the_note_there(cx: &mut TestAppConte
     assert!(title_is_focused(cx, handle));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn picking_a_template_in_all_notes_creates_the_note_in_the_inbox(cx: &mut TestAppContext) {
     let fixture = fixture();
     template_in(&fixture.store, &fixture.work, "Meeting", 3);
@@ -200,7 +196,7 @@ fn picking_a_template_in_all_notes_creates_the_note_in_the_inbox(cx: &mut TestAp
     assert_eq!(listed_titles(cx, &view), ["Meeting"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn picking_a_template_copies_its_tags(cx: &mut TestAppContext) {
     let fixture = fixture();
     let template = template_in(&fixture.store, &fixture.inbox, "Meeting", 3);
@@ -217,7 +213,7 @@ fn picking_a_template_copies_its_tags(cx: &mut TestAppContext) {
     assert_eq!(created.tags[0].name, "weekly");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn picking_a_template_from_the_trash_switches_to_all_notes(cx: &mut TestAppContext) {
     let fixture = fixture();
     template_in(&fixture.store, &fixture.work, "Meeting", 3);
@@ -232,7 +228,7 @@ fn picking_a_template_from_the_trash_switches_to_all_notes(cx: &mut TestAppConte
     assert_eq!(listed_titles(cx, &view), ["Meeting"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn picking_a_template_from_the_templates_view_switches_to_all_notes(cx: &mut TestAppContext) {
     let fixture = fixture();
     template_in(&fixture.store, &fixture.work, "Meeting", 3);
@@ -248,15 +244,14 @@ fn picking_a_template_from_the_templates_view_switches_to_all_notes(cx: &mut Tes
     assert_eq!(listed_titles(cx, &view), ["Meeting"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn picking_a_template_saves_the_pending_edit_first(cx: &mut TestAppContext) {
     let fixture = fixture();
     let plain = note_in(&fixture.store, &fixture.inbox, "Plain", 2);
     template_in(&fixture.store, &fixture.inbox, "Meeting", 3);
     let (handle, view) = open_view(cx, fixture.store);
     click(cx, handle, "title");
-    cx.update_window(handle, |_, window, cx| window.input("!", cx))
-        .unwrap();
+    type_text(cx, handle, "!");
 
     new_from_template(cx, handle, 0);
 
@@ -267,7 +262,7 @@ fn open_note_actions(cx: &mut TestAppContext, handle: AnyWindowHandle) {
     click(cx, handle, "note-actions");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_note_actions_menu_offers_mark_as_template_for_a_plain_note(cx: &mut TestAppContext) {
     let fixture = fixture();
     note_in(&fixture.store, &fixture.inbox, "Plain", 2);
@@ -281,7 +276,7 @@ fn the_note_actions_menu_offers_mark_as_template_for_a_plain_note(cx: &mut TestA
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_note_actions_menu_offers_unmark_for_a_template(cx: &mut TestAppContext) {
     let fixture = fixture();
     template_in(&fixture.store, &fixture.inbox, "Meeting", 3);
@@ -297,7 +292,7 @@ fn the_note_actions_menu_offers_unmark_for_a_template(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn marking_the_open_note_keeps_it_open_and_moves_it_to_templates(cx: &mut TestAppContext) {
     let fixture = fixture();
     let plain = note_in(&fixture.store, &fixture.inbox, "Plain", 2);
@@ -319,7 +314,7 @@ fn marking_the_open_note_keeps_it_open_and_moves_it_to_templates(cx: &mut TestAp
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn unmarking_the_open_template_keeps_it_open_and_returns_it_to_all_notes(cx: &mut TestAppContext) {
     let fixture = fixture();
     let template = template_in(&fixture.store, &fixture.inbox, "Meeting", 3);
@@ -337,14 +332,13 @@ fn unmarking_the_open_template_keeps_it_open_and_returns_it_to_all_notes(cx: &mu
     assert_eq!(listed_titles(cx, &view), ["Meeting"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn marking_saves_the_pending_edit_first(cx: &mut TestAppContext) {
     let fixture = fixture();
     let plain = note_in(&fixture.store, &fixture.inbox, "Plain", 2);
     let (handle, view) = open_view(cx, fixture.store);
     click(cx, handle, "title");
-    cx.update_window(handle, |_, window, cx| window.input("!", cx))
-        .unwrap();
+    type_text(cx, handle, "!");
 
     open_note_actions(cx, handle);
     choose_popup_item(cx, handle, 0);
@@ -356,7 +350,7 @@ fn no_titles() -> Vec<String> {
     Vec::new()
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_note_actions_menu_copies_the_cli_command_of_the_open_note(cx: &mut TestAppContext) {
     let fixture = fixture();
     let plain = note_in(&fixture.store, &fixture.inbox, "Plain", 2);

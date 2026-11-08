@@ -4,7 +4,7 @@ use bourbon_core::{
     NoteScope, NoteStatus, NoteStore, NotebookDepth, NotebookId, StoreError, TagId,
 };
 use bourbon_editor::TextField;
-use gpui_kit::{Entity, SharedString, Subscription};
+use gpui::{Entity, SharedString, Subscription};
 
 use super::tree;
 

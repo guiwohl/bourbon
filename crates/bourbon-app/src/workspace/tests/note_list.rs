@@ -1,33 +1,20 @@
+use super::harness::RenderFrame as _;
 use bourbon_core::{NoteId, NoteSort, NoteStore, TagColor, Timestamp};
-use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
+use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
 
 use super::{
-    at, choose_menu_entry as choose_menu_item, click, listed_titles, menu_labels, note_in,
-    open_view,
+    at, choose_menu_entry as choose_menu_item, click, is_listed, listed_titles, menu_labels,
+    note_in, open_view, press, render, right_click, type_text,
 };
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
-
-fn right_click(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.right_click(id.to_owned(), cx);
-        window.render_frame(cx);
-    })
-    .unwrap();
-}
 
 fn no_titles() -> Vec<String> {
     Vec::new()
 }
 
 fn is_present(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> bool {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.try_find(id.to_owned()).is_some()
-    })
-    .unwrap()
+    is_listed(cx, handle, id)
 }
 
 fn selected_title(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Option<String> {
@@ -48,7 +35,7 @@ fn three_notes() -> (NoteStore, [NoteId; 3]) {
     (store, [mango, zebra, apple])
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_sort_selector_reorders_by_updated_created_and_title(cx: &mut TestAppContext) {
     let (store, _) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -70,7 +57,7 @@ fn the_sort_selector_reorders_by_updated_created_and_title(cx: &mut TestAppConte
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn pinning_moves_a_note_to_the_top_and_shows_the_pin_icon(cx: &mut TestAppContext) {
     let (store, [_, zebra, _]) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -83,7 +70,7 @@ fn pinning_moves_a_note_to_the_top_and_shows_the_pin_icon(cx: &mut TestAppContex
     assert!(is_present(cx, handle, &format!("pin-{zebra}")));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn unpinning_returns_the_note_to_its_sorted_place_and_hides_the_icon(cx: &mut TestAppContext) {
     let (store, [_, zebra, _]) = three_notes();
     store.pin_note(&zebra).unwrap();
@@ -97,7 +84,7 @@ fn unpinning_returns_the_note_to_its_sorted_place_and_hides_the_icon(cx: &mut Te
     assert!(!is_present(cx, handle, &format!("pin-{zebra}")));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn duplicating_creates_a_copy_in_the_list_and_selects_it(cx: &mut TestAppContext) {
     let (store, [mango, _, _]) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -119,7 +106,7 @@ fn duplicating_creates_a_copy_in_the_list_and_selects_it(cx: &mut TestAppContext
     cx.read(|cx| assert_eq!(view.read(cx).editor.body(cx), "edited"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn trashing_the_selected_note_selects_the_next_row(cx: &mut TestAppContext) {
     let (store, [mango, _, _]) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -132,7 +119,7 @@ fn trashing_the_selected_note_selects_the_next_row(cx: &mut TestAppContext) {
     assert_eq!(selected_title(cx, &view).as_deref(), Some("Apple"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn trashing_the_last_selected_row_selects_the_previous_one(cx: &mut TestAppContext) {
     let (store, [_, zebra, _]) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -146,7 +133,7 @@ fn trashing_the_last_selected_row_selects_the_previous_one(cx: &mut TestAppConte
     assert_eq!(selected_title(cx, &view).as_deref(), Some("Apple"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn trashing_the_only_note_leaves_the_editor_empty(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -162,7 +149,7 @@ fn trashing_the_only_note_leaves_the_editor_empty(cx: &mut TestAppContext) {
     assert!(is_present(cx, handle, "no-notes"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn trashing_another_note_keeps_the_selection(cx: &mut TestAppContext) {
     let (store, [_, zebra, _]) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -174,16 +161,12 @@ fn trashing_another_note_keeps_the_selection(cx: &mut TestAppContext) {
     assert_eq!(selected_title(cx, &view).as_deref(), Some("Mango"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn trashing_saves_the_pending_edit_of_the_selected_note_first(cx: &mut TestAppContext) {
     let (store, [mango, _, _]) = three_notes();
     let (handle, view) = open_view(cx, store);
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.click("title", cx);
-        window.input("!", cx);
-    })
-    .unwrap();
+    click(cx, handle, "title");
+    type_text(cx, handle, "!");
 
     right_click(cx, handle, &format!("note-{mango}"));
     choose_menu_item(cx, handle, 2);
@@ -193,7 +176,7 @@ fn trashing_saves_the_pending_edit_of_the_selected_note_first(cx: &mut TestAppCo
     assert!(stored.trashed_at.is_some());
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_trash_context_menu_restores_a_note_out_of_the_trash_list(cx: &mut TestAppContext) {
     let (store, [_, zebra, _]) = three_notes();
     store.trash_note(&zebra, Timestamp::now()).unwrap();
@@ -209,7 +192,7 @@ fn the_trash_context_menu_restores_a_note_out_of_the_trash_list(cx: &mut TestApp
     assert_eq!(listed_titles(cx, &view).len(), 3);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_trash_context_menu_offers_only_restore(cx: &mut TestAppContext) {
     let (store, [_, zebra, _]) = three_notes();
     store.trash_note(&zebra, Timestamp::now()).unwrap();
@@ -221,7 +204,7 @@ fn the_trash_context_menu_offers_only_restore(cx: &mut TestAppContext) {
     assert_eq!(menu_labels(cx, &view), ["Restore"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_list_context_menu_offers_pin_duplicate_and_trash(cx: &mut TestAppContext) {
     let (store, [mango, _, _]) = three_notes();
     store.pin_note(&mango).unwrap();
@@ -235,7 +218,7 @@ fn the_list_context_menu_offers_pin_duplicate_and_trash(cx: &mut TestAppContext)
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_trash_header_swaps_compose_for_empty_trash(cx: &mut TestAppContext) {
     let (store, _) = three_notes();
     let (handle, _) = open_view(cx, store);
@@ -248,7 +231,7 @@ fn the_trash_header_swaps_compose_for_empty_trash(cx: &mut TestAppContext) {
     assert!(is_present(cx, handle, "empty-trash"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn emptying_the_trash_asks_for_confirmation_before_deleting(cx: &mut TestAppContext) {
     let (store, [mango, zebra, _]) = three_notes();
     store.trash_note(&mango, Timestamp::now()).unwrap();
@@ -260,16 +243,12 @@ fn emptying_the_trash_asks_for_confirmation_before_deleting(cx: &mut TestAppCont
     cx.run_until_parked();
     assert_eq!(listed_titles(cx, &view).len(), 2);
 
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.press("enter", cx);
-    })
-    .unwrap();
+    press(cx, handle, "enter");
     cx.run_until_parked();
     assert_eq!(listed_titles(cx, &view), no_titles());
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn cancelling_the_confirmation_keeps_the_trash(cx: &mut TestAppContext) {
     let (store, [mango, _, _]) = three_notes();
     store.trash_note(&mango, Timestamp::now()).unwrap();
@@ -278,17 +257,13 @@ fn cancelling_the_confirmation_keeps_the_trash(cx: &mut TestAppContext) {
 
     click(cx, handle, "empty-trash");
     cx.run_until_parked();
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.press("escape", cx);
-    })
-    .unwrap();
+    press(cx, handle, "escape");
     cx.run_until_parked();
 
     assert_eq!(listed_titles(cx, &view), ["Mango"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn emptying_the_trash_clears_a_selected_note_that_was_purged(cx: &mut TestAppContext) {
     let (store, [mango, _, _]) = three_notes();
     store.trash_note(&mango, Timestamp::now()).unwrap();
@@ -302,7 +277,7 @@ fn emptying_the_trash_clears_a_selected_note_that_was_purged(cx: &mut TestAppCon
     assert_eq!(selected_title(cx, &view), None);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn emptying_the_trash_keeps_a_selected_note_that_is_not_trashed(cx: &mut TestAppContext) {
     let (store, _) = three_notes();
     let (_, view) = open_view(cx, store);
@@ -312,7 +287,7 @@ fn emptying_the_trash_keeps_a_selected_note_that_is_not_trashed(cx: &mut TestApp
     assert_eq!(selected_title(cx, &view).as_deref(), Some("Mango"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_tag_chip_lists_that_tag_without_changing_the_selection(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -335,21 +310,21 @@ fn clicking_a_tag_chip_lists_that_tag_without_changing_the_selection(cx: &mut Te
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn an_empty_list_says_there_are_no_notes(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let (handle, _) = open_view(cx, store);
     assert!(is_present(cx, handle, "no-notes"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_list_with_notes_does_not_show_the_empty_message(cx: &mut TestAppContext) {
     let (store, _) = three_notes();
     let (handle, _) = open_view(cx, store);
     assert!(!is_present(cx, handle, "no-notes"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_failing_change_shows_the_error_banner(cx: &mut TestAppContext) {
     let (store, _) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -363,7 +338,7 @@ fn a_failing_change_shows_the_error_banner(cx: &mut TestAppContext) {
     assert!(is_present(cx, handle, "error-banner"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn changing_notes_refreshes_the_sidebar_counts(cx: &mut TestAppContext) {
     let (store, [mango, _, _]) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -384,7 +359,7 @@ fn changing_notes_refreshes_the_sidebar_counts(cx: &mut TestAppContext) {
     assert_eq!(count(cx), 2);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_filter_keeps_only_notes_matching_titles_or_bodies_and_empty_restores(
     cx: &mut TestAppContext,
 ) {
@@ -406,7 +381,7 @@ fn the_filter_keeps_only_notes_matching_titles_or_bodies_and_empty_restores(
     assert_eq!(listed_titles(cx, &view).len(), 3);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn escape_in_the_filter_clears_it(cx: &mut TestAppContext) {
     let (store, _) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -418,7 +393,7 @@ fn escape_in_the_filter_clears_it(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view).len(), 3);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn enter_in_the_filter_hands_the_focus_to_the_list(cx: &mut TestAppContext) {
     let (store, _) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -432,22 +407,13 @@ fn enter_in_the_filter_hands_the_focus_to_the_list(cx: &mut TestAppContext) {
 }
 
 fn type_filter(cx: &mut TestAppContext, handle: AnyWindowHandle, text: &str) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.click("note-filter-input", cx);
-        window.input(text, cx);
-        window.render_frame(cx);
-    })
-    .unwrap();
+    click(cx, handle, "note-filter-input");
+    type_text(cx, handle, text);
 }
 
 fn press_escape_in_filter(cx: &mut TestAppContext, handle: AnyWindowHandle) {
-    cx.update_window(handle, |_, window, cx| {
-        window.click("note-filter-input", cx);
-        window.press("escape", cx);
-        window.render_frame(cx);
-    })
-    .unwrap();
+    click(cx, handle, "note-filter-input");
+    press(cx, handle, "escape");
 }
 
 fn list_has_focus(
@@ -475,12 +441,11 @@ fn sidebar_has_focus(
 }
 
 fn press_key(cx: &mut TestAppContext, handle: AnyWindowHandle, key: &str) {
-    cx.update_window(handle, |_, window, cx| window.press(key, cx))
-        .unwrap();
+    press(cx, handle, key);
     cx.run_until_parked();
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_sidebar_row_focuses_the_sidebar_and_clicking_a_note_focuses_the_list(
     cx: &mut TestAppContext,
 ) {
@@ -498,7 +463,7 @@ fn clicking_a_sidebar_row_focuses_the_sidebar_and_clicking_a_note_focuses_the_li
     assert!(!sidebar_has_focus(cx, handle, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn arrow_keys_open_the_neighbouring_notes_while_the_list_keeps_the_focus(cx: &mut TestAppContext) {
     let (store, [mango, zebra, apple]) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -524,7 +489,7 @@ fn arrow_keys_open_the_neighbouring_notes_while_the_list_keeps_the_focus(cx: &mu
     assert!(list_has_focus(cx, handle, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn arrow_keys_outside_the_list_do_not_change_the_open_note(cx: &mut TestAppContext) {
     let (store, [mango, _, _]) = three_notes();
     let (handle, view) = open_view(cx, store);
@@ -535,7 +500,7 @@ fn arrow_keys_outside_the_list_do_not_change_the_open_note(cx: &mut TestAppConte
     assert_eq!(cx.read(|cx| view.read(cx).selected.clone()), Some(mango));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn opening_a_note_below_the_fold_scrolls_it_into_view(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -544,8 +509,7 @@ fn opening_a_note_below_the_fold_scrolls_it_into_view(cx: &mut TestAppContext) {
         note_in(&store, &inbox, &format!("Note {index}"), index);
     }
     let (handle, view) = open_view(cx, store);
-    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
-        .unwrap();
+    render(cx, handle);
     let before = view.read_with(cx, |view, _| {
         view.note_list_state.logical_scroll_top().item_ix
     });
@@ -572,12 +536,11 @@ fn long_list(cx: &mut TestAppContext) -> (AnyWindowHandle, Entity<Workspace>) {
         note_in(&store, &inbox, &format!("Note {index}"), index);
     }
     let (handle, view) = open_view(cx, store);
-    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
-        .unwrap();
+    render(cx, handle);
     (handle, view)
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn revealing_a_fully_visible_row_leaves_the_scroll_position_alone(cx: &mut TestAppContext) {
     let (handle, view) = long_list(cx);
     let top = |cx: &mut TestAppContext| {
@@ -587,12 +550,10 @@ fn revealing_a_fully_visible_row_leaves_the_scroll_position_alone(cx: &mut TestA
     };
 
     cx.update_window(handle, |_, window, cx| {
-        view.read(cx)
-            .note_list_state
-            .scroll_to(gpui_kit::ListOffset {
-                item_ix: 10,
-                offset_in_item: gpui_kit::px(0.),
-            });
+        view.read(cx).note_list_state.scroll_to(gpui::ListOffset {
+            item_ix: 10,
+            offset_in_item: gpui::px(0.),
+        });
         window.render_frame(cx);
         window.render_frame(cx);
         crate::note_list::reveal(&view.read(cx).note_list_state, 11);
@@ -603,7 +564,7 @@ fn revealing_a_fully_visible_row_leaves_the_scroll_position_alone(cx: &mut TestA
     assert_eq!(top(cx), 10);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn revealing_a_row_cut_by_the_bottom_edge_scrolls_to_it(cx: &mut TestAppContext) {
     let (handle, view) = long_list(cx);
 

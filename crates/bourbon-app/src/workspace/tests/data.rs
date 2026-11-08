@@ -4,13 +4,12 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use bourbon_core::{BackupOutcome, NoteQuery, NoteStore, Settings};
-use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext, VisualTestContext};
+use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext, VisualTestContext};
 use jiff::civil::date;
 
 use super::{
-    choose_menu_entry, choose_setting, click, locations_with_runner, menu_labels, note_in,
-    open_view_with, seeded_store, type_into_title,
+    choose_menu_entry, choose_setting, click, is_listed, locations_with_runner, menu_labels,
+    note_in, open_view_with, press, seeded_store, type_into_title, type_text,
 };
 use crate::backup_runner::{BackupJob, BackupRunner};
 use crate::locations::Locations;
@@ -53,20 +52,6 @@ impl BackupRunner for FakeRunner {
         std::fs::copy(source, &job.database).map_err(|error| error.to_string())?;
         Ok(())
     }
-}
-
-fn press(cx: &mut TestAppContext, handle: AnyWindowHandle, keystrokes: &str) {
-    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
-        .unwrap();
-    VisualTestContext::from_window(handle, cx).simulate_keystrokes(keystrokes);
-}
-
-fn type_text(cx: &mut TestAppContext, handle: AnyWindowHandle, text: &str) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.input(text, cx);
-    })
-    .unwrap();
 }
 
 struct Setup {
@@ -118,11 +103,7 @@ fn open_default(cx: &mut TestAppContext) -> Setup {
 }
 
 fn is_present(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) -> bool {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.try_find(id.to_owned()).is_some()
-    })
-    .unwrap()
+    is_listed(cx, handle, id)
 }
 
 fn status(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Option<String> {
@@ -148,7 +129,7 @@ fn titles(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Vec<String> {
     })
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_app_menu_lists_its_four_entries_once_opened(cx: &mut TestAppContext) {
     let setup = open_default(cx);
 
@@ -157,7 +138,7 @@ fn the_app_menu_lists_its_four_entries_once_opened(cx: &mut TestAppContext) {
     assert_eq!(menu_labels(cx, &setup.view).len(), 4);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_menu_settings_entry_opens_settings(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     click(cx, setup.handle, "app-menu");
@@ -167,7 +148,7 @@ fn the_menu_settings_entry_opens_settings(cx: &mut TestAppContext) {
     assert!(setup.view.read_with(cx, |view, _| view.settings_open));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_menu_back_up_entry_runs_a_backup_of_the_configured_repository(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     click(cx, setup.handle, "app-menu");
@@ -182,7 +163,7 @@ fn the_menu_back_up_entry_runs_a_backup_of_the_configured_repository(cx: &mut Te
     assert_eq!(jobs[0].work_dir, setup.locations.backup_work_dir);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_menu_restore_entry_asks_before_replacing_anything(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     click(cx, setup.handle, "app-menu");
@@ -199,7 +180,7 @@ fn the_menu_restore_entry_asks_before_replacing_anything(cx: &mut TestAppContext
     assert!(setup.runner.restores.lock().unwrap().is_empty());
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_action_search_offers_and_runs_back_up_now(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     press(cx, setup.handle, "ctrl-p");
@@ -215,7 +196,7 @@ fn the_action_search_offers_and_runs_back_up_now(cx: &mut TestAppContext) {
     assert_eq!(setup.runner.backup_count(), 1);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_action_search_runs_restore_from_backup_with_a_confirmation(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     press(cx, setup.handle, "ctrl-p");
@@ -230,7 +211,7 @@ fn the_action_search_runs_restore_from_backup_with_a_confirmation(cx: &mut TestA
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_manual_backup_reports_the_time_and_an_unchanged_one_says_up_to_date(cx: &mut TestAppContext) {
     let setup = open_default(cx);
 
@@ -246,7 +227,7 @@ fn a_manual_backup_reports_the_time_and_an_unchanged_one_says_up_to_date(cx: &mu
     assert_eq!(banner(cx, &setup.view), None);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_failed_backup_goes_to_the_status_line_and_the_banner(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     *setup.runner.backup_result.lock().unwrap() = Err("push rejected".to_owned());
@@ -258,7 +239,7 @@ fn a_failed_backup_goes_to_the_status_line_and_the_banner(cx: &mut TestAppContex
     assert_eq!(banner(cx, &setup.view).as_deref(), Some("push rejected"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn backing_up_without_a_repository_asks_for_one(cx: &mut TestAppContext) {
     let setup = open_with_settings(
         cx,
@@ -277,7 +258,7 @@ fn backing_up_without_a_repository_asks_for_one(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn two_backups_never_run_at_once(cx: &mut TestAppContext) {
     let setup = open_default(cx);
 
@@ -293,7 +274,7 @@ fn two_backups_never_run_at_once(cx: &mut TestAppContext) {
     assert_eq!(setup.runner.backup_count(), 2);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn an_edit_triggers_an_automatic_backup_five_minutes_later(cx: &mut TestAppContext) {
     let setup = open_with_settings(
         cx,
@@ -312,7 +293,7 @@ fn an_edit_triggers_an_automatic_backup_five_minutes_later(cx: &mut TestAppConte
     assert_eq!(setup.runner.backup_count(), 1);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_new_edit_restarts_the_five_minutes(cx: &mut TestAppContext) {
     let setup = open_with_settings(
         cx,
@@ -333,7 +314,7 @@ fn a_new_edit_restarts_the_five_minutes(cx: &mut TestAppContext) {
     assert_eq!(setup.runner.backup_count(), 1);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn edits_never_back_up_while_automatic_backup_is_off(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     type_into_title(cx, setup.handle, "Edited");
@@ -344,7 +325,7 @@ fn edits_never_back_up_while_automatic_backup_is_off(cx: &mut TestAppContext) {
     assert_eq!(setup.runner.backup_count(), 0);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn closing_after_an_edit_waits_for_a_backup_then_closes(cx: &mut TestAppContext) {
     let setup = open_with_settings(
         cx,
@@ -362,7 +343,7 @@ fn closing_after_an_edit_waits_for_a_backup_then_closes(cx: &mut TestAppContext)
     assert!(cx.update_window(setup.handle, |_, _, _| ()).is_err());
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn closing_after_an_edit_still_closes_when_the_backup_fails(cx: &mut TestAppContext) {
     let setup = open_with_settings(
         cx,
@@ -379,7 +360,7 @@ fn closing_after_an_edit_still_closes_when_the_backup_fails(cx: &mut TestAppCont
     assert!(cx.update_window(setup.handle, |_, _, _| ()).is_err());
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn closing_without_edits_or_without_automatic_backup_does_not_back_up(cx: &mut TestAppContext) {
     let untouched = open_with_settings(
         cx,
@@ -438,7 +419,7 @@ fn open_for_restore(cx: &mut TestAppContext, restore_source: Result<PathBuf, Str
     }
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn restoring_swaps_the_store_keeps_a_copy_and_starts_over(cx: &mut TestAppContext) {
     let setup = open_for_restore(cx, Ok(backup_file_with("From backup")));
     setup
@@ -476,7 +457,7 @@ fn restoring_swaps_the_store_keeps_a_copy_and_starts_over(cx: &mut TestAppContex
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn cancelling_the_restore_changes_nothing(cx: &mut TestAppContext) {
     let setup = open_for_restore(cx, Ok(backup_file_with("From backup")));
     setup.view.update(cx, Workspace::begin_restore);
@@ -492,7 +473,7 @@ fn cancelling_the_restore_changes_nothing(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_failed_restore_reopens_the_old_notes_and_says_why(cx: &mut TestAppContext) {
     let setup = open_for_restore(cx, Err("repository not found".to_owned()));
     setup.view.update(cx, Workspace::begin_restore);
@@ -514,7 +495,7 @@ fn a_failed_restore_reopens_the_old_notes_and_says_why(cx: &mut TestAppContext) 
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn restoring_saves_the_pending_edit_first(cx: &mut TestAppContext) {
     let setup = open_for_restore(cx, Err("nope".to_owned()));
     type_into_title(cx, setup.handle, "Typed");
@@ -530,7 +511,7 @@ fn restoring_saves_the_pending_edit_first(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_restore_is_refused_while_a_backup_is_running(cx: &mut TestAppContext) {
     let setup = open_for_restore(cx, Ok(backup_file_with("From backup")));
     setup.view.update(cx, |view, cx| {
@@ -544,7 +525,7 @@ fn a_restore_is_refused_while_a_backup_is_running(cx: &mut TestAppContext) {
     assert_eq!(titles(cx, &setup.view), ["Current"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn exporting_writes_every_note_into_a_dated_folder(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     let target = tempfile::tempdir().unwrap();
@@ -567,7 +548,7 @@ fn exporting_writes_every_note_into_a_dated_folder(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn an_export_that_cannot_be_written_is_reported(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     let target = tempfile::tempdir().unwrap();
@@ -596,7 +577,7 @@ fn walk(directory: &std::path::Path) -> Vec<String> {
     found
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_settings_repository_field_validates_and_saves(cx: &mut TestAppContext) {
     let setup = open_with_settings(
         cx,
@@ -630,7 +611,7 @@ fn the_settings_repository_field_validates_and_saves(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn choosing_the_token_login_shows_a_token_field_whose_text_is_saved_privately(
     cx: &mut TestAppContext,
 ) {
@@ -658,7 +639,7 @@ fn choosing_the_token_login_shows_a_token_field_whose_text_is_saved_privately(
     assert!(!settings_text.contains("ghp_abc"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_settings_toggle_and_buttons_drive_the_backup(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     press(cx, setup.handle, "ctrl-,");
@@ -678,7 +659,7 @@ fn the_settings_toggle_and_buttons_drive_the_backup(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn starting_an_export_dismisses_the_previous_notice(cx: &mut TestAppContext) {
     let setup = open_default(cx);
     setup

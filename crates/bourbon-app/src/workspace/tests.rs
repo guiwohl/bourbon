@@ -2,17 +2,20 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bourbon_core::{NoteId, NoteStatus, NoteStore, NotebookId, TagColor, Timestamp};
-use gpui_kit::VisualTestContext;
-use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{
+use gpui::VisualTestContext;
+use gpui::{
     AnyWindowHandle, AppContext as _, Bounds, Entity, Point, TestAppContext, WindowBounds,
     WindowOptions, px, size,
 };
+use gpui_kit::test::TestWindowExt as _;
 
 use super::Workspace;
 use crate::backup_runner::BackupRunner;
 use crate::locations::Locations;
 use crate::navigation::Navigation;
+pub(crate) use harness::{
+    bounds, click, click_at, drag, drag_by, hover, is_listed, press, render, right_click, type_text,
+};
 
 mod control_pane;
 mod data;
@@ -20,6 +23,7 @@ mod drag;
 mod editor;
 mod find;
 mod focus;
+mod harness;
 mod links;
 mod tasks;
 mod view_modes;
@@ -104,12 +108,8 @@ fn stored_title(cx: &mut TestAppContext, view: &Entity<Workspace>, id: &NoteId) 
 }
 
 fn type_into_title(cx: &mut TestAppContext, handle: AnyWindowHandle, text: &str) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.click("title", cx);
-        window.input(text, cx);
-    })
-    .unwrap();
+    click(cx, handle, "title");
+    type_text(cx, handle, text);
 }
 
 fn choose_popup_item(cx: &mut TestAppContext, handle: AnyWindowHandle, index: usize) {
@@ -153,14 +153,9 @@ fn menu_labels(cx: &mut TestAppContext, view: &Entity<Workspace>) -> Vec<String>
 }
 
 fn choose_menu_entry(cx: &mut TestAppContext, handle: AnyWindowHandle, position: usize) {
-    cx.update_window(handle, |_, window, cx| {
-        for _ in 0..=position {
-            window.press("down", cx);
-        }
-        window.press("enter", cx);
-        window.render_frame(cx);
-    })
-    .unwrap();
+    let downs = vec!["down"; position + 1].join(" ");
+    press(cx, handle, &downs);
+    press(cx, handle, "enter");
     cx.run_until_parked();
 }
 
@@ -170,15 +165,7 @@ fn choose_setting(cx: &mut TestAppContext, handle: AnyWindowHandle, select: &str
     choose_menu_entry(cx, handle, position);
 }
 
-fn click(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.click(id.to_owned(), cx);
-    })
-    .unwrap();
-}
-
-#[gpui_kit::test]
+#[gpui::test]
 fn startup_selects_the_most_recent_note_and_loads_it(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (_, view) = open_view(cx, store);
@@ -191,7 +178,7 @@ fn startup_selects_the_most_recent_note_and_loads_it(cx: &mut TestAppContext) {
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn typing_a_title_is_saved_only_after_the_autosave_delay(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -207,15 +194,14 @@ fn typing_a_title_is_saved_only_after_the_autosave_delay(cx: &mut TestAppContext
     assert_eq!(stored_title(cx, &view, &seeded.newer), "Newer!");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn each_keystroke_restarts_the_autosave_delay(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
 
     type_into_title(cx, handle, "!");
     cx.executor().advance_clock(Duration::from_millis(400));
-    cx.update_window(handle, |_, window, cx| window.input("?", cx))
-        .unwrap();
+    type_text(cx, handle, "?");
     cx.executor().advance_clock(Duration::from_millis(400));
     cx.run_until_parked();
     assert_eq!(stored_title(cx, &view, &seeded.newer), "Newer");
@@ -225,7 +211,7 @@ fn each_keystroke_restarts_the_autosave_delay(cx: &mut TestAppContext) {
     assert_eq!(stored_title(cx, &view, &seeded.newer), "Newer!?");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn switching_notes_saves_the_pending_edit_immediately(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -242,7 +228,7 @@ fn switching_notes_saves_the_pending_edit_immediately(cx: &mut TestAppContext) {
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn creating_a_note_selects_it_on_top_of_the_list_and_focuses_the_title(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -265,24 +251,16 @@ fn creating_a_note_selects_it_on_top_of_the_list_and_focuses_the_title(cx: &mut 
     .unwrap();
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn starting_without_notes_shows_the_empty_state_and_creating_leaves_it(cx: &mut TestAppContext) {
     let (handle, view) = open_view(cx, NoteStore::open_in_memory().unwrap());
 
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        assert!(window.try_find("empty-new-note").is_some());
-        assert!(window.try_find("title").is_none());
-    })
-    .unwrap();
+    assert!(is_listed(cx, handle, "empty-new-note"));
+    assert!(!is_listed(cx, handle, "title"));
 
     click(cx, handle, "empty-new-note");
 
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        assert!(window.try_find("title").is_some());
-    })
-    .unwrap();
+    assert!(is_listed(cx, handle, "title"));
     cx.read(|cx| assert!(view.read(cx).selected.is_some()));
 }
 
@@ -296,14 +274,10 @@ fn select_missing_note(cx: &mut TestAppContext, view: &Entity<Workspace>) {
 }
 
 fn banner_is_shown(cx: &mut TestAppContext, handle: AnyWindowHandle) -> bool {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.try_find("error-banner").is_some()
-    })
-    .unwrap()
+    is_listed(cx, handle, "error-banner")
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn closing_the_window_saves_an_edit_typed_before_the_autosave_delay(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -316,7 +290,7 @@ fn closing_the_window_saves_an_edit_typed_before_the_autosave_delay(cx: &mut Tes
     assert_eq!(stored_title(cx, &view, &seeded.newer), "Newer!");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn closing_the_window_is_refused_while_the_edit_cannot_be_saved(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -329,7 +303,7 @@ fn closing_the_window_is_refused_while_the_edit_cannot_be_saved(cx: &mut TestApp
     assert!(banner_is_shown(cx, handle));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn switching_notes_cancels_the_pending_autosave(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -347,7 +321,7 @@ fn switching_notes_cancels_the_pending_autosave(cx: &mut TestAppContext) {
     assert_eq!(stored_title(cx, &view, &seeded.older), "Elsewhere");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_failed_save_shows_the_banner_until_the_next_successful_save(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -359,14 +333,13 @@ fn a_failed_save_shows_the_banner_until_the_next_successful_save(cx: &mut TestAp
     assert!(banner_is_shown(cx, handle));
 
     view.update(cx, |view, _| view.selected = Some(seeded.newer.clone()));
-    cx.update_window(handle, |_, window, cx| window.input("?", cx))
-        .unwrap();
+    type_text(cx, handle, "?");
     advance_past_autosave_delay(cx);
     assert!(!banner_is_shown(cx, handle));
     assert_eq!(stored_title(cx, &view, &seeded.newer), "Newer!?");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_failed_save_blocks_switching_to_another_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -384,7 +357,7 @@ fn a_failed_save_blocks_switching_to_another_note(cx: &mut TestAppContext) {
     assert!(banner_is_shown(cx, handle));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_n_creates_and_selects_a_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -401,7 +374,7 @@ fn ctrl_n_creates_and_selects_a_note(cx: &mut TestAppContext) {
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_n_creates_a_note_when_nothing_is_focused(cx: &mut TestAppContext) {
     let (handle, view) = open_view(cx, NoteStore::open_in_memory().unwrap());
 
@@ -414,13 +387,13 @@ fn ctrl_n_creates_a_note_when_nothing_is_focused(cx: &mut TestAppContext) {
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn quitting_the_app_saves_an_edit_typed_before_the_autosave_delay(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
 
     type_into_title(cx, handle, "!");
-    cx.update(gpui_kit::App::shutdown);
+    cx.update(gpui::App::shutdown);
     cx.run_until_parked();
 
     assert_eq!(stored_title(cx, &view, &seeded.newer), "Newer!");
@@ -442,7 +415,7 @@ fn note_in(store: &NoteStore, notebook: &NotebookId, title: &str, at_millis: i64
     note.id
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_notebook_lists_only_its_notes(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -457,7 +430,7 @@ fn clicking_a_notebook_lists_only_its_notes(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view), ["In work"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_all_notes_after_a_notebook_lists_everything_again(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -472,7 +445,7 @@ fn clicking_all_notes_after_a_notebook_lists_everything_again(cx: &mut TestAppCo
     assert_eq!(listed_titles(cx, &view), ["In work", "In inbox"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_notebook_lists_the_notes_of_its_sub_notebooks(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let work = store.create_notebook("Work", None, at(1)).unwrap();
@@ -487,7 +460,7 @@ fn clicking_a_notebook_lists_the_notes_of_its_sub_notebooks(cx: &mut TestAppCont
     assert_eq!(listed_titles(cx, &view), ["Deep"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_status_lists_notes_with_that_status(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -503,7 +476,7 @@ fn clicking_a_status_lists_notes_with_that_status(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view), ["Done"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_tag_lists_notes_carrying_it(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -518,7 +491,7 @@ fn clicking_a_tag_lists_notes_carrying_it(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view), ["Tagged"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_trash_lists_only_trashed_notes(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -533,7 +506,7 @@ fn clicking_trash_lists_only_trashed_notes(cx: &mut TestAppContext) {
     assert_eq!(listed_titles(cx, &view), ["Trashed"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn creating_a_note_while_a_notebook_is_selected_puts_it_there(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let work = store.create_notebook("Work", None, at(1)).unwrap();
@@ -560,7 +533,7 @@ fn created_note(cx: &mut TestAppContext, view: &Entity<Workspace>) -> bourbon_co
     })
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn creating_a_note_on_all_notes_puts_it_in_the_inbox_and_lists_it(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -572,7 +545,7 @@ fn creating_a_note_on_all_notes_puts_it_in_the_inbox_and_lists_it(cx: &mut TestA
     assert_eq!(created_note(cx, &view).notebook, inbox);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn creating_a_note_on_trash_switches_to_all_notes_and_lists_it(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -585,7 +558,7 @@ fn creating_a_note_on_trash_switches_to_all_notes_and_lists_it(cx: &mut TestAppC
     cx.read(|cx| assert_eq!(view.read(cx).listing.navigation, Navigation::AllNotes));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn creating_a_note_on_a_status_gives_it_that_status_and_lists_it(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -599,7 +572,7 @@ fn creating_a_note_on_a_status_gives_it_that_status_and_lists_it(cx: &mut TestAp
     assert_eq!(note.status, NoteStatus::Completed);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn creating_a_note_on_a_tag_adds_the_tag_and_lists_it(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -614,7 +587,7 @@ fn creating_a_note_on_a_tag_adds_the_tag_and_lists_it(cx: &mut TestAppContext) {
     assert_eq!(note.tags, [tag]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn creating_a_note_with_several_tags_adds_every_tag(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let first = store.create_tag("one", TagColor::Red, at(1)).unwrap();
@@ -639,7 +612,7 @@ fn creating_a_note_with_several_tags_adds_every_tag(cx: &mut TestAppContext) {
     assert!(tag_ids.contains(&second.id));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn saving_reloads_the_list_and_leaves_the_sidebar_data_unchanged(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -659,7 +632,7 @@ fn saving_reloads_the_list_and_leaves_the_sidebar_data_unchanged(cx: &mut TestAp
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn creating_a_note_refreshes_the_sidebar_counts(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let (handle, view) = open_view(cx, store);
@@ -679,7 +652,7 @@ fn creating_a_note_refreshes_the_sidebar_counts(cx: &mut TestAppContext) {
     assert_eq!(count(cx), 1);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn startup_purges_trash_older_than_the_retention(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();

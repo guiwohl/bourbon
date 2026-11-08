@@ -1,6 +1,6 @@
 use bourbon_core::ViewMode;
 use bourbon_core::{NoteId, StoreError, format_note_link, parse_note_link};
-use gpui_kit::{Context, Window};
+use gpui::{Context, Window};
 
 use super::{Workspace, load_note};
 use crate::editor::{LinkPicker, MAX_SUGGESTIONS, tasks};

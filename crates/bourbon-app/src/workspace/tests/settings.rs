@@ -2,25 +2,19 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use bourbon_core::{Appearance, NoteStore, Settings, ThemeSource};
+use gpui::{AnyWindowHandle, AppContext as _, Entity, Hsla, TestAppContext, point, px};
 use gpui_kit::component::{ActiveTheme as _, Theme};
-use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{
-    AnyWindowHandle, AppContext as _, Entity, Hsla, TestAppContext, VisualTestContext, point, px,
-};
 
-use super::{choose_setting, click, isolated_locations, open_view, open_view_with};
+use super::{
+    choose_setting, click, drag_by, is_listed, isolated_locations, open_view, open_view_with,
+    press, type_text,
+};
 use crate::locations::Locations;
 use crate::theme::BOURBON_LIGHT_BACKGROUND;
 use crate::workspace::Workspace;
 
 const LIGHT_SCHEME: &str = "background = \"#fdf6e3\"\nforeground = \"#586e75\"\naccent = \"#268bd2\"\nselection = \"#93a1a1\"\ncolor1 = \"#dc322f\"\ncolor8 = \"#839496\"\n";
 const DARK_SCHEME: &str = "background = \"#001c2b\"\nforeground = \"#6c7c81\"\naccent = \"#268bd2\"\nselection = \"#6c7c81\"\ncolor1 = \"#d8322f\"\ncolor8 = \"#5f6f74\"\n";
-
-fn press(cx: &mut TestAppContext, handle: AnyWindowHandle, keystrokes: &str) {
-    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
-        .unwrap();
-    VisualTestContext::from_window(handle, cx).simulate_keystrokes(keystrokes);
-}
 
 const TAMPERED: u32 = 0x00ff_0000;
 
@@ -33,7 +27,7 @@ fn background(cx: &mut TestAppContext) -> Hsla {
 }
 
 fn color(hex: u32) -> Hsla {
-    Hsla::from(gpui_kit::rgb(hex))
+    Hsla::from(gpui::rgb(hex))
 }
 
 fn saved(locations: &Locations) -> Settings {
@@ -67,7 +61,7 @@ fn set_modified(path: &Path, seconds: u64) {
         .unwrap();
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_comma_opens_the_settings_view(cx: &mut TestAppContext) {
     let (handle, view) = open_view(cx, NoteStore::open_in_memory().unwrap());
     assert!(!is_open(cx, &view));
@@ -77,22 +71,18 @@ fn ctrl_comma_opens_the_settings_view(cx: &mut TestAppContext) {
     assert!(is_open(cx, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_open_settings_pane_action_opens_the_settings_view(cx: &mut TestAppContext) {
     let (handle, view) = open_view(cx, NoteStore::open_in_memory().unwrap());
 
     press(cx, handle, "ctrl-p");
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.input("open settings", cx);
-    })
-    .unwrap();
+    type_text(cx, handle, "open settings");
     press(cx, handle, "enter");
 
     assert!(is_open(cx, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_back_button_closes_the_settings_view(cx: &mut TestAppContext) {
     let (handle, view) = open_view(cx, NoteStore::open_in_memory().unwrap());
     press(cx, handle, "ctrl-,");
@@ -102,7 +92,7 @@ fn the_back_button_closes_the_settings_view(cx: &mut TestAppContext) {
     assert!(!is_open(cx, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_app_starts_in_the_light_bourbon_theme_by_default(cx: &mut TestAppContext) {
     open_view(cx, NoteStore::open_in_memory().unwrap());
 
@@ -110,7 +100,7 @@ fn the_app_starts_in_the_light_bourbon_theme_by_default(cx: &mut TestAppContext)
     assert!(!cx.read(|cx| cx.theme().is_dark()));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn choosing_light_applies_the_light_palette_and_saves(cx: &mut TestAppContext) {
     let locations = isolated_locations();
     let (handle, _view) = open_view_with(
@@ -126,7 +116,7 @@ fn choosing_light_applies_the_light_palette_and_saves(cx: &mut TestAppContext) {
     assert_eq!(saved(&locations).appearance, Appearance::Light);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn saved_settings_are_applied_at_startup(cx: &mut TestAppContext) {
     let locations = isolated_locations();
     let mut stored = Settings::default();
@@ -144,7 +134,7 @@ fn saved_settings_are_applied_at_startup(cx: &mut TestAppContext) {
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn following_omarchy_applies_its_colors_and_saves(cx: &mut TestAppContext) {
     let locations = locations_with_scheme(LIGHT_SCHEME);
     let (handle, _view) = open_view_with(
@@ -161,7 +151,7 @@ fn following_omarchy_applies_its_colors_and_saves(cx: &mut TestAppContext) {
     assert_eq!(saved(&locations).theme_source, ThemeSource::Omarchy);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_appearance_choice_is_ignored_while_following_omarchy(cx: &mut TestAppContext) {
     let locations = locations_with_scheme(DARK_SCHEME);
     let (handle, view) = open_view_with(
@@ -181,7 +171,7 @@ fn the_appearance_choice_is_ignored_while_following_omarchy(cx: &mut TestAppCont
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn an_unreadable_omarchy_file_falls_back_to_bourbon_without_an_error(cx: &mut TestAppContext) {
     let locations = locations_with_scheme("not a scheme");
     let (handle, view) = open_view_with(
@@ -197,7 +187,7 @@ fn an_unreadable_omarchy_file_falls_back_to_bourbon_without_an_error(cx: &mut Te
     view.read_with(cx, |view, _| assert!(view.error_message.is_none()));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_changed_omarchy_file_is_reapplied_within_two_seconds(cx: &mut TestAppContext) {
     let locations = locations_with_scheme(DARK_SCHEME);
     set_modified(&locations.omarchy_colors, 1_000);
@@ -219,7 +209,7 @@ fn a_changed_omarchy_file_is_reapplied_within_two_seconds(cx: &mut TestAppContex
     assert_eq!(background(cx), color(0x00fd_f6e3));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn toggling_the_sidebar_is_saved(cx: &mut TestAppContext) {
     let locations = isolated_locations();
     let (handle, _view) = open_view_with(
@@ -235,7 +225,7 @@ fn toggling_the_sidebar_is_saved(cx: &mut TestAppContext) {
     assert!(saved(&locations).sidebar_visible);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn resizing_clamps_the_widths_and_saves_only_when_the_drag_ends(cx: &mut TestAppContext) {
     let locations = isolated_locations();
     let (_, view) = open_view_with(
@@ -260,17 +250,11 @@ fn resizing_clamps_the_widths_and_saves_only_when_the_drag_ends(cx: &mut TestApp
 }
 
 fn drag_splitter(cx: &mut TestAppContext, handle: AnyWindowHandle, id: &str, distance: f32) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        let start = window.find(id.to_owned()).bounds().center();
-        window.drag(start, point(start.x + px(distance), start.y), cx);
-        window.render_frame(cx);
-    })
-    .unwrap();
+    drag_by(cx, handle, id, point(px(distance), px(0.)));
     cx.run_until_parked();
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn dragging_the_sidebar_splitter_resizes_the_sidebar_within_its_limits_and_saves_on_release(
     cx: &mut TestAppContext,
 ) {
@@ -295,7 +279,7 @@ fn dragging_the_sidebar_splitter_resizes_the_sidebar_within_its_limits_and_saves
     assert_eq!(saved(&locations).sidebar_width(), 170);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn dragging_the_note_list_splitter_resizes_only_the_note_list(cx: &mut TestAppContext) {
     let locations = isolated_locations();
     let (handle, view) = open_view_with(
@@ -318,7 +302,7 @@ fn dragging_the_note_list_splitter_resizes_only_the_note_list(cx: &mut TestAppCo
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_theme_is_not_repainted_while_the_omarchy_file_is_unchanged(cx: &mut TestAppContext) {
     let locations = locations_with_scheme(DARK_SCHEME);
     set_modified(&locations.omarchy_colors, 1_000);
@@ -334,7 +318,7 @@ fn the_theme_is_not_repainted_while_the_omarchy_file_is_unchanged(cx: &mut TestA
     assert_eq!(background(cx), color(TAMPERED));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_changed_omarchy_file_is_ignored_while_bourbon_is_the_theme_source(cx: &mut TestAppContext) {
     let locations = locations_with_scheme(DARK_SCHEME);
     set_modified(&locations.omarchy_colors, 1_000);
@@ -353,7 +337,7 @@ fn a_changed_omarchy_file_is_ignored_while_bourbon_is_the_theme_source(cx: &mut 
     assert_eq!(background(cx), color(TAMPERED));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn opening_a_note_leaves_the_settings_view(cx: &mut TestAppContext) {
     let (store, seeded) = super::seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -367,7 +351,7 @@ fn opening_a_note_leaves_the_settings_view(cx: &mut TestAppContext) {
     assert!(!is_open(cx, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_view_mode_is_saved_when_it_changes(cx: &mut TestAppContext) {
     let locations = isolated_locations();
     let (store, _) = super::seeded_store();
@@ -381,7 +365,7 @@ fn the_view_mode_is_saved_when_it_changes(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_saved_view_mode_is_restored_at_startup(cx: &mut TestAppContext) {
     let locations = isolated_locations();
     let mut stored = Settings::default();
@@ -396,27 +380,14 @@ fn the_saved_view_mode_is_restored_at_startup(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_settings_screen_replaces_the_columns_and_switches_pages(cx: &mut TestAppContext) {
     let (handle, view) = open_view(cx, NoteStore::open_in_memory().unwrap());
     press(cx, handle, "ctrl-,");
-    let listed = |cx: &mut TestAppContext, id: &str| {
-        cx.update_window(handle, |_, window, cx| {
-            window.render_frame(cx);
-            window.try_find(id.to_owned()).is_some()
-        })
-        .unwrap()
-    };
+    let listed = |cx: &mut TestAppContext, id: &str| is_listed(cx, handle, id);
 
-    let selected = |cx: &mut TestAppContext, id: &str| {
-        cx.update_window(handle, |_, window, cx| {
-            window.render_frame(cx);
-            window.find(id.to_owned()).selected()
-        })
-        .unwrap()
-    };
-    assert_eq!(selected(cx, "settings-page-general"), Some(true));
-    assert_eq!(selected(cx, "settings-page-backup"), Some(false));
+    assert!(listed(cx, "settings-page-general-active"));
+    assert!(!listed(cx, "settings-page-backup-active"));
     assert!(!listed(cx, "sidebar"));
     assert!(listed(cx, "settings-theme"));
     assert!(!listed(cx, "settings-backup-repository"));
@@ -425,6 +396,7 @@ fn the_settings_screen_replaces_the_columns_and_switches_pages(cx: &mut TestAppC
 
     assert!(listed(cx, "settings-backup-repository"));
     assert!(!listed(cx, "settings-theme"));
-    assert_eq!(selected(cx, "settings-page-backup"), Some(true));
+    assert!(listed(cx, "settings-page-backup-active"));
+    assert!(!listed(cx, "settings-page-general-active"));
     view.read_with(cx, |view, _| assert!(view.settings_open));
 }

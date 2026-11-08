@@ -1,27 +1,12 @@
 use bourbon_core::{NoteId, NoteStatus, NoteStore};
-use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{
-    AnyWindowHandle, AppContext as _, Entity, Point, TestAppContext, VisualTestContext, px,
-};
+use gpui::{AnyWindowHandle, Entity, Point, TestAppContext, px};
 
-use super::{at, click, note_in, open_view, seeded_store};
+use super::{
+    at, click, click_at, hover, is_listed, note_in, open_view, press, seeded_store, type_text,
+};
 use crate::control_pane::{Mode, PaneAction};
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
-
-fn press(cx: &mut TestAppContext, handle: AnyWindowHandle, keystrokes: &str) {
-    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
-        .unwrap();
-    VisualTestContext::from_window(handle, cx).simulate_keystrokes(keystrokes);
-}
-
-fn type_text(cx: &mut TestAppContext, handle: AnyWindowHandle, text: &str) {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.input(text, cx);
-    })
-    .unwrap();
-}
 
 fn is_open(cx: &mut TestAppContext, view: &Entity<Workspace>) -> bool {
     view.read_with(cx, |view, _| view.control_pane.is_some())
@@ -81,7 +66,7 @@ fn run_action(cx: &mut TestAppContext, handle: AnyWindowHandle, query: &str) {
     press(cx, handle, "enter");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_o_opens_the_pane_in_notes_mode_listing_recent_notes(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -93,7 +78,7 @@ fn ctrl_o_opens_the_pane_in_notes_mode_listing_recent_notes(cx: &mut TestAppCont
     assert_eq!(highlighted(cx, &view), 0);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_p_opens_the_pane_in_actions_mode_prefilled(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -104,7 +89,7 @@ fn ctrl_p_opens_the_pane_in_actions_mode_prefilled(cx: &mut TestAppContext) {
     assert!(offered_actions(cx, &view).contains(&PaneAction::NewNote));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn typing_searches_the_note_text(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -115,7 +100,7 @@ fn typing_searches_the_note_text(cx: &mut TestAppContext) {
     assert_eq!(found_titles(cx, &view), ["Older"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn deleting_the_leading_angle_bracket_switches_to_notes(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -127,7 +112,7 @@ fn deleting_the_leading_angle_bracket_switches_to_notes(cx: &mut TestAppContext)
     assert_eq!(found_titles(cx, &view), ["Newer", "Older"]);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn typing_an_angle_bracket_first_switches_to_actions(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -139,7 +124,7 @@ fn typing_an_angle_bracket_first_switches_to_actions(cx: &mut TestAppContext) {
     assert!(offered_actions(cx, &view).contains(&PaneAction::GoToTrash));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn down_and_up_move_the_highlight_and_stop_at_the_ends(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -155,7 +140,7 @@ fn down_and_up_move_the_highlight_and_stop_at_the_ends(cx: &mut TestAppContext) 
     assert_eq!(highlighted(cx, &view), 0);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn changing_the_query_resets_the_highlight(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -167,7 +152,7 @@ fn changing_the_query_resets_the_highlight(cx: &mut TestAppContext) {
     assert_eq!(highlighted(cx, &view), 0);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn enter_opens_the_highlighted_note_and_closes_the_pane(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -180,7 +165,7 @@ fn enter_opens_the_highlighted_note_and_closes_the_pane(cx: &mut TestAppContext)
     assert_eq!(selected(cx, &view), Some(seeded.older));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_row_opens_that_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -192,7 +177,7 @@ fn clicking_a_row_opens_that_note(cx: &mut TestAppContext) {
     assert_eq!(selected(cx, &view), Some(seeded.older));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn escape_closes_the_pane_without_opening_anything(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -205,22 +190,18 @@ fn escape_closes_the_pane_without_opening_anything(cx: &mut TestAppContext) {
     assert_eq!(selected(cx, &view), Some(seeded.newer));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_outside_the_panel_closes_it(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
     press(cx, handle, "ctrl-o");
 
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.click_at("pane-backdrop", Point::new(px(5.), px(5.)), cx);
-    })
-    .unwrap();
+    click_at(cx, handle, "pane-backdrop", Point::new(px(5.), px(5.)));
 
     assert!(!is_open(cx, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_inside_the_panel_keeps_it_open(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -231,7 +212,7 @@ fn clicking_inside_the_panel_keeps_it_open(cx: &mut TestAppContext) {
     assert!(is_open(cx, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn opening_a_note_outside_the_listing_switches_to_all_notes(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -254,7 +235,7 @@ fn found_count(cx: &mut TestAppContext, view: &Entity<Workspace>) -> usize {
     view.read_with(cx, |view, _| view.notes.len())
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn opening_a_note_inside_the_listing_keeps_the_navigation(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let inbox = store.default_notebook().unwrap();
@@ -271,16 +252,12 @@ fn opening_a_note_inside_the_listing_keeps_the_navigation(cx: &mut TestAppContex
     assert!(matches!(navigation(cx, &view), Navigation::Notebook(_, _)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn opening_a_note_saves_the_pending_edit_first(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.click("title", cx);
-        window.input("!", cx);
-    })
-    .unwrap();
+    click(cx, handle, "title");
+    type_text(cx, handle, "!");
 
     press(cx, handle, "ctrl-o");
     type_text(cx, handle, "older");
@@ -293,7 +270,7 @@ fn opening_a_note_saves_the_pending_edit_first(cx: &mut TestAppContext) {
     assert_eq!(selected(cx, &view), Some(seeded.older));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn an_action_filter_matches_a_subsequence_of_the_name(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -311,7 +288,7 @@ fn an_action_filter_matches_a_subsequence_of_the_name(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn actions_needing_a_note_are_hidden_without_a_selection(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let (handle, view) = open_view(cx, store);
@@ -325,7 +302,7 @@ fn actions_needing_a_note_are_hidden_without_a_selection(cx: &mut TestAppContext
     assert!(!offered.contains(&PaneAction::SetStatus(NoteStatus::Active)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_new_note_action_creates_a_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -338,7 +315,7 @@ fn the_new_note_action_creates_a_note(cx: &mut TestAppContext) {
     assert_ne!(current, seeded.older);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_toggle_sidebar_action_hides_the_sidebar(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -348,7 +325,7 @@ fn the_toggle_sidebar_action_hides_the_sidebar(cx: &mut TestAppContext) {
     assert!(!view.read_with(cx, |view, _| view.sidebar.is_visible));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_go_to_trash_action_navigates_to_trash(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -358,7 +335,7 @@ fn the_go_to_trash_action_navigates_to_trash(cx: &mut TestAppContext) {
     assert_eq!(navigation(cx, &view), Navigation::Trash);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_go_to_templates_action_navigates_to_templates(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -368,7 +345,7 @@ fn the_go_to_templates_action_navigates_to_templates(cx: &mut TestAppContext) {
     assert_eq!(navigation(cx, &view), Navigation::Templates);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_go_to_all_notes_action_leaves_the_trash(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -379,7 +356,7 @@ fn the_go_to_all_notes_action_leaves_the_trash(cx: &mut TestAppContext) {
     assert_eq!(navigation(cx, &view), Navigation::AllNotes);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_sort_action_changes_the_listing_order(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -396,7 +373,7 @@ fn the_sort_action_changes_the_listing_order(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_set_status_action_changes_the_open_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -406,7 +383,7 @@ fn the_set_status_action_changes_the_open_note(cx: &mut TestAppContext) {
     assert_eq!(stored_status(cx, &view, &seeded.newer), NoteStatus::OnHold);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_duplicate_action_copies_and_opens_the_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -418,7 +395,7 @@ fn the_duplicate_action_copies_and_opens_the_note(cx: &mut TestAppContext) {
     assert_eq!(found_count(cx, &view), 3);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_pin_action_pins_the_open_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -431,7 +408,7 @@ fn the_pin_action_pins_the_open_note(cx: &mut TestAppContext) {
     assert!(pinned);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_trash_action_trashes_the_open_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -450,7 +427,7 @@ fn the_trash_action_trashes_the_open_note(cx: &mut TestAppContext) {
     assert_eq!(selected(cx, &view), Some(seeded.older));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_move_to_notebook_action_opens_the_notebook_selector(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -460,7 +437,7 @@ fn the_move_to_notebook_action_opens_the_notebook_selector(cx: &mut TestAppConte
     assert!(view.read_with(cx, |view, _| view.editor.notebook_selector_is_open()));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_empty_trash_action_shows_the_trash_and_asks_for_confirmation(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     store
@@ -477,7 +454,7 @@ fn the_empty_trash_action_shows_the_trash_and_asks_for_confirmation(cx: &mut Tes
     assert_eq!(found_count(cx, &view), 0);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_history_back_action_returns_to_the_previous_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -488,7 +465,7 @@ fn the_history_back_action_returns_to_the_previous_note(cx: &mut TestAppContext)
     assert_eq!(selected(cx, &view), Some(seeded.newer));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_history_forward_action_returns_to_the_next_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -500,7 +477,7 @@ fn the_history_forward_action_returns_to_the_next_note(cx: &mut TestAppContext) 
     assert_eq!(selected(cx, &view), Some(seeded.older));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_an_action_row_runs_it(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -513,7 +490,7 @@ fn clicking_an_action_row_runs_it(cx: &mut TestAppContext) {
     assert!(!is_open(cx, &view));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_search_that_matches_nothing_has_no_rows_and_enter_does_nothing(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -526,15 +503,11 @@ fn a_search_that_matches_nothing_has_no_rows_and_enter_does_nothing(cx: &mut Tes
     assert_eq!(selected(cx, &view), Some(seeded.newer));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_pane_works_while_the_editor_has_focus(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.click("title", cx);
-    })
-    .unwrap();
+    click(cx, handle, "title");
 
     press(cx, handle, "ctrl-o");
 
@@ -542,14 +515,10 @@ fn the_pane_works_while_the_editor_has_focus(cx: &mut TestAppContext) {
 }
 
 fn row_is_highlighted(cx: &mut TestAppContext, handle: AnyWindowHandle, index: usize) -> bool {
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.find(format!("pane-row-{index}")).selected() == Some(true)
-    })
-    .unwrap()
+    is_listed(cx, handle, &format!("pane-row-{index}-highlight"))
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn only_the_highlighted_note_row_is_marked(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, _) = open_view(cx, store);
@@ -563,7 +532,7 @@ fn only_the_highlighted_note_row_is_marked(cx: &mut TestAppContext) {
     assert!(row_is_highlighted(cx, handle, 1));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn only_the_highlighted_action_row_is_marked(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, _) = open_view(cx, store);
@@ -581,7 +550,7 @@ fn clipboard_text(cx: &mut TestAppContext) -> Option<String> {
     cx.read_from_clipboard().and_then(|item| item.text())
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_copy_cli_command_action_copies_the_open_notes_command(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, _) = open_view(cx, store);
@@ -594,7 +563,7 @@ fn the_copy_cli_command_action_copies_the_open_notes_command(cx: &mut TestAppCon
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_copy_cli_command_action_needs_an_open_note(cx: &mut TestAppContext) {
     let store = NoteStore::open_in_memory().unwrap();
     let (handle, view) = open_view(cx, store);
@@ -605,22 +574,18 @@ fn the_copy_cli_command_action_needs_an_open_note(cx: &mut TestAppContext) {
     assert!(!offered_actions(cx, &view).contains(&PaneAction::CopyCliCommand));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn hovering_a_row_highlights_it(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
     press(cx, handle, "ctrl-o");
 
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.hover("pane-row-1", cx);
-    })
-    .unwrap();
+    hover(cx, handle, "pane-row-1");
 
     assert_eq!(highlighted(cx, &view), 1);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn cancelling_the_empty_trash_dialog_keeps_the_notes(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     store
@@ -635,7 +600,7 @@ fn cancelling_the_empty_trash_dialog_keeps_the_notes(cx: &mut TestAppContext) {
     assert!(!view.read_with(cx, |view, _| view.dialogs.empty_trash));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_empty_trash_dialog_button_empties_it(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     store
@@ -649,7 +614,7 @@ fn the_empty_trash_dialog_button_empties_it(cx: &mut TestAppContext) {
     assert_eq!(found_count(cx, &view), 0);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn escape_closes_the_empty_trash_dialog(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     store

@@ -1,7 +1,7 @@
 use bourbon_core::{
     NoteId, NoteStatus, NoteStore, NotebookId, StoreError, TagColor, TagId, Timestamp,
 };
-use gpui_kit::{Context, Window};
+use gpui::{Context, Window};
 
 use super::Workspace;
 use super::load_note;

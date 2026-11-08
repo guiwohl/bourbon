@@ -8,9 +8,9 @@ mod tree;
 
 use bourbon_core::{NoteStatus, NotebookNode, TagSummary};
 use bourbon_ui::{IconName, ListRow, ScrollArea, ThemeExt as _};
-use gpui_kit::{
+use gpui::{
     AnyElement, Context, FocusHandle, InteractiveElement as _, IntoElement, ParentElement as _,
-    ScrollHandle, SharedString, Styled as _, TestSupportExt as _, div, px,
+    ScrollHandle, SharedString, Styled as _, div, px,
 };
 
 pub(crate) use prompt::prompt_dialog;
@@ -19,9 +19,10 @@ pub(crate) use tree::subtree_ids;
 
 use crate::navigation::Navigation;
 use crate::presentation::{status_icon, status_label};
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::Workspace;
 
-gpui_kit::actions!(bourbon, [ToggleSidebar]);
+gpui::actions!(bourbon, [ToggleSidebar]);
 
 const STATUS_ROWS: [NoteStatus; 4] = [
     NoteStatus::Active,

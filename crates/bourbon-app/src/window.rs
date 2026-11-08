@@ -2,7 +2,7 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::Duration;
 
 use bourbon_core::NoteStore;
-use gpui_kit::{
+use gpui::{
     AnyWindowHandle, App, AppContext as _, Entity, KeyBinding, TitlebarOptions, Window,
     WindowOptions,
 };
@@ -49,7 +49,7 @@ pub(crate) fn app_id() -> &'static str {
 }
 
 pub(crate) fn run(store: NoteStore, locations: Locations, focus_requests: Receiver<()>) {
-    gpui_kit::application()
+    gpui_platform::application()
         .with_assets(AppAssets)
         .run(move |cx| {
             gpui_kit::init(cx);
@@ -155,7 +155,7 @@ fn window_options(identity: &Identity) -> WindowOptions {
 mod tests {
     use std::sync::mpsc;
 
-    use gpui_kit::{AppContext as _, Empty, TestAppContext, WindowOptions};
+    use gpui::{AppContext as _, Empty, TestAppContext, WindowOptions};
 
     use super::{
         DEVELOPMENT, FOCUS_POLL_INTERVAL, RELEASE, app_id, forward_focus_requests, window_options,
@@ -166,7 +166,7 @@ mod tests {
         assert!([RELEASE.app_id, DEVELOPMENT.app_id].contains(&app_id()));
     }
 
-    #[gpui_kit::test]
+    #[gpui::test]
     fn a_focus_request_activates_the_window(cx: &mut TestAppContext) {
         let (sender, receiver) = mpsc::channel();
         let target = cx.update(|cx| {

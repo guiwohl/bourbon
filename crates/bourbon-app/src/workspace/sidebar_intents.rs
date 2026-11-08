@@ -1,6 +1,6 @@
 use bourbon_core::{NotebookId, StoreError, TagColor, TagId, Timestamp};
 use bourbon_editor::{TextField, TextFieldEvent};
-use gpui_kit::{AppContext as _, Context, Entity, Window};
+use gpui::{AppContext as _, Context, Entity, Window};
 
 use super::Workspace;
 use crate::navigation::Navigation;

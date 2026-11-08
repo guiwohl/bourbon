@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use bourbon_core::{NoteId, NoteSort, NoteStore, StoreError, Timestamp};
-use gpui_kit::{Context, Window};
+use gpui::{Context, Window};
 
 use crate::note_list::{Step, adjacent_note};
 use crate::workspace::Workspace;

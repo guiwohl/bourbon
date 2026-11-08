@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use bourbon_core::{NoteId, NoteStore};
-use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
+use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
 
-use super::view_modes::{focus_body, press};
-use super::{at, click, open_view, seeded_store};
+use super::view_modes::focus_body;
+use super::{at, click, open_view, press, seeded_store};
 use crate::workspace::Workspace;
 
 const BODY: &str = "intro\n- [ ] first\n- [x] second\n- plain\nclosing";
@@ -40,7 +40,7 @@ fn place_cursor_on_line(
     .unwrap();
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_an_open_task_in_the_preview_checks_that_exact_line(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
@@ -54,7 +54,7 @@ fn clicking_an_open_task_in_the_preview_checks_that_exact_line(cx: &mut TestAppC
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_done_task_in_the_preview_reopens_it(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
@@ -68,7 +68,7 @@ fn clicking_a_done_task_in_the_preview_reopens_it(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_task_toggled_in_the_preview_is_autosaved_like_typing(cx: &mut TestAppContext) {
     let (store, id) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
@@ -87,7 +87,7 @@ fn a_task_toggled_in_the_preview_is_autosaved_like_typing(cx: &mut TestAppContex
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn tasks_inside_a_code_fence_get_no_checkbox(cx: &mut TestAppContext) {
     let (store, _) = store_with_body("```\n- [ ] code\n```\n- [ ] real");
     let (handle, _) = open_view(cx, store);
@@ -101,7 +101,7 @@ fn tasks_inside_a_code_fence_get_no_checkbox(cx: &mut TestAppContext) {
     assert!(super::view_modes::is_rendered(cx, handle, "preview-task-3"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_enter_toggles_the_task_on_the_cursor_line(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
@@ -115,7 +115,7 @@ fn ctrl_enter_toggles_the_task_on_the_cursor_line(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_enter_turns_a_plain_list_line_into_a_task(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
@@ -129,7 +129,7 @@ fn ctrl_enter_turns_a_plain_list_line_into_a_task(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_enter_on_any_other_line_changes_nothing(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
@@ -140,7 +140,7 @@ fn ctrl_enter_on_any_other_line_changes_nothing(cx: &mut TestAppContext) {
     assert_eq!(editor_body(cx, &view), BODY);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_enter_is_autosaved_and_keeps_the_cursor_on_its_line(cx: &mut TestAppContext) {
     let (store, id) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
@@ -158,7 +158,7 @@ fn ctrl_enter_is_autosaved_and_keeps_the_cursor_on_its_line(cx: &mut TestAppCont
     assert_eq!(editor_body(cx, &view), BODY);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn the_cursor_stays_on_a_line_that_became_a_task(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
@@ -177,7 +177,7 @@ fn cursor(cx: &mut TestAppContext, view: &Entity<Workspace>) -> usize {
     cx.read(|cx| view.read(cx).editor.cursor(cx))
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_cursor_after_the_inserted_checkbox_moves_with_the_text(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
@@ -193,7 +193,7 @@ fn a_cursor_after_the_inserted_checkbox_moves_with_the_text(cx: &mut TestAppCont
     assert_eq!(cursor(cx, &view), end_of_plain + "[ ] ".len());
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_cursor_before_the_edit_does_not_move(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);
@@ -211,7 +211,7 @@ fn a_cursor_before_the_edit_does_not_move(cx: &mut TestAppContext) {
     assert_eq!(cursor(cx, &view), start_of_plain);
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_cursor_after_a_toggled_mark_stays_put(cx: &mut TestAppContext) {
     let (store, _) = store_with_body(BODY);
     let (handle, view) = open_view(cx, store);

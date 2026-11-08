@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use gpui_kit::{Context, Task};
+use gpui::{Context, Task};
 
 pub(crate) const AUTOSAVE_DELAY: Duration = Duration::from_millis(500);
 

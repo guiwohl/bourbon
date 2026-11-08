@@ -2,7 +2,8 @@ use gpui::{
     AnyElement, ElementId, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
     Styled as _, div,
 };
-use gpui_kit::TestSupportExt as _;
+
+use crate::test_id::TestSupportExt as _;
 
 pub(crate) fn tagged(id: impl Into<SharedString>, content: impl IntoElement) -> AnyElement {
     div()

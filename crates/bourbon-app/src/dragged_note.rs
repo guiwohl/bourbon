@@ -1,6 +1,6 @@
 use bourbon_core::{NoteId, NoteSummary};
 use bourbon_ui::ThemeExt as _;
-use gpui_kit::{Context, IntoElement, ParentElement as _, Render, Styled as _, Window, div};
+use gpui::{Context, IntoElement, ParentElement as _, Render, Styled as _, Window, div};
 
 use crate::presentation::display_title;
 
@@ -23,9 +23,9 @@ impl Render for DraggedNote {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let tokens = cx.theme().tokens.clone();
         div()
-            .p(gpui_kit::px(8.))
+            .p(gpui::px(8.))
             .rounded(tokens.scale.radius_default)
-            .max_w(gpui_kit::px(300.))
+            .max_w(gpui::px(300.))
             .truncate()
             .bg(tokens.colors.input_background)
             .text_color(tokens.colors.text)

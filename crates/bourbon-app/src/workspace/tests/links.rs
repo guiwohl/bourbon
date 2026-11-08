@@ -1,11 +1,11 @@
 use std::time::Duration;
 
 use bourbon_core::NoteId;
+use gpui::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
 use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
 
-use super::view_modes::{is_rendered, press, type_into_body};
-use super::{at, banner_is_shown, click, open_view, seeded_store};
+use super::view_modes::{is_rendered, type_into_body};
+use super::{at, banner_is_shown, click, open_view, press, seeded_store, type_text};
 use crate::navigation::Navigation;
 use crate::workspace::Workspace;
 
@@ -37,7 +37,7 @@ fn note_url(id: &NoteId) -> String {
     format!("bourbon://note/{id}")
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn typing_two_brackets_offers_the_notes(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -49,7 +49,7 @@ fn typing_two_brackets_offers_the_notes(cx: &mut TestAppContext) {
     assert!(is_rendered(cx, handle, &suggestion(&seeded.newer)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn typing_after_the_brackets_filters_the_titles_ignoring_case(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -60,7 +60,7 @@ fn typing_after_the_brackets_filters_the_titles_ignoring_case(cx: &mut TestAppCo
     assert!(!is_rendered(cx, handle, &suggestion(&seeded.newer)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn suggestions_also_match_note_bodies(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let inbox = store.default_notebook().unwrap();
@@ -75,7 +75,7 @@ fn suggestions_also_match_note_bodies(cx: &mut TestAppContext) {
     assert!(is_rendered(cx, handle, &suggestion(&hidden.id)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn no_matching_note_closes_the_popup(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -85,7 +85,7 @@ fn no_matching_note_closes_the_popup(cx: &mut TestAppContext) {
     assert!(!is_rendered(cx, handle, "link-suggestions"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_single_bracket_offers_nothing(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -95,7 +95,7 @@ fn a_single_bracket_offers_nothing(cx: &mut TestAppContext) {
     assert!(!is_rendered(cx, handle, "link-suggestions"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn enter_replaces_the_query_with_a_markdown_link(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -110,7 +110,7 @@ fn enter_replaces_the_query_with_a_markdown_link(cx: &mut TestAppContext) {
     assert!(!is_rendered(cx, handle, "link-suggestions"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn down_moves_the_highlight_and_enter_picks_that_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -126,7 +126,7 @@ fn down_moves_the_highlight_and_enter_picks_that_note(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn up_returns_the_highlight_to_the_first_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -143,7 +143,7 @@ fn up_returns_the_highlight_to_the_first_note(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn escape_cancels_and_leaves_the_typed_text(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -155,7 +155,7 @@ fn escape_cancels_and_leaves_the_typed_text(cx: &mut TestAppContext) {
     assert!(!is_rendered(cx, handle, "link-suggestions"));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_suggestion_inserts_its_link(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -169,7 +169,7 @@ fn clicking_a_suggestion_inserts_its_link(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn an_untitled_note_is_linked_as_untitled(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let blank = store
@@ -187,7 +187,7 @@ fn an_untitled_note_is_linked_as_untitled(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn enter_without_a_popup_still_inserts_a_newline(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -198,7 +198,7 @@ fn enter_without_a_popup_still_inserts_a_newline(cx: &mut TestAppContext) {
     assert_eq!(editor_body(cx, &view), "newer bodyx\n");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_picked_link_is_autosaved(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -222,7 +222,7 @@ fn a_picked_link_is_autosaved(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn opening_a_note_link_selects_that_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -233,7 +233,7 @@ fn opening_a_note_link_selects_that_note(cx: &mut TestAppContext) {
     assert_eq!(cx.read(|cx| view.read(cx).editor.body(cx)), "older body");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn opening_a_note_link_saves_the_pending_edit_first(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -252,7 +252,7 @@ fn opening_a_note_link_saves_the_pending_edit_first(cx: &mut TestAppContext) {
     assert_eq!(stored, "newer body!");
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_link_to_a_note_outside_the_listing_switches_to_all_notes(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let work = store.create_notebook("Work", None, at(5)).unwrap();
@@ -275,7 +275,7 @@ fn a_link_to_a_note_outside_the_listing_switches_to_all_notes(cx: &mut TestAppCo
     cx.read(|cx| assert_eq!(view.read(cx).listing.navigation, Navigation::AllNotes));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_link_to_a_listed_note_keeps_the_navigation(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let work = store.create_notebook("Work", None, at(5)).unwrap();
@@ -295,7 +295,7 @@ fn a_link_to_a_listed_note_keeps_the_navigation(cx: &mut TestAppContext) {
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_link_to_a_missing_note_shows_the_banner_and_keeps_the_open_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -306,7 +306,7 @@ fn a_link_to_a_missing_note_shows_the_banner_and_keeps_the_open_note(cx: &mut Te
     assert_eq!(selected(cx, &view), Some(seeded.newer.clone()));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn a_link_to_a_trashed_note_shows_the_banner_and_keeps_the_open_note(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     store.trash_note(&seeded.older, at(9)).unwrap();
@@ -318,7 +318,7 @@ fn a_link_to_a_trashed_note_shows_the_banner_and_keeps_the_open_note(cx: &mut Te
     assert_eq!(selected(cx, &view), Some(seeded.newer.clone()));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn other_links_go_to_the_system_opener(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -342,7 +342,7 @@ fn store_with_link_to_older() -> (bourbon_core::NoteStore, NoteId, NoteId) {
     (store, seeded.newer, seeded.older)
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn clicking_a_note_link_in_the_preview_opens_that_note(cx: &mut TestAppContext) {
     let (store, _, older) = store_with_link_to_older();
     let (handle, view) = open_view(cx, store);
@@ -353,7 +353,7 @@ fn clicking_a_note_link_in_the_preview_opens_that_note(cx: &mut TestAppContext) 
         window.render_frame(cx);
         window.click_at(
             "preview".to_owned(),
-            gpui_kit::point(gpui_kit::px(14.), gpui_kit::px(16.)),
+            gpui::point(gpui::px(14.), gpui::px(16.)),
             cx,
         );
     })
@@ -374,7 +374,7 @@ fn highlighted_suggestions(
     .unwrap()
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn only_the_highlighted_suggestion_is_marked_selected(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -392,16 +392,12 @@ fn only_the_highlighted_suggestion_is_marked_selected(cx: &mut TestAppContext) {
     );
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn picking_a_link_keeps_the_text_that_follows_the_query(cx: &mut TestAppContext) {
     let (store, seeded) = seeded_store();
     let (handle, view) = open_view(cx, store);
     super::view_modes::focus_body(cx, handle, &view);
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        window.input("[[Old", cx);
-    })
-    .unwrap();
+    type_text(cx, handle, "[[Old");
 
     press(cx, handle, "enter");
 

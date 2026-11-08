@@ -3,11 +3,11 @@ use std::collections::HashSet;
 use bourbon_core::{NoteId, NoteSummary};
 use bourbon_editor::TextField;
 use bourbon_ui::ThemeExt as _;
-use gpui_kit::{
-    Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Styled as _,
-    TestSupportExt as _, div, px,
+use gpui::{
+    Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Styled as _, div, px,
 };
 
+use crate::test_id::TestSupportExt as _;
 use crate::workspace::Workspace;
 
 const SIDE_MARGIN: f32 = 12.;

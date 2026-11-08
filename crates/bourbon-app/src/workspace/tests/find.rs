@@ -1,10 +1,10 @@
-use gpui_kit::TestAppContext;
+use gpui::TestAppContext;
 
-use super::view_modes::{focus_body, is_rendered, mode, press};
-use super::{click, open_view, seeded_store};
+use super::view_modes::{focus_body, is_rendered, mode};
+use super::{click, open_view, press, seeded_store};
 use bourbon_core::ViewMode;
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_f_in_the_editor_opens_find(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -19,7 +19,7 @@ fn ctrl_f_in_the_editor_opens_find(cx: &mut TestAppContext) {
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_h_in_the_editor_opens_find_with_replace(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -34,7 +34,7 @@ fn ctrl_h_in_the_editor_opens_find_with_replace(cx: &mut TestAppContext) {
     });
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_f_from_the_title_field_still_opens_find_in_the_body(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -45,7 +45,7 @@ fn ctrl_f_from_the_title_field_still_opens_find_in_the_body(cx: &mut TestAppCont
     cx.read(|cx| assert!(view.read(cx).editor.search_is_open(cx)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn ctrl_h_from_the_title_field_opens_replace(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -56,7 +56,7 @@ fn ctrl_h_from_the_title_field_opens_replace(cx: &mut TestAppContext) {
     cx.read(|cx| assert!(view.read(cx).editor.search_is_replacing(cx)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn find_from_the_preview_returns_to_the_editor(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);
@@ -70,7 +70,7 @@ fn find_from_the_preview_returns_to_the_editor(cx: &mut TestAppContext) {
     cx.read(|cx| assert!(view.read(cx).editor.search_is_open(cx)));
 }
 
-#[gpui_kit::test]
+#[gpui::test]
 fn find_from_side_by_side_keeps_the_mode(cx: &mut TestAppContext) {
     let (store, _) = seeded_store();
     let (handle, view) = open_view(cx, store);

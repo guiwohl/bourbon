@@ -1,5 +1,5 @@
 use bourbon_core::NoteId;
-use gpui_kit::{App, ClipboardItem};
+use gpui::{App, ClipboardItem};
 
 pub(crate) fn cli_command(id: &NoteId) -> String {
     format!("bourbon get {id}")

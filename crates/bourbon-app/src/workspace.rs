@@ -22,11 +22,11 @@ use bourbon_core::{
 };
 use bourbon_editor::{TextField, TextFieldEvent};
 use bourbon_ui::{IconName, Splitter, ThemeExt as _};
-use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::{
+use gpui::prelude::FluentBuilder as _;
+use gpui::{
     AnyElement, AppContext as _, Context, Entity, FocusHandle, Focusable, InteractiveElement as _,
     IntoElement, ListState, ParentElement as _, Pixels, Point, Render, ScrollHandle, SharedString,
-    Styled as _, Subscription, Task, TestSupportExt as _, Window, div,
+    Styled as _, Subscription, Task, Window, div,
 };
 
 use crate::control_pane::{self, ControlPane};
@@ -37,10 +37,11 @@ use crate::note_list::NoteListData;
 use crate::settings_view::{SettingsData, SettingsPage};
 use crate::sidebar::{SidebarCounts, SidebarData};
 use crate::sidebar::{SidebarState, ToggleSidebar};
+use crate::test_id::TestSupportExt as _;
 use crate::theme::{self, ModificationWatch};
 use crate::{autosave, note_list, settings_view, sidebar};
 
-gpui_kit::actions!(
+gpui::actions!(
     bourbon,
     [NewNote, OpenNoteSearch, OpenActionSearch, OpenSettings]
 );
@@ -481,7 +482,7 @@ pub(super) fn load_note(store: &NoteStore, id: &NoteId) -> Result<Note, StoreErr
 }
 
 impl Focusable for Workspace {
-    fn focus_handle(&self, _cx: &gpui_kit::App) -> FocusHandle {
+    fn focus_handle(&self, _cx: &gpui::App) -> FocusHandle {
         self.focus_handle.clone()
     }
 }
@@ -544,7 +545,7 @@ impl Workspace {
             div().id("sidebar-splitter").test_support().child(
                 Splitter::new(
                     "sidebar-splitter-handle",
-                    gpui_kit::px(f32::from(self.settings.sidebar_width())),
+                    gpui::px(f32::from(self.settings.sidebar_width())),
                     limits,
                 )
                 .on_resize(move |width, _, cx| {
@@ -566,7 +567,7 @@ impl Workspace {
             div().id("note-list-splitter").test_support().child(
                 Splitter::new(
                     "note-list-splitter-handle",
-                    gpui_kit::px(f32::from(self.settings.note_list_width())),
+                    gpui::px(f32::from(self.settings.note_list_width())),
                     limits,
                 )
                 .on_resize(move |width, _, cx| {
@@ -613,8 +614,8 @@ impl Render for Workspace {
             .size_full()
             .flex()
             .flex_col()
-            .bg(gpui_kit::component::ActiveTheme::theme(&**cx).background)
-            .text_color(gpui_kit::component::ActiveTheme::theme(&**cx).foreground)
+            .bg(cx.theme().tokens.colors.page_background)
+            .text_color(cx.theme().tokens.colors.text)
             .on_action(cx.listener(|view, _: &NewNote, window, cx| view.create_note(window, cx)))
             .on_action(cx.listener(|view, _: &ToggleSidebar, _, cx| view.toggle_sidebar(cx)))
             .on_action(cx.listener(|view, _: &OpenSettings, _, cx| view.open_settings(cx)))

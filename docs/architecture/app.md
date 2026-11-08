@@ -47,6 +47,7 @@ Each column is a module owned by one concern. Columns render from data the works
 | `window.rs` | GPUI application, key binding, window options, the close hook |
 | `autosave.rs` | The 500 ms delayed task |
 | `control_pane/` | The search and command palette (see Control pane) |
+| `test_id.rs` | `TestSupportExt::test_support()`: sets the element's id as its GPUI debug selector (recorded only in debug test builds, a no-op elsewhere) |
 | `overlay.rs` | `tagged(id, element)` and `layer(id, dialog)`: wrap `bourbon-ui` overlays and buttons in test-visible ids |
 | `workspace/dialogs.rs` | `DialogState` (dialog focus, empty trash pending), `Workspace::dialog` (sidebar prompt, restore, empty trash; one at a time), the generic confirmation dialog (Cancel + danger confirm, Enter confirms, Esc and backdrop cancel). Dialogs without a field take the dialog focus when shown |
 | `navigation.rs` | `Navigation`, `Listing`, the pure mapping to `NoteQuery` |
@@ -64,7 +65,7 @@ Each column is a module owned by one concern. Columns render from data the works
 
 ## Tests
 
-Headless, through `gpui-kit` `test-support` (`#[gpui_kit::test]`, `TestAppContext`): the workspace takes a `NoteStore` (in memory in tests), clicks and typing go through real element ids, and the clock is advanced with `advance_clock`. They cover startup selection, autosave timing (499 ms vs 500 ms, restart on keystroke), flush on switch, creation, and the empty state. Also: close flush (through `simulate_close`, which runs the real `on_window_should_close` handler registered by `window::build_workspace`), refused close on a failed save, quit flush (`App::shutdown`, which runs the `on_app_quit` handlers), pending autosave cancelled on switch, banner shown and cleared, failed save blocking a switch, and `Ctrl+N` through the real key binding. Navigation tests click real sidebar row ids (`nav-notebook-<id>`, `nav-trash`, ...) and check the listed titles, the notebook a created note lands in, and the startup trash purge. A save is made to fail honestly by selecting a note id the store does not hold.
+Headless, through GPUI's own `test-support` (`#[gpui::test]`, `TestAppContext`, `VisualTestContext`): the workspace takes a `NoteStore` (in memory in tests), clicks and typing go through real element ids (harness below), and the clock is advanced with `advance_clock`. They cover startup selection, autosave timing (499 ms vs 500 ms, restart on keystroke), flush on switch, creation, and the empty state. Also: close flush (through `simulate_close`, which runs the real `on_window_should_close` handler registered by `window::build_workspace`), refused close on a failed save, quit flush (`App::shutdown`, which runs the `on_app_quit` handlers), pending autosave cancelled on switch, banner shown and cleared, failed save blocking a switch, and `Ctrl+N` through the real key binding. Navigation tests click real sidebar row ids (`nav-notebook-<id>`, `nav-trash`, ...) and check the listed titles, the notebook a created note lands in, and the startup trash purge. A save is made to fail honestly by selecting a note id the store does not hold.
 
 ## Dependency guard
 
@@ -231,3 +232,9 @@ Decisions in [M4 editor](../decisions/2026-11-06-m4-editor.md). Pure logic is in
 | Word count | `word-count` | Computed from the body on every render |
 
 Tests: `workspace/tests/{view_modes,tasks,links,find,focus}.rs` (real key bindings, real clicks, painted text) plus unit tests next to each pure module and in `bourbon-core/src/note_link.rs`. The preview link test clicks inside the `preview` pane at the first character of the link.
+
+## Test harness
+
+`workspace/tests/harness.rs`, on GPUI only: `render` (refresh + draw), `bounds(id)` (`VisualTestContext::debug_bounds` of the id set by `test_support()`), `is_listed`, `click`, `click_at(id, offset)`, `click_with(id, Press { button, modifiers, count })`, `right_click`, `hover`, `drag(from, to)` and `drag_by(id, distance)` (8 pointer steps, so GPUI starts the drag), `press(keys)` (`simulate_keystrokes`), `type_text` (`simulate_input`), `RenderFrame` for closures that need a fresh frame. State a test asserts on is marked with its own debug selector: `pane-row-<n>-highlight` on the highlighted palette row, `settings-page-<page>-active` on the active settings page.
+
+Transitional until the editor column (PR #38) leaves `gpui-kit`: `bounds` falls back to the gpui-kit observation registry for ids the editor column registers with gpui-kit's `test_support`; the editor tests still read gpui-kit snapshots (`selected`, `label`, `focused`, `popup-menu`, `texts`); the window is still opened through `gpui_kit::open_window` (its `Root` resets that registry each frame) after `gpui_kit::init` (gpui-component setup); `assets.rs` still serves gpui-component icons; `presentation::chip_color` maps to gpui-component `ColorName` for the editor header; `theme/` still paints gpui-component's `Theme`. The app is started with `gpui_platform::application()` and the root background and text use the `bourbon-ui` tokens.
