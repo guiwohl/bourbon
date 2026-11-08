@@ -1,4 +1,5 @@
 use bourbon_core::NoteStatus;
+use bourbon_editor::{FindNext, FindPrevious};
 use gpui::{Context, Div, InteractiveElement as _};
 
 use crate::workspace::Workspace;
@@ -62,10 +63,16 @@ pub(crate) fn register_writing(root: Div, cx: &mut Context<Workspace>) -> Div {
         workspace.cycle_view_mode(window, cx);
     }))
     .on_action(cx.listener(|workspace, _: &FindInNote, window, cx| {
-        workspace.find_in_note(window, cx);
+        workspace.find_in_note(false, window, cx);
     }))
     .on_action(cx.listener(|workspace, _: &ReplaceInNote, window, cx| {
-        workspace.find_in_note(window, cx);
+        workspace.find_in_note(true, window, cx);
+    }))
+    .on_action(cx.listener(|workspace, _: &FindNext, _, cx| {
+        workspace.find_next_in_note(cx);
+    }))
+    .on_action(cx.listener(|workspace, _: &FindPrevious, _, cx| {
+        workspace.find_previous_in_note(cx);
     }))
     .on_action(cx.listener(|workspace, _: &ToggleFocusMode, window, cx| {
         workspace.toggle_focus_mode(window, cx);

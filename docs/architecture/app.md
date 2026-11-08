@@ -242,7 +242,7 @@ Decisions in [M4 editor](../decisions/2026-11-06-m4-editor.md). Pure logic is in
 | Preview tasks | `task-line-<line>` (debug selector of `PreviewView`) | `PreviewEvent::ToggleTask` → `Editor::toggle_task_at_line`, then the normal autosave |
 | Task shortcut | `Ctrl+Enter` in the body | `bourbon-editor` `toggle_task` (any line becomes a task, a task flips) |
 | Note links | `[[`, `link-suggestions`, `link-suggestion-<id>`; `Up`/`Down`/`Enter`/`Esc` while open | `LinkPicker` lives on `EditorPane`, drawn over the body; keys are bound in `LinkPicker > BourbonEditor` after `bind_editor_keys`, so they win over the editor's own; the link goes in with `Editor::replace_range` |
-| Find and replace | `Ctrl+F`, `Ctrl+H` | `bourbon-editor` has no search panel yet: both switch to the editor (from Preview) and focus the body |
+| Find and replace | `Ctrl+F` find, `Ctrl+H` / `Ctrl+Alt+F` replace, `Ctrl+G` / `Ctrl+Shift+G` next / previous (also from the body) | `bourbon_editor::SearchPanel` on `EditorPane`, drawn above the body inside `body-editor`; switches Preview to Edit first; `load` calls `refresh()`. Control pane Find / Replace do the same |
 | Focus mode | `Ctrl+Shift+F`, `Esc`, toolbar toggle | `Workspace::focus_mode` hides the two columns at render time (Inkdrop's distraction free); the column keeps its full width |
 | Word count | `word-count` | Computed from the body on every render |
 

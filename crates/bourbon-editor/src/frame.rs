@@ -6,6 +6,7 @@ use crate::editor::{Editor, line_height_of};
 use crate::layout::{LineLayout, editor_font};
 use crate::line_decor::{CardShape, card_shape, quote_bar};
 use crate::segments::{inline_code_ranges, line_segments};
+use crate::search::MatchRect;
 
 const MEASURE_BUDGET: usize = 400;
 
@@ -25,6 +26,7 @@ pub struct Frame {
     pub gutter_width: Pixels,
     pub lines: Vec<FrameLine>,
     pub caret: Option<Bounds<Pixels>>,
+    pub search_matches: Vec<MatchRect>,
     pub measuring_pending: bool,
 }
 
@@ -168,6 +170,7 @@ impl Editor {
         let number_size = self.theme.font_size * self.theme.gutter_font_scale;
         let mut lines = Vec::new();
         let mut caret = None;
+        let mut search_matches = Vec::new();
         for (line, layout) in visible {
             let line_top = bounds.top() + px(self.heights.top(*line)) - self.scroll_top;
             let origin = point(bounds.left() + self.text_left, line_top);
@@ -180,6 +183,7 @@ impl Editor {
                 .into_iter()
                 .map(|rect| Bounds::new(origin + rect.origin, rect.size))
                 .collect();
+            search_matches.extend(self.match_rects(start..end, layout, origin));
             if *line == head_line {
                 let position = layout.position_for_index(main.head - start);
                 caret = Some(Bounds::new(
@@ -224,6 +228,7 @@ impl Editor {
             gutter_width,
             lines,
             caret,
+            search_matches,
             measuring_pending,
         }
     }

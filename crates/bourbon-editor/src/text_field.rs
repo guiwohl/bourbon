@@ -189,7 +189,7 @@ impl TextField {
         self.select(moved, cx);
     }
 
-    fn select_all(&mut self, cx: &mut Context<Self>) {
+    pub fn select_all(&mut self, cx: &mut Context<Self>) {
         self.select(SelectionRange::new(0, self.state.text.len()), cx);
     }
 

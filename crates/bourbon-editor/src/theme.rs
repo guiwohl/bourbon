@@ -80,6 +80,9 @@ pub struct EditorTheme {
     pub code_background: Hsla,
     pub code_border: Hsla,
     pub quote_bar: Hsla,
+    pub search_match: Hsla,
+    pub search_match_current: Hsla,
+    pub search_match_outline: Hsla,
 }
 
 fn hsl(hue: f32, saturation: f32, lightness: f32) -> Hsla {
@@ -174,6 +177,9 @@ impl EditorTheme {
             code_background: placeholder,
             code_border: placeholder,
             quote_bar: placeholder,
+            search_match: hsl_alpha(38.0, 92.0, 50.0, 0.25),
+            search_match_current: hsl_alpha(38.0, 92.0, 50.0, 0.50),
+            search_match_outline: hsl(38.0, 92.0, 50.0),
         }
     }
 

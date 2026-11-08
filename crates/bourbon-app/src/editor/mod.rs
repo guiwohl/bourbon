@@ -1,7 +1,9 @@
 use std::time::Instant;
 
 use bourbon_core::{Note, NotebookNode, Tag, TagSummary, ViewMode};
-use bourbon_editor::{Editor, EditorEvent, PreviewEvent, PreviewView, TextField, TextFieldEvent};
+use bourbon_editor::{
+    Editor, EditorEvent, PreviewEvent, PreviewView, SearchPanel, TextField, TextFieldEvent,
+};
 use bourbon_ui::{Appearance, Button, ButtonVariant, ThemeExt as _};
 use gpui::{
     App, AppContext as _, Context, Entity, Hsla, InteractiveElement as _, IntoElement,
@@ -51,6 +53,7 @@ type ThemeKey = (Appearance, Hsla);
 pub(crate) struct EditorPane {
     title: Entity<TextField>,
     body: Entity<Editor>,
+    search: Entity<SearchPanel>,
     preview: Entity<PreviewView>,
     tag_field: Entity<TextField>,
     note_header: Option<NoteHeader>,
@@ -67,15 +70,17 @@ fn theme_key(cx: &App) -> ThemeKey {
 }
 
 impl EditorPane {
-    pub(crate) fn new(cx: &mut App) -> Self {
+    pub(crate) fn new(window: &mut Window, cx: &mut App) -> Self {
         let themes = themes::pane_themes(cx.theme());
+        let body = cx.new(|cx| {
+            let mut body = Editor::new("", themes.editor, cx);
+            body.set_line_numbers(true, cx);
+            body
+        });
         Self {
             title: cx.new(title_field),
-            body: cx.new(|cx| {
-                let mut body = Editor::new("", themes.editor, cx);
-                body.set_line_numbers(true, cx);
-                body
-            }),
+            search: cx.new(|cx| SearchPanel::new(body.clone(), window, cx)),
+            body,
             preview: cx.new(|cx| PreviewView::new("", themes.preview, cx)),
             tag_field: cx.new(tag_field),
             note_header: None,
@@ -209,6 +214,7 @@ impl EditorPane {
             .update(cx, |title, cx| title.set_text(&note.title, cx));
         self.body
             .update(cx, |body, cx| body.set_text(&note.body, cx));
+        self.search.update(cx, SearchPanel::refresh);
         self.preview.update(cx, |preview, cx| {
             preview.set_source(&note.body, cx);
             preview.set_scroll_top(px(0.), cx);
@@ -279,6 +285,24 @@ impl EditorPane {
                 .map(|tag| (*tag).clone()),
             None => header::tag_named(typed, tags).cloned(),
         }
+    }
+
+    pub(crate) fn open_search(&self, replacing: bool, window: &mut Window, cx: &mut App) {
+        self.search
+            .update(cx, |search, cx| search.open(replacing, window, cx));
+    }
+
+    pub(crate) fn find_next(&self, cx: &mut App) {
+        self.search.update(cx, SearchPanel::find_next);
+    }
+
+    pub(crate) fn find_previous(&self, cx: &mut App) {
+        self.search.update(cx, SearchPanel::find_previous);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn search_panel(&self) -> &Entity<SearchPanel> {
+        &self.search
     }
 
     pub(crate) fn focus_body(&self, window: &mut Window, cx: &mut App) {
@@ -355,6 +379,7 @@ impl EditorPane {
             &BodyPanes {
                 mode: view.toolbar.mode,
                 editor: &self.body,
+                search: &self.search,
                 preview: &self.preview,
                 link_picker: self.link_picker.as_ref(),
             },

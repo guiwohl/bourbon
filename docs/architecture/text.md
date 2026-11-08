@@ -1,6 +1,6 @@
 # bourbon-text
 
-GPUI-free text core of the Markdown editor (Phase 0 of [the UI rebuild](../decisions/2026-11-07-ui-rebuild.md)). State model in the style of CodeMirror 6. Deps: `ropey` (no default features: only `\n` breaks lines), `unicode-segmentation`. Guarded by `just architecture` (no `gpui*`).
+GPUI-free text core of the Markdown editor (Phase 0 of [the UI rebuild](../decisions/2026-11-07-ui-rebuild.md)). State model in the style of CodeMirror 6. Deps: `ropey` (no default features: only `\n` breaks lines), `unicode-segmentation`, `regex` (search). Guarded by `just architecture` (no `gpui*`).
 
 ## Model
 
@@ -47,6 +47,16 @@ Pure `fn(&EditorState) -> Option<Transaction>` (`None` = nothing to do, so the U
 Line-oriented commands (`indent`, `outdent`, `toggle_task`) emit minimal per-line changes and map the selection through them.
 
 Not covered yet: markup-aware Backspace, heading/list/quote toggles, links, code fences, move/copy line, smart paste. Syntax-tree awareness (skipping code blocks) arrives with `bourbon-markdown`.
+
+## Search (`search`)
+
+| Item | Behaviour |
+|---|---|
+| `SearchQuery { pattern, match_case, regex, whole_word }` | Plain patterns are escaped; case-insensitive unless `match_case`; `^`/`$` work per line |
+| `Search::new(&query)` | `Err(InvalidPattern)` for a bad regex; an empty pattern finds nothing |
+| `find_all(&text)` | Sorted, non-overlapping byte ranges. Empty matches are skipped; every step moves forward at least one char, so the loop ends. Whole word: no letter, digit or `_` right before or after; a rejected start retries one char later |
+| `replace_all(state, replacement)` / `replace_match(state, range, replacement)` | One `Command` transaction, `isolate`d, so each is one undo step. Regex mode expands `$1`, `$name`; plain mode inserts literally. `replace_all` maps the selection; `replace_match` puts the caret after the new text and refuses a range that is not a match |
+| `next_match` / `previous_match` / `current_match` | Index into the matches from a `SelectionRange`: next starts at the selection end, previous ends at its start, both wrap; current is the match equal to the selection |
 
 ## Tests
 
