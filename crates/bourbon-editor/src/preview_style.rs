@@ -39,7 +39,7 @@ pub fn item_gap(index: usize, theme: &PreviewTheme) -> Pixels {
     if index == 0 {
         px(0.0)
     } else {
-        theme.font_size * 0.25
+        theme.font_size * 0.3
     }
 }
 
@@ -207,11 +207,11 @@ mod tests {
     }
 
     #[test]
-    fn lists_indent_two_em_and_space_items_a_quarter_em() {
+    fn lists_indent_two_em_and_space_items_three_tenths_of_an_em() {
         let theme = theme();
         assert_eq!(list_indent(&theme), px(32.0));
         assert_eq!(item_gap(0, &theme), px(0.0));
-        assert_eq!(item_gap(1, &theme), px(4.0));
+        assert_eq!(item_gap(1, &theme), px(4.8));
     }
 
     #[test]

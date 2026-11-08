@@ -50,7 +50,7 @@ impl PreviewTheme {
             border: hsl(0.0, 0.0, 9.0, 0.15),
             solid_border: hsl(240.0, 5.0, 84.0, 1.0),
             code_background: hsl(214.0, 32.0, 91.0, 0.10),
-            code_border: hsl(213.0, 27.0, 84.0, 0.50),
+            code_border: hsl(213.0, 27.0, 84.0, 0.35),
             inline_code_background: hsl(0.0, 0.0, 0.0, 0.05),
             table_header_background: hsl(0.0, 0.0, 0.0, 0.10),
             table_stripe_background: hsl(0.0, 0.0, 0.0, 0.05),
@@ -154,7 +154,7 @@ mod tests {
         let theme = PreviewTheme::light();
         assert_eq!(theme.text, hsla(0.0, 0.0, 0.0, 0.87));
         assert_eq!(theme.solid_border, hsla(240.0 / 360.0, 0.05, 0.84, 1.0));
-        assert_eq!(theme.code_border, hsla(213.0 / 360.0, 0.27, 0.84, 0.50));
+        assert_eq!(theme.code_border, hsla(213.0 / 360.0, 0.27, 0.84, 0.35));
     }
 
     #[test]
