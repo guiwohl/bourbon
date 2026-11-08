@@ -20,7 +20,7 @@ use crate::navigation::Navigation;
 use crate::workspace::Workspace;
 
 pub(crate) use filter::{ClearFilter, narrow};
-use header::{ListView, title_icon};
+use header::ListView;
 
 gpui_kit::actions!(bourbon, [SelectPreviousNote, SelectNextNote]);
 
@@ -75,7 +75,6 @@ pub(crate) fn render(data: &NoteListData, cx: &mut Context<Workspace>) -> impl I
     let header = header::render(
         header::HeaderData {
             title: title::view_title(data.navigation, data.notebooks, data.tags).into(),
-            icon: title_icon(data.navigation),
             sort: data.sort,
             view: view_kind,
             note_count: data.notes.len(),

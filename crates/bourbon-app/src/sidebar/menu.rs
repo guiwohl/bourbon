@@ -14,10 +14,6 @@ pub(super) const ENTRIES: [(&str, PaneAction); 4] = [
     ("Export to Markdown\u{2026}", PaneAction::ExportToMarkdown),
 ];
 
-const TITLE: &str = "Bourbon";
-const TITLE_OPACITY: f32 = 0.6;
-const TITLE_GAP: f32 = 6.;
-const TITLE_MARGIN_LEFT: f32 = 11.;
 const TRAILING_PADDING: f32 = 2.;
 
 pub(super) fn builder() -> MenuBuilder {
@@ -51,19 +47,9 @@ pub(super) fn control_strip(cx: &mut Context<Workspace>) -> impl IntoElement + u
         .flex_none()
         .items_center()
         .min_h(tokens.scale.header_height)
+        .justify_end()
         .pr(px(TRAILING_PADDING))
         .font_family(tokens.fonts.ui_family.clone())
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .ml(px(TITLE_MARGIN_LEFT))
-                .mr(px(TITLE_GAP))
-                .opacity(TITLE_OPACITY)
-                .text_size(tokens.scale.medium)
-                .text_color(tokens.colors.text)
-                .child(TITLE),
-        )
         .child(gear)
 }
 

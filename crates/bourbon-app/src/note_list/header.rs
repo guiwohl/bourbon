@@ -1,5 +1,5 @@
 use bourbon_core::{NoteId, NoteSort};
-use bourbon_ui::{Icon, IconButton, IconName, MenuItem, ThemeExt as _};
+use bourbon_ui::{IconButton, IconName, MenuItem, ThemeExt as _};
 use gpui_kit::{
     ClickEvent, Context, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
@@ -16,9 +16,6 @@ const SORTS: [(NoteSort, &str); 3] = [
     (NoteSort::TitleAlphabetical, "Sort by title"),
 ];
 const TITLE_SIZE: f32 = 16.8;
-const TITLE_ICON_OPACITY: f32 = 0.8;
-const TITLE_ICON_SIZE: f32 = 16.;
-const TITLE_GAP: f32 = 4.;
 const HORIZONTAL_PADDING: f32 = 2.;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,20 +35,8 @@ impl ListView {
     }
 }
 
-pub(crate) fn title_icon(navigation: &Navigation) -> IconName {
-    match navigation {
-        Navigation::AllNotes => IconName::FileText,
-        Navigation::Notebook(..) => IconName::Notebook,
-        Navigation::Status(_) => IconName::CirclePlay,
-        Navigation::Tags(_) => IconName::Tag,
-        Navigation::Templates => IconName::Copy,
-        Navigation::Trash => IconName::Trash,
-    }
-}
-
 pub(crate) struct HeaderData {
     pub(crate) title: SharedString,
-    pub(crate) icon: IconName,
     pub(crate) sort: NoteSort,
     pub(crate) view: ListView,
     pub(crate) note_count: usize,
@@ -74,7 +59,6 @@ pub(crate) fn render(data: HeaderData, cx: &mut Context<Workspace>) -> impl Into
         .flex()
         .items_center()
         .justify_center()
-        .gap(px(TITLE_GAP))
         .min_w_0()
         .cursor_pointer()
         .text_size(px(TITLE_SIZE))
@@ -85,13 +69,6 @@ pub(crate) fn render(data: HeaderData, cx: &mut Context<Workspace>) -> impl Into
             cx.listener(move |workspace, event: &ClickEvent, window, cx| {
                 workspace.open_menu(event.position(), title_menu(sort, &templates), window, cx);
             }),
-        )
-        .child(
-            div().flex_none().opacity(TITLE_ICON_OPACITY).child(
-                Icon::new(data.icon)
-                    .size(px(TITLE_ICON_SIZE))
-                    .color(colors.text),
-            ),
         )
         .child(div().truncate().child(data.title));
     let primary_action = match data.view {
@@ -166,8 +143,6 @@ pub(crate) fn title_menu(current: NoteSort, templates: &[(NoteId, String)]) -> M
 
 #[cfg(test)]
 mod tests {
-    use bourbon_core::NotebookDepth;
-
     use super::*;
 
     #[test]
@@ -181,20 +156,5 @@ mod tests {
         assert_eq!(ListView::of(&Navigation::Trash), ListView::Trash);
         assert_eq!(ListView::of(&Navigation::Templates), ListView::Templates);
         assert_eq!(ListView::of(&Navigation::AllNotes), ListView::Notes);
-    }
-
-    #[test]
-    fn each_view_has_its_own_title_icon() {
-        let notebook = Navigation::Notebook(
-            bourbon_core::NotebookId::generate(),
-            NotebookDepth::WithDescendants,
-        );
-        assert_eq!(title_icon(&notebook), IconName::Notebook);
-        assert_eq!(title_icon(&Navigation::Trash), IconName::Trash);
-        assert_eq!(title_icon(&Navigation::Tags(Vec::new())), IconName::Tag);
-        assert_ne!(
-            title_icon(&Navigation::AllNotes),
-            title_icon(&Navigation::Templates)
-        );
     }
 }

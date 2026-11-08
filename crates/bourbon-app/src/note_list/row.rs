@@ -20,6 +20,7 @@ const PROGRESS_INNER_WIDTH: f32 = 30.;
 const PROGRESS_HEIGHT: f32 = 6.;
 const TITLE_MARGIN: f32 = 8.;
 const META_GAP: f32 = 5.;
+const META_ICON_SIZE: f32 = 14.;
 const LEFT_PADDING: f32 = 14.;
 const TOP_PADDING: f32 = 2.;
 const BOTTOM_PADDING: f32 = 10.;
@@ -204,7 +205,7 @@ fn meta_line(
         .children(
             summary
                 .task_progress
-                .map(|progress| progress_bar(progress, colors)),
+                .map(|progress| progress_view(progress, colors)),
         )
         .children(
             summary
@@ -212,6 +213,25 @@ fn meta_line(
                 .iter()
                 .map(|tag| tag_chip(&summary.id, tag, view)),
         )
+}
+
+fn progress_label(progress: TaskProgress) -> String {
+    format!("{} of {}", progress.done, progress.total)
+}
+
+fn progress_view(progress: TaskProgress, colors: &Colors) -> impl IntoElement + use<> {
+    div()
+        .flex()
+        .items_center()
+        .gap(px(META_GAP))
+        .text_color(colors.muted_text)
+        .child(
+            Icon::new(IconName::ListChecks)
+                .size(px(META_ICON_SIZE))
+                .color(colors.muted_text),
+        )
+        .child(progress_bar(progress, colors))
+        .child(progress_label(progress))
 }
 
 fn progress_bar(progress: TaskProgress, colors: &Colors) -> impl IntoElement + use<> {
@@ -277,6 +297,11 @@ pub(crate) fn note_menu(id: &NoteId, pinned: bool, in_trash: bool) -> MenuBuilde
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn progress_reads_done_of_total() {
+        assert_eq!(progress_label(TaskProgress { done: 1, total: 2 }), "1 of 2");
+    }
 
     #[test]
     fn the_filled_bar_is_a_share_of_the_full_width() {
