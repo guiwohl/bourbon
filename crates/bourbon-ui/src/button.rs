@@ -21,6 +21,11 @@ pub enum ButtonVariant {
     Primary,
 }
 
+#[must_use]
+pub fn has_ring(variant: ButtonVariant) -> bool {
+    variant == ButtonVariant::Subtle
+}
+
 #[derive(IntoElement)]
 pub struct Button {
     id: ElementId,
@@ -133,7 +138,7 @@ impl RenderOnce for Button {
                 row.child(Icon::new(icon).size(tokens.scale.icon_slot).color(text))
             })
             .children(self.label);
-        if self.variant == ButtonVariant::Subtle {
+        if has_ring(self.variant) {
             content = content.border_1().border_color(colors.button_ring);
         }
         if self.disabled {
@@ -312,6 +317,13 @@ mod tests {
     fn counter() -> (Rc<Cell<usize>>, Rc<Cell<usize>>) {
         let count = Rc::new(Cell::new(0));
         (count.clone(), count)
+    }
+
+    #[test]
+    fn only_the_subtle_variant_has_a_ring() {
+        assert!(has_ring(ButtonVariant::Subtle));
+        assert!(!has_ring(ButtonVariant::Plain));
+        assert!(!has_ring(ButtonVariant::Primary));
     }
 
     #[test]

@@ -91,6 +91,21 @@ mod tests {
     }
 
     #[test]
+    fn blending_weights_each_channel_of_both_colours() {
+        let mixed = blended(0x0020_4060, 0x0080_c0e0, 0.25).to_rgb();
+        let expected = [
+            (32. * 0.75 + 128. * 0.25) / 255.,
+            (64. * 0.75 + 192. * 0.25) / 255.,
+            (96. * 0.75 + 224. * 0.25) / 255.,
+        ];
+        for (got, want) in [mixed.r, mixed.g, mixed.b].into_iter().zip(expected) {
+            assert!((got - want).abs() < 1e-3, "{got} {want}");
+        }
+        assert!((blended(0x0020_4060, 0x0080_c0e0, 0.).to_rgb().r - 32. / 255.).abs() < 1e-3);
+        assert!((blended(0x0020_4060, 0x0080_c0e0, 1.).to_rgb().r - 128. / 255.).abs() < 1e-3);
+    }
+
+    #[test]
     fn blending_half_way_averages_each_channel_and_stays_opaque() {
         let mixed = blended(BLACK, WHITE, 0.5).to_rgb();
         assert!((mixed.r - 0.5).abs() < 1e-3);

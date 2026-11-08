@@ -9,6 +9,10 @@ use crate::icon::{Icon, IconName};
 use crate::theme::ThemeExt;
 use crate::tooltip::Tooltip;
 
+fn is_selected(index: usize, selected: usize) -> bool {
+    index == selected
+}
+
 type ChangeHandler = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
 pub struct Segment {
@@ -70,7 +74,7 @@ impl RenderOnce for SegmentedControl {
             .into_iter()
             .enumerate()
             .map(|(index, segment)| {
-                let is_selected = index == selected;
+                let is_selected = is_selected(index, selected);
                 let handler = on_change.clone();
                 let label = segment.label;
                 let mut button = div()
@@ -148,6 +152,12 @@ mod tests {
 
     fn segment_centre(index: u8) -> gpui::Point<gpui::Pixels> {
         point(px(1. + 44. * f32::from(index) + 22.), px(15.))
+    }
+
+    #[test]
+    fn only_the_matching_index_is_selected() {
+        assert!(is_selected(1, 1));
+        assert!(!is_selected(0, 1));
     }
 
     #[gpui::test]

@@ -38,3 +38,18 @@ pub use tooltip::Tooltip;
 pub fn init(cx: &mut gpui::App) {
     menu::bind_keys(cx);
 }
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestAppContext;
+
+    #[gpui::test]
+    fn init_binds_the_menu_keys(cx: &mut TestAppContext) {
+        let before = cx.update(|cx| cx.key_bindings().borrow().bindings().count());
+
+        cx.update(super::init);
+
+        let after = cx.update(|cx| cx.key_bindings().borrow().bindings().count());
+        assert_eq!(after - before, 6);
+    }
+}

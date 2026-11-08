@@ -134,7 +134,10 @@ mod tests {
     use std::cell::Cell;
     use std::rc::Rc;
 
-    use gpui::{Context, IntoElement, Render, RenderOnce, TestAppContext, div};
+    use gpui::{
+        Context, InteractiveElement as _, IntoElement, Render, RenderOnce,
+        StatefulInteractiveElement as _, Styled as _, TestAppContext, div,
+    };
 
     use super::*;
 
@@ -181,6 +184,30 @@ mod tests {
             visual.update(|_, cx| cx.theme().appearance),
             Appearance::Light
         );
+    }
+
+    #[gpui::test]
+    fn a_themed_child_is_painted_and_clickable(cx: &mut TestAppContext) {
+        let clicked = Rc::new(Cell::new(false));
+        let seen = clicked.clone();
+        let visual = crate::test_support::host(cx, move || {
+            let seen = seen.clone();
+            Themed::new(
+                Appearance::Dark,
+                div()
+                    .id("inside")
+                    .size(gpui::px(50.))
+                    .on_click(move |_, _, _| seen.set(true)),
+            )
+            .into_any_element()
+        });
+
+        visual.simulate_click(
+            gpui::point(gpui::px(10.), gpui::px(10.)),
+            gpui::Modifiers::none(),
+        );
+
+        assert!(clicked.get());
     }
 
     #[test]
