@@ -621,4 +621,17 @@ mod tests {
         assert_eq!(run.color, theme.gutter_text);
         assert_eq!(run.font.family.as_ref(), theme.font_family.as_str());
     }
+
+    #[gpui::test]
+    fn a_caret_near_the_end_of_the_first_row_does_not_jump_to_the_next_row(
+        cx: &mut TestAppContext,
+    ) {
+        let (editor, cx) = open(cx, &format!("x\n{}", "word ".repeat(30)));
+        let scroll = editor.update_in(cx, |editor, window, cx| {
+            editor.set_selection(2 + 23, 2 + 23, cx);
+            editor.build_frame(bounds(232.0, 30.0), window);
+            editor.scroll_top
+        });
+        assert!(near(scroll, 2.0 * LINE - 30.0), "{scroll:?}");
+    }
 }
