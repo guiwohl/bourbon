@@ -1,8 +1,8 @@
 use bourbon_ui::{Icon, IconName, Modal, Placement, ThemeExt as _, Tokens};
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, Context, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Window, div, px,
+    AnyElement, Context, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Window, div, px,
 };
 use gpui_kit::TestSupportExt as _;
 
@@ -51,6 +51,10 @@ pub(crate) fn footer_hints(mode: Mode) -> [&'static str; 3] {
     ["\u{2191}\u{2193} to navigate", enter, "esc to close"]
 }
 
+pub(crate) fn panel_max_height(viewport_height: Pixels) -> Pixels {
+    viewport_height - px(PANEL_TOP + PANEL_BOTTOM_MARGIN)
+}
+
 fn mode_of(results: &Results) -> Mode {
     match results {
         Results::Notes(_) => Mode::Notes,
@@ -88,7 +92,7 @@ pub(crate) fn render(
 ) -> impl IntoElement + use<> {
     let tokens = cx.theme().tokens.clone();
     let colors = tokens.colors;
-    let max_height = window.viewport_size().height - px(PANEL_TOP + PANEL_BOTTOM_MARGIN);
+    let max_height = panel_max_height(window.viewport_size().height);
     let rows: Vec<AnyElement> = rows_of(pane.results())
         .into_iter()
         .enumerate()
@@ -284,6 +288,11 @@ fn render_row(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_panel_leaves_56_px_above_and_28_px_below() {
+        assert_eq!(panel_max_height(px(900.)), px(816.));
+    }
 
     #[test]
     fn the_footer_names_the_enter_verb_of_each_mode() {

@@ -15,6 +15,11 @@ const CHECK_SIZE: f32 = 12.;
 const CHECK_OPACITY: f32 = 0.9;
 const LABEL_GAP: f32 = 9.;
 
+#[must_use]
+pub fn description_indent() -> f32 {
+    BOX_SIZE + LABEL_GAP
+}
+
 type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
 
 #[derive(IntoElement)]
@@ -103,7 +108,7 @@ impl RenderOnce for Checkbox {
             .when_some(self.description, |root, description| {
                 root.child(
                     div()
-                        .pl(px(BOX_SIZE + LABEL_GAP))
+                        .pl(px(description_indent()))
                         .text_size(tokens.scale.small)
                         .text_color(colors.muted_text)
                         .child(description),
@@ -140,6 +145,11 @@ mod tests {
         });
         visual.simulate_click(point(px(40.), px(8.)), Modifiers::none());
         seen.take()
+    }
+
+    #[test]
+    fn the_description_lines_up_with_the_label_26_px_in() {
+        assert!((description_indent() - 26.).abs() < f32::EPSILON);
     }
 
     #[gpui::test]

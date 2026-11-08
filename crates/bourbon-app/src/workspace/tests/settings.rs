@@ -408,6 +408,15 @@ fn the_settings_screen_replaces_the_columns_and_switches_pages(cx: &mut TestAppC
         .unwrap()
     };
 
+    let selected = |cx: &mut TestAppContext, id: &str| {
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            window.find(id.to_owned()).selected()
+        })
+        .unwrap()
+    };
+    assert_eq!(selected(cx, "settings-page-general"), Some(true));
+    assert_eq!(selected(cx, "settings-page-backup"), Some(false));
     assert!(!listed(cx, "sidebar"));
     assert!(listed(cx, "settings-theme"));
     assert!(!listed(cx, "settings-backup-repository"));
@@ -416,5 +425,6 @@ fn the_settings_screen_replaces_the_columns_and_switches_pages(cx: &mut TestAppC
 
     assert!(listed(cx, "settings-backup-repository"));
     assert!(!listed(cx, "settings-theme"));
+    assert_eq!(selected(cx, "settings-page-backup"), Some(true));
     view.read_with(cx, |view, _| assert!(view.settings_open));
 }
