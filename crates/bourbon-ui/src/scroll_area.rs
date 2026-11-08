@@ -30,6 +30,16 @@ pub fn thumb(viewport: f32, content: f32, scrolled: f32, minimum_length: f32) ->
     })
 }
 
+#[must_use]
+pub fn thumb_for_scroll(viewport: f32, max_offset: f32, offset: f32) -> Option<Thumb> {
+    thumb(
+        viewport,
+        viewport + max_offset,
+        -offset,
+        MINIMUM_THUMB_LENGTH,
+    )
+}
+
 #[derive(IntoElement)]
 pub struct ScrollArea {
     id: ElementId,
@@ -57,14 +67,10 @@ impl ParentElement for ScrollArea {
 impl RenderOnce for ScrollArea {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = &cx.theme().tokens;
-        let viewport = self.handle.bounds().size.height.as_f32();
-        let scrollable = self.handle.max_offset().y.as_f32();
-        let scrolled = -self.handle.offset().y.as_f32();
-        let visible = thumb(
-            viewport,
-            viewport + scrollable,
-            scrolled,
-            MINIMUM_THUMB_LENGTH,
+        let visible = thumb_for_scroll(
+            self.handle.bounds().size.height.as_f32(),
+            self.handle.max_offset().y.as_f32(),
+            self.handle.offset().y.as_f32(),
         );
         let width = tokens.scale.scrollbar_width;
         let hover_width = tokens.scale.scrollbar_hover_width;
@@ -99,7 +105,7 @@ impl RenderOnce for ScrollArea {
                             .right_0()
                             .top(px(visible.top))
                             .h(px(visible.length))
-                            .rounded(width / 2.)
+                            .rounded_full()
                             .bg(thumb_color),
                     )
             }))
@@ -108,7 +114,46 @@ impl RenderOnce for ScrollArea {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    use gpui::{Modifiers, TestAppContext, point};
+
     use super::*;
+    use crate::test_support::host;
+
+    #[test]
+    fn a_scroll_handle_offset_is_negative_when_scrolled_down() {
+        let middle = thumb_for_scroll(100., 300., -150.).unwrap();
+        let free_track = 100. - middle.length;
+        assert!((middle.top - free_track / 2.).abs() < 1e-4);
+        assert!((middle.length - 25.).abs() < 1e-4);
+        assert_eq!(thumb_for_scroll(100., 0., 0.), None);
+    }
+
+    #[gpui::test]
+    fn children_inside_a_scroll_area_receive_clicks(cx: &mut TestAppContext) {
+        let clicked = Rc::new(Cell::new(false));
+        let seen = clicked.clone();
+        let visual = host(cx, move || {
+            let seen = seen.clone();
+            div()
+                .size(px(200.))
+                .child(
+                    ScrollArea::new("area", &ScrollHandle::new()).child(
+                        div()
+                            .id("inside")
+                            .size(px(50.))
+                            .on_click(move |_, _, _| seen.set(true)),
+                    ),
+                )
+                .into_any_element()
+        });
+
+        visual.simulate_click(point(px(10.), px(10.)), Modifiers::none());
+
+        assert!(clicked.get());
+    }
 
     #[test]
     fn content_that_fits_has_no_thumb() {

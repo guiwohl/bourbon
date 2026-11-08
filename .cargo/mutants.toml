@@ -2,7 +2,7 @@ exclude_re = [
     "replace main with \\(\\)",
     "replace run with \\(\\)",
     "\\bindent\\b",
-    "replace register with \\(\\)",
+    "replace register_fonts with \\(\\)",
     "replace glyph -> Icon with Default::default\\(\\)",
     "replace status_glyph -> Option<Icon> with Some\\(Default::default\\(\\)\\)",
     "replace pin_icon -> Icon with Default::default\\(\\)",

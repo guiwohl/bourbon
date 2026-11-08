@@ -120,6 +120,14 @@ impl Focusable for Menu {
     }
 }
 
+fn is_selected(selected: Option<usize>, index: usize) -> bool {
+    selected == Some(index)
+}
+
+fn after_hover(hovered: bool, selected: Option<usize>, index: usize) -> Option<usize> {
+    if hovered { Some(index) } else { selected }
+}
+
 fn enabled_flags(entries: &[MenuEntry]) -> Vec<bool> {
     entries
         .iter()
@@ -170,7 +178,7 @@ impl Menu {
         cx: &Context<Self>,
     ) -> AnyElement {
         let colors = tokens.colors;
-        let is_selected = self.selected == Some(index);
+        let is_selected = is_selected(self.selected, index);
         let text = if item.disabled {
             colors.disabled_text
         } else {
@@ -188,10 +196,8 @@ impl Menu {
             .when(!item.disabled, |row| {
                 row.cursor_pointer()
                     .on_hover(cx.listener(move |menu, hovered: &bool, _, cx| {
-                        if *hovered && menu.selected != Some(index) {
-                            menu.selected = Some(index);
-                            cx.notify();
-                        }
+                        menu.selected = after_hover(*hovered, menu.selected, index);
+                        cx.notify();
                     }))
                     .on_click(cx.listener(move |menu, _, _, cx| menu.confirm_at(index, cx)))
             })
@@ -321,8 +327,8 @@ mod tests {
                 recorded.borrow_mut().push(*event);
             })
             .detach();
-            let handle = menu.read(cx).focus_handle.clone();
-            window.focus(&handle, cx);
+            let entity = menu.clone();
+            entity.update(cx, |menu, cx| menu.focus(window, cx));
         });
         visual.run_until_parked();
         Opened {
@@ -428,6 +434,31 @@ mod tests {
             .simulate_mouse_move(point(px(60.), px(20.)), None, Modifiers::none());
 
         assert_eq!(selected(&mut opened), Some(0));
+    }
+
+    #[gpui::test]
+    fn leaving_an_item_with_the_mouse_keeps_the_keyboard_selection(cx: &mut TestAppContext) {
+        let mut opened = open(cx);
+
+        opened
+            .visual
+            .simulate_mouse_move(point(px(60.), px(20.)), None, Modifiers::none());
+        opened.visual.simulate_keystrokes("down");
+        opened
+            .visual
+            .simulate_mouse_move(point(px(900.), px(600.)), None, Modifiers::none());
+
+        assert_eq!(selected(&mut opened), Some(3));
+    }
+
+    #[test]
+    fn selection_and_hover_rules() {
+        assert!(is_selected(Some(2), 2));
+        assert!(!is_selected(Some(2), 1));
+        assert!(!is_selected(None, 0));
+        assert_eq!(after_hover(true, Some(1), 3), Some(3));
+        assert_eq!(after_hover(false, Some(1), 3), Some(1));
+        assert_eq!(after_hover(false, None, 3), None);
     }
 
     #[test]

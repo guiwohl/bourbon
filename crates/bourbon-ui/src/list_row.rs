@@ -468,6 +468,30 @@ mod tests {
     }
 
     #[gpui::test]
+    fn an_accessory_is_revealed_and_clickable_while_the_row_is_hovered(cx: &mut TestAppContext) {
+        let clicks = Rc::new(RefCell::new(Vec::new()));
+        let recorded = clicks.clone();
+        let visual = host(cx, move || {
+            let recorded = recorded.clone();
+            div()
+                .w(px(200.))
+                .child(
+                    ListRow::new("notebook-work", "Work").accessory(
+                        IconButton::new("add", IconName::Plus)
+                            .size(crate::button::IconButtonSize::Accessory)
+                            .on_click(move |_, _, _| recorded.borrow_mut().push("add")),
+                    ),
+                )
+                .into_any_element()
+        });
+
+        visual.simulate_mouse_move(point(px(100.), px(15.)), None, Modifiers::none());
+        visual.simulate_click(point(px(183.), px(15.)), Modifiers::none());
+
+        assert_eq!(*clicks.borrow(), ["add"]);
+    }
+
+    #[gpui::test]
     fn the_section_collapse_button_asks_for_the_opposite_state(cx: &mut TestAppContext) {
         let requests = Rc::new(RefCell::new(Vec::new()));
         let recorded = requests.clone();

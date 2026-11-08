@@ -74,6 +74,18 @@ mod tests {
     }
 
     #[test]
+    fn a_current_index_past_the_end_counts_as_the_last_item() {
+        assert_eq!(
+            next_enabled(&[true, true, true], Some(10), Step::Forward),
+            Some(0)
+        );
+        assert_eq!(
+            next_enabled(&[true, true, true], Some(10), Step::Backward),
+            Some(1)
+        );
+    }
+
+    #[test]
     fn a_single_enabled_item_stays_selected() {
         assert_eq!(
             next_enabled(&[false, true], Some(1), Step::Forward),

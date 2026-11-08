@@ -111,6 +111,11 @@ fn parse_request(path: &str) -> Option<(&'static str, &str)> {
     valid_stroke.then_some((*source, stroke))
 }
 
+#[must_use]
+pub fn rotation_radians(quarter_turns: f32) -> Option<f32> {
+    (quarter_turns != 0.).then_some(quarter_turns * std::f32::consts::FRAC_PI_2)
+}
+
 pub struct IconAssets;
 
 impl AssetSource for IconAssets {
@@ -191,10 +196,8 @@ impl RenderOnce for Icon {
             .size(self.size)
             .flex_none()
             .text_color(color);
-        if self.quarter_turns != 0. {
-            glyph = glyph.with_transformation(Transformation::rotate(radians(
-                self.quarter_turns * std::f32::consts::FRAC_PI_2,
-            )));
+        if let Some(angle) = rotation_radians(self.quarter_turns) {
+            glyph = glyph.with_transformation(Transformation::rotate(radians(angle)));
         }
         glyph
     }
@@ -240,6 +243,13 @@ mod tests {
         assert!(listed.iter().any(|path| path == "icons/file-text.svg"));
         assert_eq!(listed.len(), IconName::ALL.len());
         assert_eq!(listed.len(), 32);
+    }
+
+    #[test]
+    fn no_turns_means_no_rotation_and_each_turn_is_a_right_angle() {
+        assert_eq!(rotation_radians(0.), None);
+        assert_eq!(rotation_radians(1.), Some(std::f32::consts::FRAC_PI_2));
+        assert_eq!(rotation_radians(2.), Some(std::f32::consts::PI));
     }
 
     #[test]
