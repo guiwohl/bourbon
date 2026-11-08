@@ -72,8 +72,7 @@ impl Folds {
             let Some(range) = self
                 .hidden
                 .iter()
-                .filter(|range| range.start < position && position <= range.end)
-                .max_by_key(|range| range.end - range.start)
+                .find(|range| range.start < position && position <= range.end)
             else {
                 break;
             };

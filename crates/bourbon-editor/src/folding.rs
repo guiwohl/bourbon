@@ -392,4 +392,99 @@ mod tests {
             assert_eq!(hidden_lines(editor), Vec::<usize>::new());
         });
     }
+
+    const LONG_SECTION_LINES: usize = 50;
+
+    fn long_section() -> String {
+        format!("## A\n{}## B\nend", "x\n".repeat(LONG_SECTION_LINES))
+    }
+
+    fn total_after_frame(editor: &mut Editor, window: &mut gpui::Window) -> f32 {
+        let tiny = gpui::Bounds::new(point(px(0.0), px(0.0)), gpui::size(px(400.0), px(20.0)));
+        editor.build_frame(tiny, window);
+        editor.heights.total()
+    }
+
+    fn near(actual: f32, expected: f32) -> bool {
+        (actual - expected).abs() < 0.1
+    }
+
+    const HEADING: f32 = 21.75 * 1.16;
+    const LINE: f32 = 14.5 * 1.16;
+
+    #[gpui::test]
+    fn folding_and_unfolding_remeasure_every_hidden_line(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, &long_section());
+        let full = 2.0 * HEADING + LINE * crate::numeric::count_f32(LONG_SECTION_LINES + 1);
+        editor.update_in(cx, |editor, window, cx| {
+            assert!(near(total_after_frame(editor, window), full));
+            editor.toggle_fold(0, cx);
+            assert!(near(
+                total_after_frame(editor, window),
+                2.0 * HEADING + LINE
+            ));
+            editor.toggle_fold(0, cx);
+            assert!(near(total_after_frame(editor, window), full));
+            editor.toggle_fold(0, cx);
+            total_after_frame(editor, window);
+            let inside = editor.state.text.line_start(LONG_SECTION_LINES);
+            editor.set_selection(inside, inside, cx);
+            assert!(near(total_after_frame(editor, window), full));
+        });
+    }
+
+    #[gpui::test]
+    fn folding_over_a_selection_anchor_collapses_it_to_the_header(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, SOURCE);
+        editor.update(cx, |editor, cx| {
+            let inside = editor.state.text.line_start(2);
+            editor.select(SelectionRange::new(inside, 0), cx);
+            editor.toggle_fold(0, cx);
+            let header_end = editor.state.text.line_end(0);
+            assert_eq!(editor.selected_range(), header_end..header_end);
+        });
+    }
+
+    #[gpui::test]
+    fn an_edit_leaving_the_caret_inside_a_fold_puts_it_on_the_header(cx: &mut TestAppContext) {
+        use bourbon_text::{Change, ChangeSet, Selection, Transaction, TransactionKind};
+        let (editor, cx) = open(cx, SOURCE);
+        editor.update(cx, |editor, cx| {
+            editor.toggle_fold(0, cx);
+            let inside = editor.state.text.line_start(1) + 1;
+            let last = editor.state.text.len();
+            editor.apply(
+                &Transaction::new(
+                    ChangeSet::new(vec![Change::insert(last, "z")]),
+                    Selection::cursor(inside),
+                    TransactionKind::Input,
+                ),
+                cx,
+            );
+            let header_end = editor.state.text.line_end(0);
+            assert_eq!(editor.selected_range(), header_end..header_end);
+            assert_eq!(hidden_lines(editor), vec![1, 2]);
+        });
+    }
+
+    #[gpui::test]
+    fn only_the_chevron_column_of_a_header_toggles(cx: &mut TestAppContext) {
+        let (editor, cx) = open(cx, SOURCE);
+        editor.update_in(cx, |editor, window, cx| {
+            editor.set_line_numbers(true, cx);
+            let viewport =
+                gpui::Bounds::new(point(px(100.0), px(50.0)), gpui::size(px(400.0), px(60.0)));
+            editor.build_frame(viewport, window);
+            editor.scroll_top = px(10.0);
+            let header_top = editor.heights.top(4);
+            let y = px(50.0 + header_top - 10.0 + 5.0);
+            let at = |x: f32| point(px(100.0 + x), y);
+            assert_eq!(editor.chevron_line_at(at(35.0)), Some(4));
+            assert_eq!(editor.chevron_line_at(at(20.0)), None);
+            assert_eq!(editor.chevron_line_at(at(100.0)), None);
+            assert_eq!(editor.chevron_line_at(point(px(135.0), px(70.0))), None);
+            editor.set_line_numbers(false, cx);
+            assert_eq!(editor.chevron_line_at(at(35.0)), None);
+        });
+    }
 }
