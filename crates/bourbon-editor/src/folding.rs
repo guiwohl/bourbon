@@ -427,7 +427,7 @@ mod tests {
             assert!(near(total_after_frame(editor, window), full));
             editor.toggle_fold(0, cx);
             total_after_frame(editor, window);
-            let inside = editor.state.text.line_start(LONG_SECTION_LINES);
+            let inside = editor.state.text.line_start(1);
             editor.set_selection(inside, inside, cx);
             assert!(near(total_after_frame(editor, window), full));
         });
