@@ -270,6 +270,11 @@ mod tests {
             ..query("a+b?")
         };
         assert_eq!(find(&words, "aab ab"), vec![0..3, 4..6]);
+        let plain = SearchQuery {
+            whole_word: true,
+            ..query("ab")
+        };
+        assert_eq!(find(&plain, "xab ab"), vec![4..6]);
         let overlapping = SearchQuery {
             whole_word: true,
             regex: true,
