@@ -5,8 +5,8 @@ use gpui::{Bounds, Pixels, Point, ShapedLine, TextRun, Window, point, px, size};
 use crate::editor::{Editor, line_height_of};
 use crate::layout::{LineLayout, editor_font};
 use crate::line_decor::{CardShape, card_shape, quote_bar};
-use crate::segments::{inline_code_ranges, line_segments};
 use crate::search::MatchRect;
+use crate::segments::{inline_code_ranges, line_segments};
 
 const MEASURE_BUDGET: usize = 400;
 

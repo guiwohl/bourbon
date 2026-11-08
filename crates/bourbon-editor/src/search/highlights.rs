@@ -68,8 +68,8 @@ mod tests {
     use super::*;
     use gpui::{TestAppContext, VisualTestContext, point, size};
 
-    const CHAR: f32 = 7.8;
-    const LINE: f32 = 19.5;
+    const CHAR: f32 = 8.7;
+    const LINE: f32 = 16.82;
 
     fn open<'a>(
         cx: &'a mut TestAppContext,
@@ -123,7 +123,7 @@ mod tests {
         let rects = frame_matches(&editor, cx, vec![1..4, 7..8], 0..0);
         assert_eq!(rects.len(), 3);
         assert!(rects.iter().all(|rect| !rect.current));
-        assert!(near(rects[0].bounds.size.width, CHAR + 6.5));
+        assert!(near(rects[0].bounds.size.width, CHAR + 7.25));
         assert!(near(rects[1].bounds.size.width, CHAR));
     }
 
@@ -136,7 +136,7 @@ mod tests {
             rects[0].bounds.left(),
             f32::from(rects[1].bounds.left()) + CHAR
         ));
-        assert!(near(rects[0].bounds.size.width, 6.5));
+        assert!(near(rects[0].bounds.size.width, 7.25));
         assert_eq!(
             rects.iter().map(|rect| rect.current).collect::<Vec<_>>(),
             vec![false, true]
@@ -167,8 +167,8 @@ mod tests {
         assert_eq!(current.background, theme.search_match_current.into());
         assert_eq!(current.border_widths.left, px(1.0));
         assert_eq!(current.border_color, theme.search_match_outline);
-        assert!(near(other.corner_radii.top_left, 13.0 * 0.4));
-        assert!(near(current.corner_radii.bottom_right, 13.0 * 0.4));
+        assert!(near(other.corner_radii.top_left, 14.5 * 0.4));
+        assert!(near(current.corner_radii.bottom_right, 14.5 * 0.4));
     }
 
     #[gpui::test]
