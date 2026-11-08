@@ -782,3 +782,16 @@ fn input_bounds_account_for_scrolling_and_the_element_origin(cx: &mut TestAppCon
         .expect("bounds");
     assert!((f32::from(found.origin.y) - (50.0 + 10.0 * LINE_HEIGHT - 100.0)).abs() < 0.1);
 }
+#[gpui::test]
+fn input_bounds_on_a_wrapped_row_sit_below_the_first_row(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, &"word ".repeat(30));
+    cx.simulate_resize(gpui::size(px(232.0), px(400.0)));
+    cx.run_until_parked();
+    let element = gpui::Bounds::new(point(px(0.0), px(0.0)), gpui::size(px(232.0), px(400.0)));
+    let found = editor
+        .update_in(cx, |editor, window, cx| {
+            editor.bounds_for_range(110..111, element, window, cx)
+        })
+        .expect("bounds");
+    assert!((f32::from(found.origin.y) - 4.0 * LINE_HEIGHT).abs() < 0.1);
+}
