@@ -130,8 +130,7 @@ impl Render for PreviewView {
                 div()
                     .flex()
                     .flex_col()
-                    .px(px(24.0))
-                    .py(px(16.0))
+                    .p(px(10.0))
                     .on_children_prepainted(move |bounds, _, cx| {
                         view.update(cx, |preview, _| preview.record_layouts(&bounds));
                     })

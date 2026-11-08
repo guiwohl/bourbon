@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use bourbon_editor::{
     Editor, EditorEvent, EditorTheme, PreviewEvent, PreviewTheme, PreviewView, bind_editor_keys,
+    register_editor_fonts,
 };
 use gpui::{
     App, Bounds, Context, Entity, FocusHandle, Focusable, KeyBinding, TitlebarOptions, Window,
@@ -123,14 +124,26 @@ impl Focusable for Demo {
 
 impl Render for Demo {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let border = if self.dark {
+            PreviewTheme::dark().border
+        } else {
+            PreviewTheme::light().border
+        };
         div()
             .size_full()
             .flex()
             .flex_row()
             .on_action(cx.listener(Self::toggle_theme))
             .on_action(cx.listener(Self::toggle_line_numbers))
-            .child(div().flex_1().h_full().child(self.editor.clone()))
-            .child(div().flex_1().h_full().child(self.preview.clone()))
+            .child(div().flex_1().min_w_0().h_full().child(self.editor.clone()))
+            .child(div().w(px(1.0)).h_full().flex_none().bg(border))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .h_full()
+                    .child(self.preview.clone()),
+            )
     }
 }
 
@@ -140,6 +153,7 @@ fn main() {
         if let Err(error) = cx.text_system().add_fonts(faces) {
             eprintln!("editor demo: cannot load fonts: {error}");
         }
+        register_editor_fonts(cx);
         bind_editor_keys(cx);
         cx.bind_keys([
             KeyBinding::new("ctrl-shift-l", ToggleTheme, None),

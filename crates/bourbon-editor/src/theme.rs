@@ -141,7 +141,7 @@ impl EditorTheme {
             font_size: px(13.0),
             line_height: 1.5,
             heading_scales: HEADING_SCALES,
-            line_padding: px(8.0),
+            line_padding: px(16.0),
             caret_width: px(2.0),
             gutter_font_scale: 0.7,
             gutter_min_width_em: 3.0,
@@ -217,7 +217,7 @@ mod tests {
         assert_eq!(theme.font_size, px(13.0));
         assert_eq!(theme.line_height, 1.5);
         assert_eq!(theme.caret_width, px(2.0));
-        assert_eq!(theme.line_padding, px(8.0));
+        assert_eq!(theme.line_padding, px(16.0));
         assert_ne!(theme.font_fallbacks, [] as [std::string::String; 0]);
     }
 
