@@ -9,7 +9,7 @@ use gpui::{
 
 const CHAR_WIDTH: f32 = 7.8;
 const LINE_HEIGHT: f32 = 19.5;
-const TEXT_LEFT: f32 = 8.0;
+const TEXT_LEFT: f32 = 16.0;
 
 fn open<'a>(cx: &'a mut TestAppContext, text: &str) -> (Entity<Editor>, &'a mut VisualTestContext) {
     cx.update(bind_editor_keys);
