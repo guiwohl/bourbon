@@ -1,10 +1,11 @@
 use gpui::{
     App, BorderStyle, Bounds, ContentMask, Element, ElementId, ElementInputHandler, Entity,
-    GlobalElementId, InspectorElementId, IntoElement, LayoutId, PaintQuad, Pixels, Style, Window,
-    fill, point, px, quad, relative, size,
+    GlobalElementId, InspectorElementId, IntoElement, LayoutId, PaintQuad, Path, PathBuilder,
+    Pixels, Style, Window, fill, point, px, quad, relative, size,
 };
 
 use crate::editor::Editor;
+use crate::folding::{Chevron, chevron_points};
 use crate::frame::{Frame, FrameLine};
 use crate::search::match_quad;
 use crate::theme::EditorTheme;
@@ -52,6 +53,40 @@ pub fn decoration_quads(line: &FrameLine, theme: &EditorTheme) -> Vec<PaintQuad>
         )
     });
     card.into_iter().chain(bar).chain(code_boxes).collect()
+}
+
+pub fn chevron_path(chevron: &Chevron) -> Option<Path<Pixels>> {
+    let [start, tip, end] = chevron_points(chevron);
+    let mut builder = PathBuilder::stroke(px(1.0));
+    builder.move_to(start);
+    builder.line_to(tip);
+    builder.line_to(end);
+    builder.build().ok()
+}
+
+fn paint_fold_markers(line: &FrameLine, theme: &EditorTheme, window: &mut Window, cx: &mut App) {
+    if let Some(path) = line.chevron.as_ref().and_then(chevron_path) {
+        window.paint_path(path, theme.gutter_text);
+    }
+    if let Some(placeholder) = line.fold_placeholder.as_ref() {
+        let radius = theme.font_size * theme.fold_placeholder_radius_em;
+        window.paint_quad(fill(placeholder.bounds, theme.fold_placeholder).corner_radii(radius));
+        let label_origin = point(
+            placeholder.bounds.center().x - placeholder.label.width / 2.0,
+            placeholder.bounds.top(),
+        );
+        placeholder
+            .label
+            .paint(
+                label_origin,
+                placeholder.bounds.size.height,
+                gpui::TextAlign::Left,
+                None,
+                window,
+                cx,
+            )
+            .ok();
+    }
 }
 
 pub struct EditorElement {
@@ -168,11 +203,12 @@ impl Element for EditorElement {
             }
             for line in &frame.lines {
                 line.layout.paint(line.origin, window, cx);
+                paint_fold_markers(line, &theme, window, cx);
                 if let Some((number, origin)) = line.number.as_ref() {
                     number
                         .paint(
                             *origin,
-                            line.layout.line_height(),
+                            line.layout.first_row_height(),
                             gpui::TextAlign::Left,
                             None,
                             window,
@@ -217,6 +253,16 @@ mod tests {
     }
 
     #[test]
+    fn a_chevron_becomes_a_stroked_path() {
+        let chevron = Chevron {
+            center: point(px(30.0), px(40.0)),
+            width: px(9.0),
+            folded: false,
+        };
+        assert!(chevron_path(&chevron).is_some());
+    }
+
+    #[test]
     fn there_is_no_border_without_a_gutter() {
         assert_eq!(gutter_border_bounds(bounds(), px(0.0)), None);
     }
@@ -230,9 +276,10 @@ mod tests {
                 &crate::layout::ShapeRequest {
                     text: "",
                     segments: &[],
-                    prefix_len: 0,
                     font_size: px(14.5),
                     line_height: px(16.82),
+                    tall_ranges: &[],
+                    tall_row_height: px(0.0),
                     wrap_width: None,
                     bold: false,
                     box_model: crate::layout::LineBox::default(),
@@ -261,6 +308,8 @@ mod tests {
             card: Some(card),
             quote_bar: Some(crate::line_decor::quote_bar(line_box, &theme)),
             code_boxes: vec![code_box],
+            chevron: None,
+            fold_placeholder: None,
         };
         let quads = decoration_quads(&line, &theme);
         assert_eq!(quads.len(), 3);
@@ -290,9 +339,10 @@ mod tests {
                 &crate::layout::ShapeRequest {
                     text: "",
                     segments: &[],
-                    prefix_len: 0,
                     font_size: px(13.0),
                     line_height: px(19.5),
+                    tall_ranges: &[],
+                    tall_row_height: px(0.0),
                     wrap_width: None,
                     bold: false,
                     box_model: crate::layout::LineBox::default(),
@@ -311,6 +361,8 @@ mod tests {
             card: None,
             quote_bar: None,
             code_boxes: Vec::new(),
+            chevron: None,
+            fold_placeholder: None,
         };
         let active = active_line_bounds(bounds(), &line);
         assert_eq!(active.origin, point(px(100.0), px(80.0)));

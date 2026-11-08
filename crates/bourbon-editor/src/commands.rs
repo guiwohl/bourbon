@@ -60,7 +60,11 @@ impl Editor {
         let row = layout.row_of_y(local.y);
         let line_count = self.state.text.line_count();
         let target = walk_rows(line, row, rows, line_count, |candidate| {
-            self.layout_for_line(candidate, window).row_count()
+            if self.is_line_hidden(candidate) {
+                0
+            } else {
+                self.layout_for_line(candidate, window).row_count()
+            }
         });
         let offset = if target == (line, row) {
             if rows.is_negative() {

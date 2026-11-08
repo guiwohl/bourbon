@@ -3,6 +3,9 @@ use std::rc::Rc;
 use gpui::{Bounds, Pixels, Point, ShapedLine, TextRun, Window, point, px, size};
 
 use crate::editor::{Editor, line_height_of};
+use crate::folding::{
+    Chevron, FOLD_PLACEHOLDER_LABEL, FoldPlaceholder, chevron_center_x, placeholder_bounds,
+};
 use crate::layout::{LineLayout, editor_font};
 use crate::line_decor::{CardShape, card_shape, quote_bar};
 use crate::search::MatchRect;
@@ -20,6 +23,8 @@ pub struct FrameLine {
     pub card: Option<CardShape>,
     pub quote_bar: Option<Bounds<Pixels>>,
     pub code_boxes: Vec<Bounds<Pixels>>,
+    pub chevron: Option<Chevron>,
+    pub fold_placeholder: Option<FoldPlaceholder>,
 }
 
 pub struct Frame {
@@ -57,20 +62,79 @@ impl Editor {
         }
     }
 
+    fn chevron(
+        &self,
+        line: usize,
+        bounds: Bounds<Pixels>,
+        gutter_width: Pixels,
+        line_top: Pixels,
+        layout: &LineLayout,
+    ) -> Option<Chevron> {
+        (self.line_numbers && self.is_fold_header(line)).then(|| {
+            let width = self.theme.font_size * self.theme.fold_chevron_em;
+            Chevron {
+                center: point(
+                    bounds.left() + chevron_center_x(gutter_width, width),
+                    line_top + layout.row_middle(0),
+                ),
+                width,
+                folded: self.is_folded(line),
+            }
+        })
+    }
+
+    fn fold_placeholder(
+        &self,
+        line: usize,
+        layout: &LineLayout,
+        origin: Point<Pixels>,
+        window: &mut Window,
+    ) -> Option<FoldPlaceholder> {
+        if !self.is_folded(line) {
+            return None;
+        }
+        let font_size = self.theme.font_size;
+        let label = window.text_system().shape_line(
+            FOLD_PLACEHOLDER_LABEL.into(),
+            font_size,
+            &[TextRun {
+                len: FOLD_PLACEHOLDER_LABEL.len(),
+                font: editor_font(&self.theme, false, false),
+                color: self.theme.background,
+                background_color: None,
+                underline: None,
+                strikethrough: None,
+            }],
+            None,
+        );
+        let text_len = self.state.text.line_end(line) - self.state.text.line_start(line);
+        let bounds = placeholder_bounds(
+            origin + layout.position_for_index(text_len),
+            origin.y + layout.row_middle(layout.row_count() - 1),
+            label.width,
+            font_size,
+        );
+        Some(FoldPlaceholder { bounds, label })
+    }
+
     fn inline_code_boxes(
         &self,
         line: std::ops::Range<usize>,
         layout: &LineLayout,
         origin: Point<Pixels>,
     ) -> Vec<Bounds<Pixels>> {
-        let outset = point(px(1.0), px(0.0));
+        let border = self.theme.inline_code_border;
+        let outset = point(border, -border);
         inline_code_ranges(&line_segments(line, &self.spans, None))
             .iter()
             .flat_map(|range| layout.selection_rects(range, false, px(0.0)))
             .map(|rect| {
                 Bounds::new(
                     origin + rect.origin - outset,
-                    size(rect.size.width + px(2.0), rect.size.height),
+                    size(
+                        rect.size.width + border * 2.0,
+                        rect.size.height - border * 2.0,
+                    ),
                 )
             })
             .collect()
@@ -88,6 +152,7 @@ impl Editor {
             self.wrap_width = Some(wrap_width);
         }
         self.viewport = Some(bounds);
+        self.gutter_width = gutter_width;
         self.text_left = text_left;
 
         let measuring_pending = self.measure_unmeasured_lines(window);
@@ -111,8 +176,12 @@ impl Editor {
             if self.heights.is_measured(line) {
                 continue;
             }
-            let height = self.shape_line(line, window).height();
-            self.heights.set_measured(line, f32::from(height));
+            let height = if self.is_line_hidden(line) {
+                0.0
+            } else {
+                f32::from(self.shape_line(line, window).height())
+            };
+            self.heights.set_measured(line, height);
             budget -= 1;
         }
         self.heights.refresh();
@@ -133,6 +202,10 @@ impl Editor {
             if y >= bottom {
                 break;
             }
+            if self.is_line_hidden(line) {
+                self.heights.set_measured(line, 0.0);
+                continue;
+            }
             let layout = self.layout_for_line(line, window);
             self.heights.set_measured(line, f32::from(layout.height()));
             y += f32::from(layout.height());
@@ -148,7 +221,7 @@ impl Editor {
         let layout = self.layout_for_line(line, window);
         let position = layout.position_for_index(head - self.state.text.line_start(line));
         let top = px(self.heights.top(line)) + position.y;
-        let bottom = top + layout.line_height();
+        let bottom = top + layout.row_height_at(head - self.state.text.line_start(line));
         self.scroll_top = self
             .scroll_top
             .min(top)
@@ -188,7 +261,10 @@ impl Editor {
                 let position = layout.position_for_index(main.head - start);
                 caret = Some(Bounds::new(
                     origin + position,
-                    size(self.theme.caret_width, layout.line_height()),
+                    size(
+                        self.theme.caret_width,
+                        layout.row_height_at(main.head - start),
+                    ),
                 ));
             }
             let number = self.line_numbers.then(|| {
@@ -222,6 +298,8 @@ impl Editor {
                     .map(|edges| card_shape(line_box, edges, &self.theme)),
                 quote_bar: decor.quote.then(|| quote_bar(line_box, &self.theme)),
                 code_boxes: self.inline_code_boxes(start..end, layout, origin),
+                chevron: self.chevron(*line, bounds, gutter_width, line_top, layout),
+                fold_placeholder: self.fold_placeholder(*line, layout, origin, window),
             });
         }
         Frame {
@@ -760,18 +838,28 @@ mod tests {
     #[gpui::test]
     fn inline_code_gets_a_box_around_code_and_backticks(cx: &mut TestAppContext) {
         let (editor, cx) = open(cx, "a `bc` d\n```\nx\n```");
-        let boxes = editor.update_in(cx, |editor, window, _| {
+        let (boxes, heights) = editor.update_in(cx, |editor, window, _| {
             let frame = editor.build_frame(bounds(400.0, 200.0), window);
-            frame
-                .lines
-                .iter()
-                .map(|line| line.code_boxes.clone())
-                .collect::<Vec<_>>()
+            (
+                frame
+                    .lines
+                    .iter()
+                    .map(|line| line.code_boxes.clone())
+                    .collect::<Vec<_>>(),
+                frame
+                    .lines
+                    .iter()
+                    .map(|line| line.height)
+                    .collect::<Vec<_>>(),
+            )
         });
         assert_eq!(boxes[0].len(), 1);
         assert!(near(boxes[0][0].origin.x, 108.0 + 2.0 * CHAR - 1.0));
+        assert!(near(boxes[0][0].origin.y, 51.0));
         assert!(near(boxes[0][0].size.width, 4.0 * CHAR + 2.0));
-        assert!(near(boxes[0][0].size.height, LINE));
+        assert!(near(boxes[0][0].size.height, 14.5 * 1.4));
+        assert!(near(heights[0], 14.5 * 1.4 + 2.0));
+        assert!(near(heights[2], LINE));
         assert!(boxes[1..].iter().all(Vec::is_empty));
     }
 

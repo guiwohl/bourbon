@@ -3,6 +3,7 @@ mod decorations;
 mod doc;
 #[cfg(test)]
 mod fixture;
+mod folds;
 mod highlight;
 mod lines;
 mod parse;
@@ -15,6 +16,7 @@ mod url;
 
 pub use decorations::{DecorationKind, LineDecoration, line_decorations};
 pub use doc::{AlertKind, Alignment, Block, BlockKind, Inline, ListItem, PreviewDoc, SourceLines};
+pub use folds::fold_ranges;
 pub use highlight::highlight;
 pub use scroll::{Anchor, line_for_preview_offset, preview_offset_for_line};
 pub use sync_guard::{Pane, SyncGuard, SyncState};

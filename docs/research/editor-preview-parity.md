@@ -16,7 +16,9 @@ Grey-scale row and column ink profiles of the crop (count of pixels darker than 
 | Gutter | border at x = 46 (slate-200), numbers right edge at about x = 20, slate-300 | min width 4.5 em of the 0.7 em number size (47 px), number padding 2.6 em |
 | Text inset | x = 55, 8 px after the gutter | `line_padding` 8 px |
 | Code card | x 50 to 415 (3 px inset), 1 px slate-300 at 50% border, rounded ends, text at +2 px, first and last line 4 px taller | `block_padding` 10, `card_inset` 3, `card_padding_y` 4, radius 0.4 em, `code_background` slate-200 at 50%, `code_border` slate-300 at 50% |
-| Inline code | box with the card colours around code and backticks | same colours, 1 px outset, row height |
+| Inline code | box with the card colours around code and backticks; rows holding it 23 px, box about 20 px | same colours, 1 px outset; row `1.4 em + 2 px` (22.3 px), box 1.4 em (20.3 px), centred |
+| Wrapped rows | list and quote continuation rows start at x = 55 (column 0) | no hanging indent, same x |
+| Fold chevrons | x 30 to 39, 4 to 5 px tall, centred on the first row, numbers colour | stroked path 0.62 em (9 px) wide, centre 1.25 widths left of the border (x 34.75) |
 | Ink | line 17 holds 139k grey levels of ink over a (235) background; Linux rendering of gray-800 gave 187k | foreground slate-600 (71,85,105): 158k. The darkest reference pixel is still gray-800, the thinner macOS stems make it read lighter |
 | Card tint | card fill 5 levels and border 17 levels darker than the page | `code_background` slate-200 at 30%, `code_border` slate-300 at 40% |
 | Colours | `##` and fences blue-600 (36,99,235), heading pink-600 (219,41,121), list marks indigo-500 (100,103,242), text gray-800 (31,41,55) | unchanged tokens |
@@ -36,13 +38,11 @@ Grey-scale row and column ink profiles of the crop (count of pixels darker than 
 
 ## Known differences
 
-- No fold chevrons in the gutter (folding is not implemented).
-- List and quote continuation rows hang under the text; the reference starts them at column 0.
-- Rows holding inline code are not taller (reference 23 px, `calc(140% + 2px)`).
 - The reference window is translucent over a photo, so its background is (240,237,236); Bourbon paints white.
-- macOS font rendering is lighter than Linux; the reference monospace is SF Mono, Bourbon bundles JetBrains Mono.
-- Preview inline code keeps the body font; tables use equal-width columns.
+- macOS font rendering is lighter than Linux; the reference monospace is SF Mono, Bourbon bundles JetBrains Mono (its backticks sit higher, so a closing fence touches the descenders of a wrapped row above).
+- The fold placeholder was not visible in the reference; its look comes from the research (inverted slate-400 pill).
+- Preview inline code keeps the body size (font-size 85% cannot be set per run) and its ligature features; table cells repeat their borders (2 px between cells).
 
 ## Repeating the check
 
-`BOURBON_DEMO_WINDOW_SIZE=838x685 cargo run -p bourbon-editor --example editor_demo` opens the demo on the reference note and lays it out in an 838x685 canvas at the top-left of the window (a tiling compositor may make the window bigger; crop the top-left 838x685). Compare with the reference crop from y = 113.
+`BOURBON_DEMO_WINDOW_SIZE=838x685 cargo run -p bourbon-editor --example editor_demo` opens the demo on the reference note and lays it out in an 838x685 canvas at the top-left of the window (a tiling compositor may make the window bigger; crop the top-left 838x685). Compare with the reference crop from y = 113. `BOURBON_DEMO_FOLD_LINE=N` folds line N (1-based) at start, for the folded shot.

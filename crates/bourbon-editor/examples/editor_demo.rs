@@ -70,6 +70,9 @@ impl Demo {
         let editor = cx.new(|cx| {
             let mut editor = Editor::new(NOTE, EditorTheme::light(), cx);
             editor.set_line_numbers(true, cx);
+            if let Some(line) = requested_fold_line() {
+                editor.toggle_fold(line, cx);
+            }
             editor
         });
         let preview = cx.new(|cx| PreviewView::new(NOTE, PreviewTheme::light(), cx));
@@ -164,6 +167,17 @@ fn requested_window_size() -> Option<(f32, f32)> {
     std::env::var(WINDOW_SIZE_VARIABLE)
         .ok()
         .and_then(|value| parse_window_size(&value))
+}
+
+const FOLD_LINE_VARIABLE: &str = "BOURBON_DEMO_FOLD_LINE";
+
+fn requested_fold_line() -> Option<usize> {
+    std::env::var(FOLD_LINE_VARIABLE)
+        .ok()?
+        .trim()
+        .parse::<usize>()
+        .ok()?
+        .checked_sub(1)
 }
 
 fn parse_window_size(value: &str) -> Option<(f32, f32)> {

@@ -860,3 +860,34 @@ fn replacing_a_range_puts_the_caret_after_the_text_and_reports_it(cx: &mut TestA
         [EditorEvent::Changed("see [[Note]]".to_owned())]
     );
 }
+
+const FOLDABLE: &str = "## A\none\ntwo\n## B\nthree";
+
+#[gpui::test]
+fn control_alt_brackets_fold_and_unfold_the_section_at_the_caret(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, FOLDABLE);
+    cx.simulate_keystrokes("ctrl-alt-[");
+    cx.simulate_keystrokes("down");
+    assert_eq!(selection(&editor, cx), 13..13);
+    cx.simulate_keystrokes("up ctrl-alt-]");
+    cx.simulate_keystrokes("down");
+    assert_eq!(selection(&editor, cx), 5..5);
+    assert_eq!(text(&editor, cx), FOLDABLE);
+}
+
+#[gpui::test]
+fn clicking_a_chevron_toggles_the_fold_without_moving_the_caret(cx: &mut TestAppContext) {
+    let (editor, cx) = open(cx, FOLDABLE);
+    editor.update(cx, |editor, cx| editor.set_line_numbers(true, cx));
+    set_selection(&editor, cx, 16, 16);
+    cx.run_until_parked();
+    let chevron = point(px(35.0), px(10.0));
+    cx.simulate_click(chevron, Modifiers::none());
+    assert_eq!(selection(&editor, cx), 16..16);
+    set_selection(&editor, cx, 0, 0);
+    cx.simulate_keystrokes("down");
+    assert_eq!(selection(&editor, cx), 13..13);
+    cx.simulate_click(chevron, Modifiers::none());
+    cx.simulate_keystrokes("up up");
+    assert_eq!(selection(&editor, cx), 5..5);
+}

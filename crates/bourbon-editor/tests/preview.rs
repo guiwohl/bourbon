@@ -216,3 +216,16 @@ fn the_document_is_the_parsed_source(cx: &mut TestAppContext) {
     let blocks = preview.read_with(cx, |preview, _| preview.doc().blocks.len());
     assert_eq!(blocks, 1);
 }
+
+#[gpui::test]
+fn table_columns_take_the_width_of_their_content(cx: &mut TestAppContext) {
+    let (_preview, cx) = open(cx, "| a | a much longer header |\n|---|---|\n| b | c |\n");
+    let short = cx.debug_bounds("inline-text-0").expect("short header");
+    let long = cx.debug_bounds("inline-text-1").expect("long header");
+    let below_short = cx.debug_bounds("inline-text-2").expect("short cell");
+    let below_long = cx.debug_bounds("inline-text-3").expect("long cell");
+    assert!(long.size.width > short.size.width * 4.0);
+    assert!(long.left() - short.left() < long.size.width);
+    assert_eq!(below_short.left(), short.left());
+    assert_eq!(below_long.left(), long.left());
+}

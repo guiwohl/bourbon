@@ -47,6 +47,8 @@ actions!(
         ToggleStrikethrough,
         ToggleCode,
         ToggleTask,
+        Fold,
+        Unfold,
         Cancel,
     ]
 );
@@ -97,5 +99,7 @@ pub fn bind_editor_keys(cx: &mut App) {
         KeyBinding::new("ctrl-shift-x", ToggleStrikethrough, context),
         KeyBinding::new("ctrl-`", ToggleCode, context),
         KeyBinding::new("ctrl-enter", ToggleTask, context),
+        KeyBinding::new("ctrl-alt-[", Fold, context),
+        KeyBinding::new("ctrl-alt-]", Unfold, context),
     ]);
 }

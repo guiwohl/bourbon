@@ -3,6 +3,7 @@ mod blink;
 mod commands;
 mod editor;
 mod element;
+mod folding;
 mod fonts;
 mod frame;
 mod inline;

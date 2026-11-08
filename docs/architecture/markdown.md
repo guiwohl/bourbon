@@ -15,6 +15,7 @@ Parser options: tables, task lists, strikethrough, footnotes, math, GFM alerts, 
 | `Inline` | Text, Emphasis, Strong, Strikethrough, Code, Link, NoteLink, Image, SoftBreak, HardBreak, FootnoteRef, InlineMath |
 | `task_lines(source) -> Vec<(line, checked)>` | Source line of every task marker, for preview checkboxes |
 | `line_decorations(source) -> Vec<LineDecoration>` | `{ lines: RangeInclusive<usize>, kind }` with `DecorationKind::Card` (code block, table) or `QuoteBar` (block quote; nested quotes are not repeated), 0-based lines, for the editor block decorations |
+| `fold_ranges(source) -> Vec<RangeInclusive<usize>>` | Foldable line ranges, 0-based, header line first, sorted by start (outer first): a heading until the line before the next heading of the same or higher level, trailing blank lines excluded; a fenced code block from fence to fence. Single-line ranges are dropped |
 | `Anchor`, `preview_offset_for_line`, `line_for_preview_offset` | Scroll-sync math (research 4.6 / 6.6) |
 | `SyncGuard`, `Pane`, `SyncState` | Echo-suppression state machine |
 

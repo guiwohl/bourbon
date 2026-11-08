@@ -43,6 +43,10 @@ impl Editor {
         cx: &mut Context<Self>,
     ) {
         window.focus(&self.focus_handle, cx);
+        if let Some(line) = self.chevron_line_at(event.position) {
+            self.toggle_fold(line, cx);
+            return;
+        }
         let Some(hit) = self.hit_test(event.position, window) else {
             return;
         };

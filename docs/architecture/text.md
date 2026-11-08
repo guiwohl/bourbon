@@ -15,6 +15,7 @@ GPUI-free text core of the Markdown editor (Phase 0 of [the UI rebuild](../decis
 | `EditorState { text, selection }` | `apply(&Transaction)` |
 | `Transaction` | `changes`, `selection_after` (in **new** coordinates), `kind`, `isolate` |
 | `TransactionKind` | `Input`, `Delete`, `Paste`, `Command`, `Undo`, `Redo` |
+| `Folds` | Editor fold state (view only). Hidden byte ranges `start..end` where `start` stays visible and `(start, end]` is hidden: `fold`, `unfold(start)`, `unfold_hiding(offset)` (removes and returns every fold hiding it), `is_folded_at`, `hides(offset)`, `clear`, `map(&ChangeSet)` (shifts folds; drops one when a change touches `(start, end]`, i.e. `change.end > start && change.start <= end`), `visible_position(offset, forward, len)` (leaves every enclosing fold: after it when moving forward, else its start; bounded by the fold count) |
 | `History` | `record(&before, &tx, now)`, `undo(&state)`, `redo(&state)` return a `Transaction` for the caller to apply |
 
 ## History

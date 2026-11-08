@@ -144,7 +144,10 @@ impl EntityInputHandler for Editor {
             element_bounds.left() + self.text_left + start.x,
             element_bounds.top() + px(self.heights.top(line)) - self.scroll_top + start.y,
         );
-        Some(Bounds::new(origin, size(width, layout.line_height())))
+        Some(Bounds::new(
+            origin,
+            size(width, layout.row_height_at(range.start - line_start)),
+        ))
     }
 
     fn character_index_for_point(

@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use std::ops::Range;
+use std::ops::{Range, RangeInclusive};
 use std::rc::Rc;
 use std::time::Instant;
 
-use bourbon_markdown::{HighlightSpan, LineDecoration, highlight, line_decorations};
+use bourbon_markdown::{HighlightSpan, LineDecoration, fold_ranges, highlight, line_decorations};
 use bourbon_text::{
-    EditorState, History, Selection, SelectionRange, Text, Transaction, TransactionKind,
+    EditorState, Folds, History, Selection, SelectionRange, Text, Transaction, TransactionKind,
 };
 use gpui::{
     Bounds, Context, EventEmitter, FocusHandle, Focusable, IntoElement, Pixels, Render, Window, px,
@@ -15,7 +15,7 @@ use crate::blink::schedule_blink;
 use crate::layout::{LineLayout, ShapeRequest};
 use crate::line_decor::{LineDecor, decor_of, line_box};
 use crate::line_heights::LineHeights;
-use crate::segments::{hanging_prefix_len, heading_level, line_segments};
+use crate::segments::{heading_level, inline_code_ranges, line_segments};
 use crate::theme::EditorTheme;
 
 const LAYOUT_CACHE_LIMIT: usize = 512;
@@ -33,6 +33,8 @@ pub struct Editor {
     pub(crate) history: History,
     pub(crate) spans: Vec<HighlightSpan>,
     decorations: Vec<LineDecoration>,
+    pub(crate) fold_ranges: Vec<RangeInclusive<usize>>,
+    pub(crate) folds: Folds,
     pub(crate) theme: Rc<EditorTheme>,
     pub(crate) heights: LineHeights,
     pub(crate) scroll_top: Pixels,
@@ -46,6 +48,7 @@ pub struct Editor {
     started: Instant,
     layouts: HashMap<usize, Rc<LineLayout>>,
     pub(crate) viewport: Option<Bounds<Pixels>>,
+    pub(crate) gutter_width: Pixels,
     pub(crate) text_left: Pixels,
     pub(crate) wrap_width: Option<Pixels>,
     pub(crate) dragging: bool,
@@ -69,6 +72,8 @@ impl Editor {
         let mut editor = Self {
             spans: highlight(text),
             decorations: line_decorations(text),
+            fold_ranges: fold_ranges(text),
+            folds: Folds::default(),
             heights: LineHeights::new(state.text.line_count(), f32::from(estimate)),
             state,
             history: History::new(),
@@ -84,6 +89,7 @@ impl Editor {
             started: Instant::now(),
             layouts: HashMap::new(),
             viewport: None,
+            gutter_width: px(0.0),
             text_left: px(0.0),
             wrap_width: None,
             dragging: false,
@@ -106,6 +112,7 @@ impl Editor {
     pub fn set_text(&mut self, text: &str, cx: &mut Context<Self>) {
         self.state = EditorState::new(Text::new(text), Selection::cursor(0));
         self.history = History::new();
+        self.folds.clear();
         self.marked = None;
         self.scroll_top = px(0.0);
         self.refresh_after_text_change(cx);
@@ -161,23 +168,28 @@ impl Editor {
 
     pub fn set_selection(&mut self, anchor: usize, head: usize, cx: &mut Context<Self>) {
         let length = self.state.text.len();
-        self.select(
-            SelectionRange::new(anchor.min(length), head.min(length)),
-            cx,
-        );
+        let (anchor, head) = (anchor.min(length), head.min(length));
+        self.reveal(anchor);
+        self.reveal(head);
+        self.select(SelectionRange::new(anchor, head), cx);
     }
 
     pub(crate) fn select(&mut self, range: SelectionRange, cx: &mut Context<Self>) {
-        self.state.selection = Selection::single(range);
+        self.set_visible_selection(range);
         self.marked = None;
         self.goal_x = None;
         self.caret_moved(cx);
     }
 
     pub(crate) fn select_keeping_goal(&mut self, range: SelectionRange, cx: &mut Context<Self>) {
-        self.state.selection = Selection::single(range);
+        self.set_visible_selection(range);
         self.marked = None;
         self.caret_moved(cx);
+    }
+
+    fn set_visible_selection(&mut self, range: SelectionRange) {
+        let previous_head = self.state.selection.main().head;
+        self.state.selection = Selection::single(self.visible_selection(range, previous_head));
     }
 
     fn caret_moved(&mut self, cx: &mut Context<Self>) {
@@ -211,6 +223,10 @@ impl Editor {
         }
         let before = self.state.clone();
         self.state = before.apply(transaction);
+        self.folds = self.folds.map(&transaction.changes);
+        if self.folds.hides(self.state.selection.main().head) {
+            self.set_visible_selection(self.state.selection.main());
+        }
         self.marked = None;
         self.goal_x = None;
         if transaction.changes.is_empty() {
@@ -242,6 +258,7 @@ impl Editor {
         let source = self.state.text.to_string();
         self.spans = highlight(&source);
         self.decorations = line_decorations(&source);
+        self.fold_ranges = fold_ranges(&source);
         if self.heights.line_count() != self.state.text.line_count() {
             let estimate = line_height_of(&self.theme, self.theme.font_size);
             self.heights = LineHeights::new(self.state.text.line_count(), f32::from(estimate));
@@ -297,9 +314,10 @@ impl Editor {
             &ShapeRequest {
                 text: &content,
                 segments: &segments,
-                prefix_len: hanging_prefix_len(&content),
                 font_size,
                 line_height: line_height_of(&self.theme, font_size),
+                tall_ranges: &inline_code_ranges(&segments),
+                tall_row_height: inline_code_row_height(&self.theme, font_size),
                 wrap_width: self.wrap_width,
                 bold: level.is_some(),
                 box_model,
@@ -345,6 +363,10 @@ impl Editor {
 
 pub(crate) fn line_height_of(theme: &EditorTheme, font_size: Pixels) -> Pixels {
     font_size * theme.line_height
+}
+
+pub(crate) fn inline_code_row_height(theme: &EditorTheme, font_size: Pixels) -> Pixels {
+    font_size * theme.inline_code_line_height + theme.inline_code_border * 2.0
 }
 
 impl Render for Editor {
